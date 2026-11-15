@@ -3,7 +3,7 @@
 > **Working name:** PickTwo
 > **Tagline:** Help me choose, and tell me whether I chose well.
 > **Document owner:** Shimon (SoulKeep)
-> **Status:** Ready for build
+> **Status:** v1 implemented in this repo (see `README.md`). Implementation notes that differ from the original draft are marked **[Impl]**.
 > **Build target:** Standalone web app (mobile-first responsive) in its own GitHub repo, deployed on Vercel.
 > **Audience for this doc:** Claude Code (or any engineer) building the app end-to-end. Every section is written to be directly implementable. Where a decision was ambiguous, a default is chosen and marked **[Default]** so the build never blocks.
 
@@ -446,7 +446,9 @@ For each resolved battle (outcome reported, chosenOption ∈ {A,B}) a voter's vo
 
 ---
 
-## 10. Data model (Prisma, PostgreSQL)
+## 10. Data model (PostgreSQL)
+
+> **[Impl]** The app uses **Drizzle ORM** instead of Prisma (pure TypeScript, no engine binaries, ideal for Vercel + Neon). The source of truth is `src/server/db/schema.ts`; SQL migrations live in `drizzle/`. The Prisma-style schema below is kept as the logical model — field names map 1:1 (snake_case in SQL).
 
 ```prisma
 generator client { provider = "prisma-client-js" }
@@ -784,6 +786,8 @@ Email via **Resend** with React Email templates. Report-back emails contain sign
 }
 ```
 
+> **[Impl]** `vercel.json` ships a single daily cron (`/api/cron/daily`) that runs close-battles, reminders, decay and rollups, so it deploys on the Hobby plan. On Pro you can add the more frequent per-job crons above.
+>
 > Note: Vercel Hobby plans limit cron frequency to once per day. If deploying on Hobby, set all crons to daily and additionally run a **lazy close**: any read of a battle past its deadline closes it on the fly. Implement lazy close regardless so correctness never depends on cron timing.
 
 Cron routes verify `Authorization: Bearer ${CRON_SECRET}`.
@@ -852,17 +856,17 @@ Events: `landing_viewed`, `signup_started`, `signup_completed`, `onboarding_comp
 | Layer | Choice | Notes |
 |---|---|---|
 | Framework | **Next.js 15 (App Router) + React 19 + TypeScript (strict)** | Server Components, Server Actions, Route Handlers |
-| Styling | Tailwind CSS v4 + shadcn/ui + lucide-react + framer-motion | Dark mode via `class` |
+| Styling | Tailwind CSS v4 + lucide-react + CSS animations **[Impl: hand-rolled components instead of shadcn/framer-motion]** | Follows system dark mode |
 | Database | **PostgreSQL on Neon** (Vercel Marketplace integration) | Pooled + unpooled URLs |
-| ORM | Prisma 6 | Migrations committed |
-| Auth | **Auth.js v5 (next-auth@5)** with Prisma adapter; Email (Resend) + Google providers | Session strategy: database |
+| ORM | **Drizzle ORM** + postgres.js **[Impl]** | SQL migrations committed in `drizzle/`, applied at build |
+| Auth | **Auth.js v5 (next-auth@5)** with Drizzle adapter; Email (Resend) + Google + optional Dev login | Session strategy: JWT **[Impl]** |
 | File storage | **Vercel Blob** (client uploads) | |
 | Email | Resend + React Email | |
 | Rate limit / cache | Upstash Redis (Vercel Marketplace) — optional with in-memory fallback | |
 | Push | `web-push` (VAPID) | P1 |
 | OG images | `next/og` (ImageResponse) | |
 | Validation | zod | Shared schemas in `lib/validators` |
-| Data fetching (client) | TanStack Query for feed + live results polling | |
+| Data fetching (client) | `fetch` helpers + 5 s polling **[Impl]** | |
 | Testing | Vitest (unit), Playwright (e2e) | |
 | Lint/format | ESLint (next config) + Prettier | |
 | Hosting | **Vercel** | Preview deployments per PR |

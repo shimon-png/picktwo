@@ -10,3 +10,4 @@ playwright-report/
 test-results/
 public/uploads/
 .DS_Store
+*.tsbuildinfo

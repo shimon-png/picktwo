@@ -1,0 +1,431 @@
+import { and, desc, eq, inArray, isNotNull, lt, sql, notInArray, or } from "drizzle-orm";
+import { db, type DbOrTx } from "../db";
+import {
+  battles,
+  options,
+  outcomes,
+  users,
+  votes,
+  reasonHelpful,
+  follows,
+  type Battle,
+  type User,
+} from "../db/schema";
+import { AppError } from "../errors";
+import { createSlug } from "@/lib/id";
+import { categoryById, kidAgeLabel } from "@/lib/constants";
+import type { CreateBattleInput } from "@/lib/validators";
+import { assertCleanText, moderateImage } from "../moderation";
+import { awardPoints, countOpenLoops } from "./points";
+import { getEconomy } from "./config";
+import { notify } from "./notifications";
+import { track } from "../analytics";
+import { pct } from "@/lib/utils";
+
+// ---------------- Create ----------------
+export async function createBattle(user: User, input: CreateBattleInput) {
+  if (!user.isAdultConfirmed || !user.handle) throw new AppError("FORBIDDEN", "Finish setting up your profile first");
+  assertCleanText(input.title, input.context, input.options[0].label, input.options[1].label);
+  for (const o of input.options) {
+    if (o.imageUrl && o.imageUrl.startsWith("https://")) {
+      const m = await moderateImage(o.imageUrl);
+      if (!m.allowed) throw new AppError("VALIDATION", "One of your images can't be posted. Please choose another.");
+    }
+  }
+  const economy = await getEconomy();
+  const deadline = new Date(Date.now() + input.deadlineHours * 3600_000);
+
+  const result = await db.transaction(async (tx) => {
+    let slug = createSlug();
+    for (let i = 0; i < 3; i++) {
+      const [exists] = await tx.select({ id: battles.id }).from(battles).where(eq(battles.slug, slug));
+      if (!exists) break;
+      slug = createSlug();
+    }
+    const [b] = await tx
+      .insert(battles)
+      .values({
+        slug,
+        authorId: user.id,
+        title: input.title,
+        context: input.context || null,
+        categoryId: input.categoryId,
+        tags: input.tags,
+        visibility: input.visibility,
+        deadline,
+        dataConsent: input.dataConsent && user.dataConsent,
+      })
+      .returning();
+    await tx.insert(options).values(
+      input.options.map((o, i) => ({
+        battleId: b.id,
+        side: (i === 0 ? "A" : "B") as "A" | "B",
+        label: o.label,
+        imageUrl: o.imageUrl || null,
+        url: o.url || null,
+        urlTitle: o.urlTitle || null,
+        urlImage: o.urlImage || null,
+        priceCents: o.priceCents ?? null,
+        currency: o.currency ?? null,
+      })),
+    );
+    const [{ n }] = await tx
+      .select({ n: sql<number>`count(*)::int` })
+      .from(battles)
+      .where(eq(battles.authorId, user.id));
+    let bonus = 0;
+    if (n === 1) bonus = await awardPoints(tx, user.id, economy.firstBattleBonus, "FIRST_BATTLE", { battleId: b.id, idemKey: `first:${user.id}` });
+    await tx.update(users).set({ lastActiveAt: new Date() }).where(eq(users.id, user.id));
+    return { battle: b, bonus };
+  });
+  track("battle_published", { category: input.categoryId, visibility: input.visibility, hours: input.deadlineHours }, { userId: user.id });
+  const openLoops = await countOpenLoops(user.id, economy);
+  return { slug: result.battle.slug, bonus: result.bonus, openLoops };
+}
+
+// ---------------- Close (lazy + cron) ----------------
+/** Closes a battle if it is open and past deadline. Idempotent. Returns true if this call closed it. */
+export async function closeIfDue(tx: DbOrTx, battleId: string, now = new Date()): Promise<boolean> {
+  const closed = await tx
+    .update(battles)
+    .set({ status: "CLOSED", closedAt: now, updatedAt: now })
+    .where(and(eq(battles.id, battleId), eq(battles.status, "OPEN"), lt(battles.deadline, now)))
+    .returning({ id: battles.id, authorId: battles.authorId, slug: battles.slug, title: battles.title, votesA: battles.votesA, votesB: battles.votesB });
+  if (closed.length === 0) return false;
+  const b = closed[0];
+  await notify(tx, b.authorId, "BATTLE_CLOSED", { slug: b.slug, title: b.title, votes: b.votesA + b.votesB });
+  return true;
+}
+
+export async function closeDueBattles(now = new Date()) {
+  const due = await db
+    .select({ id: battles.id })
+    .from(battles)
+    .where(and(eq(battles.status, "OPEN"), lt(battles.deadline, now)))
+    .limit(500);
+  let n = 0;
+  for (const b of due) if (await closeIfDue(db, b.id, now)) n++;
+  // Expire finished boosts
+  await db
+    .update(battles)
+    .set({ boostUntil: null, boostVotesLeft: 0 })
+    .where(and(isNotNull(battles.boostUntil), or(lt(battles.boostUntil, now), sql`${battles.boostVotesLeft} <= 0`)));
+  return n;
+}
+
+// ---------------- Read ----------------
+export async function getBattleRow(slug: string) {
+  const [b] = await db.select().from(battles).where(eq(battles.slug, slug));
+  if (!b || b.status === "DELETED") return null;
+  if (b.status === "OPEN" && b.deadline < new Date()) {
+    await closeIfDue(db, b.id);
+    b.status = "CLOSED";
+    b.closedAt = new Date();
+  }
+  return b;
+}
+
+export async function areFriends(a: string, b: string) {
+  if (a === b) return true;
+  const rows = await db
+    .select()
+    .from(follows)
+    .where(
+      or(
+        and(eq(follows.followerId, a), eq(follows.followingId, b)),
+        and(eq(follows.followerId, b), eq(follows.followingId, a)),
+      ),
+    );
+  return rows.length === 2;
+}
+
+export async function friendIds(userId: string): Promise<Set<string>> {
+  const rows = await db.execute<{ id: string }>(sql`
+    SELECT f1.following_id AS id FROM follow f1
+    JOIN follow f2 ON f2.follower_id = f1.following_id AND f2.following_id = f1.follower_id
+    WHERE f1.follower_id = ${userId}`);
+  return new Set(rows.map((r) => r.id));
+}
+
+export async function assertCanView(b: Battle, viewer: User | null) {
+  if (b.status === "HIDDEN" && viewer?.id !== b.authorId) throw new AppError("NOT_FOUND", "This battle isn't available");
+  if (b.visibility === "FRIENDS") {
+    if (!viewer) throw new AppError("UNAUTHORIZED", "Sign in to see this battle — it's shared with friends only");
+    if (!(await areFriends(viewer.id, b.authorId))) throw new AppError("FORBIDDEN", "This battle is shared with friends only");
+  }
+}
+
+export type ReasonView = {
+  voteId: string;
+  side: "A" | "B";
+  text: string;
+  by: string;
+  byHandle: string | null;
+  helpful: number;
+  ownerHelpful: boolean;
+  markedByMe: boolean;
+  mine: boolean;
+};
+
+export type BattleView = Awaited<ReturnType<typeof getBattleView>>;
+
+export async function getBattleView(slug: string, viewer: { user: User | null; deviceId: string | null }) {
+  const b = await getBattleRow(slug);
+  if (!b) return null;
+  await assertCanView(b, viewer.user);
+
+  const [opts, [author], [outcome]] = await Promise.all([
+    db.select().from(options).where(eq(options.battleId, b.id)),
+    db.select({ id: users.id, name: users.name, handle: users.handle, image: users.image }).from(users).where(eq(users.id, b.authorId)),
+    db.select().from(outcomes).where(eq(outcomes.battleId, b.id)),
+  ]);
+  const A = opts.find((o) => o.side === "A")!;
+  const B = opts.find((o) => o.side === "B")!;
+
+  let myVote: { id: string; side: "A" | "B"; reason: string | null } | null = null;
+  if (viewer.user || viewer.deviceId) {
+    const cond = viewer.user
+      ? or(eq(votes.userId, viewer.user.id), viewer.deviceId ? eq(votes.deviceId, viewer.deviceId) : sql`false`)
+      : eq(votes.deviceId, viewer.deviceId!);
+    const [v] = await db
+      .select({ id: votes.id, side: votes.side, reason: votes.reason })
+      .from(votes)
+      .where(and(eq(votes.battleId, b.id), cond));
+    if (v) myVote = v;
+  }
+
+  const isOwner = viewer.user?.id === b.authorId;
+  const isOpen = b.status === "OPEN";
+  const showResults = isOwner || !!myVote || !isOpen;
+  const results = showResults ? pct(b.votesA, b.votesB) : null;
+
+  let reasons: { A: ReasonView[]; B: ReasonView[] } = { A: [], B: [] };
+  if (showResults) reasons = await getReasons(b, viewer.user);
+
+  const economy = await getEconomy();
+  const totalVotes = b.votesA + b.votesB;
+  const now = new Date();
+  return {
+    id: b.id,
+    slug: b.slug,
+    title: b.title,
+    context: b.context,
+    category: categoryById(b.categoryId),
+    tags: b.tags,
+    visibility: b.visibility,
+    status: b.status,
+    isOpen,
+    deadline: b.deadline.toISOString(),
+    createdAt: b.createdAt.toISOString(),
+    author,
+    options: { A, B },
+    results,
+    totalVotes: showResults ? totalVotes : null,
+    myVote,
+    isOwner,
+    reasons,
+    outcome: outcome
+      ? { chosen: outcome.chosen, thumb: outcome.thumb, note: outcome.note, photoUrl: outcome.photoUrl, reportedAt: outcome.reportedAt.toISOString() }
+      : null,
+    boostActive: !!b.boostUntil && b.boostUntil > now && b.boostVotesLeft > 0,
+    canEdit: isOwner && totalVotes === 0 && isOpen,
+    canReportOutcome: isOwner && (!isOpen || totalVotes >= economy.minVotesForLoop),
+    loopEligible: totalVotes >= economy.minVotesForLoop,
+    minVotesForLoop: economy.minVotesForLoop,
+    boostCost: economy.boostCost,
+    viewerPP: viewer.user?.ppBalance ?? null,
+  };
+}
+
+async function getReasons(b: Battle, viewer: User | null) {
+  const rows = await db
+    .select({
+      voteId: votes.id,
+      side: votes.side,
+      text: votes.reason,
+      userId: votes.userId,
+      name: users.name,
+      handle: users.handle,
+      kidAges: users.kidAges,
+      helpful: sql<number>`(SELECT count(*)::int FROM reason_helpful rh WHERE rh.vote_id = ${votes.id})`,
+      ownerHelpful: sql<boolean>`EXISTS(SELECT 1 FROM reason_helpful rh WHERE rh.vote_id = ${votes.id} AND rh.is_owner)`,
+    })
+    .from(votes)
+    .leftJoin(users, eq(users.id, votes.userId))
+    .where(and(eq(votes.battleId, b.id), isNotNull(votes.reason), eq(votes.reasonHidden, false)))
+    .limit(200);
+
+  let mine = new Set<string>();
+  let friends = new Set<string>();
+  if (viewer) {
+    const ids = rows.map((r) => r.voteId);
+    if (ids.length) {
+      const m = await db
+        .select({ voteId: reasonHelpful.voteId })
+        .from(reasonHelpful)
+        .where(and(eq(reasonHelpful.userId, viewer.id), inArray(reasonHelpful.voteId, ids)));
+      mine = new Set(m.map((x) => x.voteId));
+    }
+    friends = await friendIds(viewer.id);
+  }
+
+  const out: { A: ReasonView[]; B: ReasonView[] } = { A: [], B: [] };
+  for (const r of rows) {
+    if (!r.text) continue;
+    const isFriend = !!r.userId && (friends.has(r.userId) || r.userId === viewer?.id);
+    const by = isFriend
+      ? r.name || `@${r.handle}`
+      : r.kidAges && r.kidAges.length
+        ? `A parent of a ${kidAgeLabel(r.kidAges[0])} y/o`
+        : r.userId
+          ? "A PickTwo voter"
+          : "A guest";
+    out[r.side].push({
+      voteId: r.voteId,
+      side: r.side,
+      text: r.text,
+      by,
+      byHandle: isFriend ? r.handle : null,
+      helpful: r.helpful,
+      ownerHelpful: r.ownerHelpful,
+      markedByMe: mine.has(r.voteId),
+      mine: !!viewer && r.userId === viewer.id,
+    });
+  }
+  const score = (r: ReasonView) => r.helpful + (r.ownerHelpful ? 2 : 0);
+  out.A.sort((x, y) => score(y) - score(x));
+  out.B.sort((x, y) => score(y) - score(x));
+  return out;
+}
+
+// ---------------- Owner actions ----------------
+export async function getOwnedBattle(slug: string, user: User) {
+  const b = await getBattleRow(slug);
+  if (!b) throw new AppError("NOT_FOUND", "Battle not found");
+  if (b.authorId !== user.id) throw new AppError("FORBIDDEN", "Only the poster can do that");
+  return b;
+}
+
+export async function editBattle(slug: string, user: User, patch: { title?: string; context?: string }) {
+  const b = await getOwnedBattle(slug, user);
+  if (b.votesA + b.votesB > 0) throw new AppError("CONFLICT", "You can't edit after the first vote");
+  assertCleanText(patch.title, patch.context);
+  await db
+    .update(battles)
+    .set({ title: patch.title ?? b.title, context: patch.context ?? b.context, updatedAt: new Date() })
+    .where(eq(battles.id, b.id));
+}
+
+export async function closeEarly(slug: string, user: User) {
+  const b = await getOwnedBattle(slug, user);
+  if (b.status !== "OPEN") return;
+  const now = new Date();
+  await db.update(battles).set({ deadline: now, status: "CLOSED", closedAt: now, updatedAt: now }).where(eq(battles.id, b.id));
+}
+
+export async function extendDeadline(slug: string, user: User, hours: number) {
+  const b = await getOwnedBattle(slug, user);
+  if (b.status !== "OPEN") throw new AppError("VOTING_CLOSED", "Voting has already closed");
+  const h = Math.min(Math.max(1, hours), 168);
+  await db
+    .update(battles)
+    .set({ deadline: new Date(b.deadline.getTime() + h * 3600_000), updatedAt: new Date() })
+    .where(eq(battles.id, b.id));
+}
+
+export async function deleteBattle(slug: string, user: User, asAdmin = false) {
+  const b = await getBattleRow(slug);
+  if (!b) throw new AppError("NOT_FOUND", "Battle not found");
+  if (!asAdmin && b.authorId !== user.id) throw new AppError("FORBIDDEN", "Only the poster can delete this");
+  await db.update(battles).set({ status: "DELETED", updatedAt: new Date() }).where(eq(battles.id, b.id));
+}
+
+export async function boostBattle(slug: string, user: User) {
+  const b = await getOwnedBattle(slug, user);
+  if (b.status !== "OPEN") throw new AppError("VOTING_CLOSED", "You can only boost an open battle");
+  if (b.boostUntil) throw new AppError("CONFLICT", "This battle has already been boosted");
+  const economy = await getEconomy();
+  return db.transaction(async (tx) => {
+    const [u] = await tx.select({ pp: users.ppBalance }).from(users).where(eq(users.id, user.id)).for("update");
+    if (!u || u.pp < economy.boostCost) throw new AppError("INSUFFICIENT_POINTS", `You need ${economy.boostCost} ⚡ to boost`);
+    await awardPoints(tx, user.id, -economy.boostCost, "BOOST", { battleId: b.id, idemKey: `boost:${b.id}` });
+    await tx
+      .update(battles)
+      .set({ boostUntil: new Date(Date.now() + economy.boostHours * 3600_000), boostVotesLeft: economy.boostVotes })
+      .where(eq(battles.id, b.id));
+    track("boost_used", { battleId: b.id }, { userId: user.id });
+    return { ppBalance: u.pp - economy.boostCost };
+  });
+}
+
+// ---------------- Lists ----------------
+export type BattleCard = {
+  id: string;
+  slug: string;
+  title: string;
+  context: string | null;
+  categoryId: string;
+  deadline: string;
+  status: string;
+  votesA: number;
+  votesB: number;
+  createdAt: string;
+  labelA: string;
+  labelB: string;
+  imageA: string | null;
+  imageB: string | null;
+  authorHandle: string | null;
+  authorName: string | null;
+  outcome: { chosen: string; thumb: string | null; note: string | null } | null;
+};
+
+export async function battleCards(where: ReturnType<typeof and>, limit = 20): Promise<BattleCard[]> {
+  const rows = await db
+    .select({
+      b: battles,
+      authorHandle: users.handle,
+      authorName: users.name,
+      oChosen: outcomes.chosen,
+      oThumb: outcomes.thumb,
+      oNote: outcomes.note,
+    })
+    .from(battles)
+    .innerJoin(users, eq(users.id, battles.authorId))
+    .leftJoin(outcomes, eq(outcomes.battleId, battles.id))
+    .where(where)
+    .orderBy(desc(battles.createdAt))
+    .limit(limit);
+  return hydrateCards(rows);
+}
+
+export async function hydrateCards(
+  rows: { b: Battle; authorHandle: string | null; authorName: string | null; oChosen: string | null; oThumb: string | null; oNote: string | null }[],
+): Promise<BattleCard[]> {
+  const ids = rows.map((r) => r.b.id);
+  const opts = ids.length ? await db.select().from(options).where(inArray(options.battleId, ids)) : [];
+  return rows.map(({ b, authorHandle, authorName, oChosen, oThumb, oNote }) => {
+    const A = opts.find((o) => o.battleId === b.id && o.side === "A");
+    const B = opts.find((o) => o.battleId === b.id && o.side === "B");
+    return {
+      id: b.id,
+      slug: b.slug,
+      title: b.title,
+      context: b.context,
+      categoryId: b.categoryId,
+      deadline: b.deadline.toISOString(),
+      status: b.status === "OPEN" && b.deadline < new Date() ? "CLOSED" : b.status,
+      votesA: b.votesA,
+      votesB: b.votesB,
+      createdAt: b.createdAt.toISOString(),
+      labelA: A?.label ?? "A",
+      labelB: B?.label ?? "B",
+      imageA: A?.imageUrl || A?.urlImage || null,
+      imageB: B?.imageUrl || B?.urlImage || null,
+      authorHandle,
+      authorName,
+      outcome: oChosen ? { chosen: oChosen, thumb: oThumb, note: oNote } : null,
+    };
+  });
+}
+
+export const visibleStatuses = notInArray(battles.status, ["DELETED", "HIDDEN"]);

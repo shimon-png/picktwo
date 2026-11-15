@@ -1,0 +1,88 @@
+import { z } from "zod";
+import { CATEGORY_IDS, KID_AGE_IDS } from "./constants";
+
+const optionalUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .url()
+  .refine((u) => /^https?:\/\//i.test(u), "Must be http(s)")
+  .optional()
+  .or(z.literal("").transform(() => undefined));
+
+const imageRef = z
+  .string()
+  .max(2_000_000)
+  .refine((s) => s.startsWith("https://") || s.startsWith("data:image/") || s.startsWith("/"), "Invalid image")
+  .optional()
+  .or(z.literal("").transform(() => undefined));
+
+export const optionInput = z.object({
+  label: z.string().trim().min(1, "Give this option a name").max(60),
+  imageUrl: imageRef,
+  url: optionalUrl,
+  urlTitle: z.string().max(300).optional(),
+  urlImage: z.string().max(2000).optional(),
+  priceCents: z.number().int().min(0).max(100_000_000).optional().nullable(),
+  currency: z.string().max(5).optional().nullable(),
+});
+
+export const createBattleInput = z.object({
+  title: z.string().trim().min(3).max(100),
+  context: z.string().trim().max(280).optional().default(""),
+  categoryId: z.enum(CATEGORY_IDS),
+  tags: z
+    .object({
+      kidAge: z.array(z.enum(KID_AGE_IDS)).max(5).optional(),
+      recipient: z.string().max(30).optional(),
+      budget: z.string().max(30).optional(),
+      occasion: z.string().max(30).optional(),
+    })
+    .default({}),
+  visibility: z.enum(["PUBLIC", "LINK_ONLY", "FRIENDS"]).default("PUBLIC"),
+  deadlineHours: z.number().min(1).max(24 * 30),
+  dataConsent: z.boolean().default(false),
+  options: z.tuple([optionInput, optionInput]),
+});
+export type CreateBattleInput = z.infer<typeof createBattleInput>;
+
+export const voteInput = z.object({
+  side: z.enum(["A", "B"]),
+  reason: z.string().trim().max(140).optional(),
+  dwellMs: z.number().int().min(0).max(3_600_000).optional(),
+  source: z.enum(["link", "feed", "profile", "home"]).optional(),
+});
+
+export const reasonInput = z.object({ reason: z.string().trim().max(140) });
+
+export const outcomeInput = z
+  .object({
+    chosen: z.enum(["A", "B", "NEITHER"]),
+    thumb: z.enum(["UP", "DOWN"]).optional().nullable(),
+    note: z.string().trim().max(280).optional(),
+    photoUrl: imageRef,
+  })
+  .refine((v) => v.chosen === "NEITHER" || !!v.thumb, { message: "Pick 👍 or 👎", path: ["thumb"] });
+
+export const profileInput = z.object({
+  name: z.string().trim().min(1).max(50),
+  handle: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .regex(/^[a-z0-9_]{3,20}$/, "3–20 letters, numbers or underscores"),
+  bio: z.string().trim().max(160).optional().default(""),
+  isAdultConfirmed: z.literal(true, { errorMap: () => ({ message: "You must be 18 or older" }) }),
+  kidAges: z.array(z.enum(KID_AGE_IDS)).default([]),
+  country: z.string().trim().max(60).optional().default(""),
+  region: z.string().trim().max(60).optional().default(""),
+  interests: z.array(z.string().max(30)).max(12).default([]),
+  dataConsent: z.boolean().default(false),
+});
+
+export const reportInput = z.object({
+  targetType: z.enum(["BATTLE", "REASON", "USER"]),
+  targetId: z.string().min(1).max(64),
+  reason: z.enum(["spam", "inappropriate", "minor_safety", "harassment", "other"]),
+  details: z.string().max(500).optional(),
+});

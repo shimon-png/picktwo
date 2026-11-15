@@ -1,0 +1,12 @@
+{
+  "name": "PickTwo",
+  "short_name": "PickTwo",
+  "description": "Help me choose, and tell me whether I chose well.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fafafa",
+  "theme_color": "#5B5BD6",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

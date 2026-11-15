@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-a: #5b5bd6;
+  --color-a-soft: #e8e8fb;
+  --color-b: #f2665e;
+  --color-b-soft: #fde6e4;
+  --color-pp: #f5a524;
+  --color-pp-soft: #fef3dc;
+  --color-ok: #22a06b;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Nunito", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    color-scheme: dark;
+  }
+}
+
+html,
+body {
+  @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+}
+
+@utility card {
+  @apply rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200;
+}
+@utility btn-ghost {
+  @apply btn text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800;
+}
+@utility btn-outline {
+  @apply btn border border-zinc-300 bg-white hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:bg-zinc-800;
+}
+@utility btn-pp {
+  @apply btn bg-pp text-zinc-900 hover:brightness-95;
+}
+@utility input {
+  @apply w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-[15px] outline-none placeholder:text-zinc-400 focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:focus:border-zinc-300;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium transition hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800;
+}
+@utility chip-on {
+  @apply border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800 dark:border-white dark:bg-white dark:text-zinc-900;
+}
+@utility label {
+  @apply mb-1.5 block text-sm font-semibold text-zinc-700 dark:text-zinc-300;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop { animation: pop 0.25s ease-out; }
+
+@keyframes fly-left { to { transform: translateX(-120%) rotate(-12deg); opacity: 0; } }
+@keyframes fly-right { to { transform: translateX(120%) rotate(12deg); opacity: 0; } }
+@keyframes fly-down { to { transform: translateY(60%); opacity: 0; } }
+.fly-A { animation: fly-left 0.35s ease-in forwards; }
+.fly-B { animation: fly-right 0.35s ease-in forwards; }
+.fly-skip { animation: fly-down 0.3s ease-in forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
