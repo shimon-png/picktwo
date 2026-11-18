@@ -18,6 +18,6 @@ export const GET = handler(async () => {
   ]);
   const data = { exportedAt: new Date(), profile: user, battles: myBattles, options: opts, votes: myVotes, outcomes: myOutcomes, ledger, following, consent };
   return new Response(JSON.stringify(data, null, 2), {
-    headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="picktwo-export.json"` },
+    headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="crowdpick-export.json"` },
   });
 });

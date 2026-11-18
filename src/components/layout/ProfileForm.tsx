@@ -45,12 +45,12 @@ export function ProfileForm({ initial, mode, next = "/" }: { initial: Init; mode
   if (step === "intro")
     return (
       <div className="space-y-4">
-        <div className="rounded-3xl bg-gradient-to-br from-amber-50 to-orange-50 p-6 dark:from-amber-500/10 dark:to-orange-500/10">
+        <div className="rounded-[14px] bg-gradient-to-br from-amber-50 to-orange-50 p-6">
           <div className="mb-3 flex items-center gap-2">
             <Zap className="size-7 fill-pp text-pp" />
-            <h2 className="font-display text-xl font-extrabold">How priority works</h2>
+            <h2 className=" text-xl font-medium">How priority works</h2>
           </div>
-          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-300">You start with 10 ⚡. Your ⚡ decides how fast your questions get answered.</p>
+          <p className="mb-4 text-sm text-zinc-600">You start with 10 ⚡. Your ⚡ decides how fast your questions get answered.</p>
           <ol className="space-y-3 text-[15px]">
             <li className="flex gap-3">
               <MessageCircle className="mt-0.5 size-5 shrink-0 text-a" />
@@ -124,8 +124,8 @@ export function ProfileForm({ initial, mode, next = "/" }: { initial: Init; mode
       <ChipGroup label="Interests (optional)" options={INTERESTS.map((i) => ({ id: i, label: i }))} value={f.interests} onChange={(v) => set("interests", v)} />
       <label className="flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-0.5 size-4 accent-zinc-900" checked={f.dataConsent} onChange={(e) => set("dataConsent", e.target.checked)} />
-        <span className="text-zinc-600 dark:text-zinc-400">
-          Help improve PickTwo and AI recommendations by allowing anonymised use of my battles, votes and outcomes. We never sell your identity. You can change this anytime.
+        <span className="text-zinc-600">
+          Help improve crowdpick and AI recommendations by allowing anonymised use of my battles, votes and outcomes. We never sell your identity. You can change this anytime.
         </span>
       </label>
       {mode === "onboarding" && (

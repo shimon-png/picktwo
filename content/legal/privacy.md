@@ -9,7 +9,7 @@ _Last updated: November 2026_
 - A random device identifier cookie so you can vote without an account.
 
 ## How we use it
-- To run PickTwo: show battles to relevant voters, calculate results, priority points and reputation.
+- To run crowdpick.ai: show battles to relevant voters, calculate results, priority points and reputation.
 - To send you notifications you've enabled.
 - **Only if you opt in:** to create anonymised preference datasets that improve recommendations and AI models. Exports never include your name, email, username, or photos.
 
@@ -19,4 +19,4 @@ _Last updated: November 2026_
 - Delete your account from Settings. Your votes remain only as anonymous counts so other people's results don't change.
 
 ## Children
-PickTwo is for adults 18+. Please don't upload photos where a child's face is visible. Reports of child-safety concerns are prioritised by our moderation team.
+crowdpick.ai is for adults 18+. Please don't upload photos where a child's face is visible. Reports of child-safety concerns are prioritised by our moderation team.

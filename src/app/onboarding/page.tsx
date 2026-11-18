@@ -12,8 +12,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl font-extrabold">Set up your profile</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">Takes 30 seconds. This helps us show your battles to the right people.</p>
+        <h1 className=" text-2xl font-medium">Set up your profile</h1>
+        <p className="text-zinc-600">Takes 30 seconds. This helps us show your battles to the right people.</p>
       </div>
       <ProfileForm
         mode="onboarding"

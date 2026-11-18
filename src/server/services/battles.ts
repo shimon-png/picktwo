@@ -13,7 +13,7 @@ import {
 } from "../db/schema";
 import { AppError } from "../errors";
 import { createSlug } from "@/lib/id";
-import { categoryById, kidAgeLabel } from "@/lib/constants";
+import { categoryById, kidAgeLabel, reasonSuggestions } from "@/lib/constants";
 import type { CreateBattleInput } from "@/lib/validators";
 import { assertCleanText, moderateImage } from "../moderation";
 import { awardPoints, countOpenLoops } from "./points";
@@ -205,6 +205,19 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
   const economy = await getEconomy();
   const totalVotes = b.votesA + b.votesB;
   const now = new Date();
+
+  // Voter relevance (owner view): how many votes came from parents of same-age kids.
+  let relevantVotes: { count: number; ageLabel: string } | null = null;
+  const ageTags = b.tags?.kidAge ?? [];
+  if (isOwner && ageTags.length && totalVotes > 0) {
+    const [r] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(votes)
+      .innerJoin(users, eq(users.id, votes.userId))
+      .where(and(eq(votes.battleId, b.id), sql`${users.kidAges} && ARRAY[${sql.join(ageTags.map((a) => sql`${a}`), sql`, `)}]::text[]`));
+    relevantVotes = { count: r?.n ?? 0, ageLabel: ageTags.map(kidAgeLabel).join(", ") };
+  }
+
   return {
     id: b.id,
     slug: b.slug,
@@ -234,6 +247,15 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     minVotesForLoop: economy.minVotesForLoop,
     boostCost: economy.boostCost,
     viewerPP: viewer.user?.ppBalance ?? null,
+    relevantVotes,
+    reasonSuggestions: reasonSuggestions(b.categoryId),
+    loopRewards: {
+      loop: economy.loopClosedPoints,
+      fast: economy.loopClosedFastBonus,
+      fastHours: economy.loopClosedFastHours,
+      note: economy.outcomeNotePoints,
+      noteMin: economy.outcomeNoteMinChars,
+    },
   };
 }
 
@@ -278,7 +300,7 @@ async function getReasons(b: Battle, viewer: User | null) {
       : r.kidAges && r.kidAges.length
         ? `A parent of a ${kidAgeLabel(r.kidAges[0])} y/o`
         : r.userId
-          ? "A PickTwo voter"
+          ? "A crowdpick voter"
           : "A guest";
     out[r.side].push({
       voteId: r.voteId,
@@ -376,6 +398,8 @@ export type BattleCard = {
   imageB: string | null;
   authorHandle: string | null;
   authorName: string | null;
+  authorKidAges: string[];
+  kidAgeTags: string[];
   outcome: { chosen: string; thumb: string | null; note: string | null } | null;
 };
 
@@ -385,6 +409,7 @@ export async function battleCards(where: ReturnType<typeof and>, limit = 20): Pr
       b: battles,
       authorHandle: users.handle,
       authorName: users.name,
+      authorKidAges: users.kidAges,
       oChosen: outcomes.chosen,
       oThumb: outcomes.thumb,
       oNote: outcomes.note,
@@ -399,11 +424,19 @@ export async function battleCards(where: ReturnType<typeof and>, limit = 20): Pr
 }
 
 export async function hydrateCards(
-  rows: { b: Battle; authorHandle: string | null; authorName: string | null; oChosen: string | null; oThumb: string | null; oNote: string | null }[],
+  rows: {
+    b: Battle;
+    authorHandle: string | null;
+    authorName: string | null;
+    authorKidAges?: string[] | null;
+    oChosen: string | null;
+    oThumb: string | null;
+    oNote: string | null;
+  }[],
 ): Promise<BattleCard[]> {
   const ids = rows.map((r) => r.b.id);
   const opts = ids.length ? await db.select().from(options).where(inArray(options.battleId, ids)) : [];
-  return rows.map(({ b, authorHandle, authorName, oChosen, oThumb, oNote }) => {
+  return rows.map(({ b, authorHandle, authorName, authorKidAges, oChosen, oThumb, oNote }) => {
     const A = opts.find((o) => o.battleId === b.id && o.side === "A");
     const B = opts.find((o) => o.battleId === b.id && o.side === "B");
     return {
@@ -423,6 +456,8 @@ export async function hydrateCards(
       imageB: B?.imageUrl || B?.urlImage || null,
       authorHandle,
       authorName,
+      authorKidAges: authorKidAges ?? [],
+      kidAgeTags: b.tags?.kidAge ?? [],
       outcome: oChosen ? { chosen: oChosen, thumb: oThumb, note: oNote } : null,
     };
   });

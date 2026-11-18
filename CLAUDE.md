@@ -12,6 +12,15 @@ PickTwo is a standalone, mobile-first Next.js app deployed on Vercel. The produc
 6. Raw `sql` templates: pass dates as ISO strings, not `Date` objects (postgres.js limitation).
 7. Children's safety: kid info is age ranges only — never names, birthdates or face photos.
 
+## Design system (crowdpick.ai redesign)
+
+- Brand is **crowdpick.ai** (repo/package name stays `picktwo`). Mark + wordmark: `components/layout/Logo.tsx`, SVGs in `public/brand/`.
+- Tokens live in `src/app/globals.css` `@theme` (OKLCH). The `zinc-*` ramp is remapped to the design neutral, so prefer `text-ink`, `bg-surface`, `accent-*`, `a`/`b` (option colours) and the tone pairs (`pink`, `teal`, `green`, `violet`, `amber` + `-soft`). Category → tone mapping is `CATEGORIES[].tone` / `TONE_CLASSES` in `lib/constants.ts` (static class strings so Tailwind sees them).
+- Headings are Inter weight 500 (no bold); buttons radius 8, cards 14, stack card 16, sheet 20.
+- IA: 3 tabs — **Vote** (`/vote`, also home when signed in), **Post** (`/post`), **You** (`/you`; `/priority` redirects there). Full-screen flows hide the header + tab bar via `isFullScreen()` in `components/layout/Nav.tsx`.
+- ⚡ display tiers (Normal / High / Top) come from `pointsTier()` in `services/priority.ts`, thresholds `tierHighAt` / `tierTopAt` in the economy config. Feed ranking still uses the continuous `priorityFactor()`.
+- One-tap reason chips: `REASON_SUGGESTIONS` per category; a chip counts as a valid reason for the reason bonus (`castVote`).
+
 ## Commands
 
 ```bash

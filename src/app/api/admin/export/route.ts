@@ -9,6 +9,6 @@ export const GET = handler(async (req) => {
   const to = new Date(url.searchParams.get("to") || Date.now());
   const body = await exportPairwise(from, to);
   return new Response(body, {
-    headers: { "Content-Type": "application/x-ndjson", "Content-Disposition": `attachment; filename="picktwo-pairwise.jsonl"` },
+    headers: { "Content-Type": "application/x-ndjson", "Content-Disposition": `attachment; filename="crowdpick-pairwise.jsonl"` },
   });
 });

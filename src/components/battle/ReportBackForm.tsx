@@ -1,11 +1,13 @@
 "use client";
+/* eslint-disable @next/next/no-img-element */
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ThumbsDown, ThumbsUp, ImagePlus, X } from "lucide-react";
+import { ArrowLeft, Check, ImagePlus, ThumbsDown, ThumbsUp, X, Zap } from "lucide-react";
 import confetti from "canvas-confetti";
 import { api, setPP, toast, uploadImage } from "@/lib/client";
 import { cn } from "@/lib/utils";
-import { OptionTile, type OptionData } from "./OptionTile";
+import { OptionFace, type OptionData } from "./OptionFace";
 
 type Chosen = "A" | "B" | "NEITHER";
 
@@ -20,6 +22,7 @@ export function ReportBackForm(props: {
   minVotes: number;
   initial: { chosen: Chosen | null; thumb: "UP" | "DOWN" | null; note: string };
   editing: boolean;
+  fastEligible: boolean;
   rewards: { loop: number; fast: number; note: number; noteMin: number };
 }) {
   const [chosen, setChosen] = useState<Chosen | null>(props.initial.chosen);
@@ -29,20 +32,27 @@ export function ReportBackForm(props: {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
   const total = props.votes.a + props.votes.b;
-  const canSubmit = !!chosen && (chosen === "NEITHER" || !!thumb) && !busy;
+  const leader = props.votes.a >= props.votes.b ? "A" : "B";
+  const leaderPct = total ? Math.round(((leader === "A" ? props.votes.a : props.votes.b) / total) * 100) : 0;
+  const needsThumb = chosen !== "NEITHER";
+  const canSubmit = !!chosen && (!needsThumb || !!thumb) && !busy && (!props.isOpen || props.eligible);
+  const noteBonus = note.trim().length >= props.rewards.noteMin ? props.rewards.note : 0;
+  const reward = props.eligible && !props.editing ? props.rewards.loop + (props.fastEligible ? props.rewards.fast : 0) + noteBonus : 0;
 
   async function submit() {
     if (!canSubmit) return;
     setBusy(true);
     try {
-      const r = await api<{ points: number }>(`/api/battles/${props.slug}/outcome`, { body: { chosen, thumb: chosen === "NEITHER" ? null : thumb, note, photoUrl: photo ?? undefined } });
+      const r = await api<{ points: number }>(`/api/battles/${props.slug}/outcome`, {
+        body: { chosen, thumb: chosen === "NEITHER" ? null : thumb, note, photoUrl: photo ?? undefined },
+      });
       if (r.points > 0) {
-        confetti({ particleCount: 120, spread: 80, origin: { y: 0.7 }, colors: ["#5B5BD6", "#F2665E", "#F5A524"] });
-        toast(`+${r.points} ⚡ Loop closed — thank you!`, "pp");
+        confetti({ particleCount: 110, spread: 80, origin: { y: 0.7 }, colors: ["#3170E8", "#E5484D", "#E8890C", "#7B4FE0"] });
+        toast(`+${r.points} Loop closed — thank you!`, "pp");
         const me = await api<{ ppBalance: number }>("/api/me/priority").catch(() => null);
         setPP(me?.ppBalance);
-      } else toast(props.editing ? "Updated" : "Thanks for reporting back!", "ok");
-      setTimeout(() => router.push(`/b/${props.slug}`), 900);
+      } else toast(props.editing ? "Outcome updated" : "Thanks for sharing the outcome!", "ok");
+      setTimeout(() => router.push(props.editing ? `/b/${props.slug}` : "/you"), 900);
       router.refresh();
     } catch (e) {
       toast((e as Error).message, "error");
@@ -59,87 +69,119 @@ export function ReportBackForm(props: {
     }
   }
 
+  const tile = (s: Chosen, label: string, face: React.ReactNode, narrow?: boolean) => (
+    <button
+      key={s}
+      type="button"
+      onClick={() => setChosen(s)}
+      aria-pressed={chosen === s}
+      aria-label={s === "NEITHER" ? "Neither" : `Picked ${label}`}
+      className={cn("relative h-[120px] min-w-0", narrow ? "w-[78px] shrink-0" : "flex-1")}
+    >
+      {face}
+      {chosen === s && (
+        <span className="absolute right-2 top-2 z-30 flex size-5 items-center justify-center rounded-full bg-accent text-white" aria-hidden>
+          <Check className="size-3.5" />
+        </span>
+      )}
+    </button>
+  );
+
   return (
-    <div className="space-y-6">
-      <header>
-        <p className="text-sm font-semibold text-zinc-500">Close the loop</p>
-        <h1 className="font-display text-2xl font-extrabold">{props.title}</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          {total} vote{total === 1 ? "" : "s"} · {total ? Math.round((props.votes.a / total) * 100) : 0}% {props.A.label} ·{" "}
-          {total ? Math.round((props.votes.b / total) * 100) : 0}% {props.B.label}
-        </p>
-      </header>
+    <div className="-mx-4 -mt-2 flex min-h-dvh flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+      <div className="-mx-2 flex h-12 shrink-0 items-center gap-1">
+        <Link href={`/b/${props.slug}`} className="rounded-lg p-2 hover:bg-surface" aria-label="Back">
+          <ArrowLeft className="size-5" />
+        </Link>
+        <span className="text-[15px]">Close the loop</span>
+      </div>
+
+      <h1 className="mt-1 text-[22px] leading-snug">{props.title}</h1>
+      <p className="mt-1 text-[13px] text-zinc-500">
+        {total > 0
+          ? `Voters said ${leader === "A" ? props.A.label : props.B.label} · ${leaderPct}% of ${total} vote${total === 1 ? "" : "s"}`
+          : "No votes yet"}
+      </p>
 
       {props.isOpen && !props.eligible && (
-        <div className="card p-4 text-sm">Voting is still open. Once you have {props.minVotes} votes you can report your decision early.</div>
+        <p className="card mt-4 p-3.5 text-[13px] text-zinc-600">Voting is still open. Once you have {props.minVotes} votes you can share your decision early.</p>
       )}
 
-      <section>
-        <h2 className="label text-base">1. Which did you choose?</h2>
-        <div className="flex gap-3">
-          {(["A", "B"] as const).map((s) => (
-            <OptionTile key={s} option={s === "A" ? props.A : props.B} selected={chosen === s} onClick={() => setChosen(s)} compact />
-          ))}
+      <section className="mt-6">
+        <h2 className="mb-2.5 text-[15px] font-medium">Which did you pick?</h2>
+        <div className="flex gap-2">
+          {tile("A", props.A.label, <OptionFace side="A" label={props.A.label} image={props.A.imageUrl || props.A.urlImage} ring={chosen === "A"} />)}
+          {tile("B", props.B.label, <OptionFace side="B" label={props.B.label} image={props.B.imageUrl || props.B.urlImage} ring={chosen === "B"} />)}
+          {tile(
+            "NEITHER",
+            "Neither",
+            <span className={cn("flex h-full w-full items-end rounded-lg bg-surface p-2.5 text-[13px]", chosen === "NEITHER" && "ring-2 ring-inset ring-accent")}>Neither</span>,
+            true,
+          )}
         </div>
-        <button className={cn("chip mt-3", chosen === "NEITHER" && "chip-on")} onClick={() => setChosen("NEITHER")} aria-pressed={chosen === "NEITHER"}>
-          Neither
-        </button>
       </section>
 
-      {chosen && chosen !== "NEITHER" && (
-        <section>
-          <h2 className="label text-base">2. How did it go?</h2>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setThumb("UP")}
-              aria-pressed={thumb === "UP"}
-              className={cn("card flex flex-1 flex-col items-center gap-1 p-4 text-sm font-semibold", thumb === "UP" && "border-ok bg-ok/10 ring-2 ring-ok/30")}
-            >
-              <ThumbsUp className={cn("size-8", thumb === "UP" ? "text-ok" : "text-zinc-400")} /> It worked out
-            </button>
-            <button
-              onClick={() => setThumb("DOWN")}
-              aria-pressed={thumb === "DOWN"}
-              className={cn("card flex flex-1 flex-col items-center gap-1 p-4 text-sm font-semibold", thumb === "DOWN" && "border-zinc-900 bg-zinc-100 ring-2 ring-zinc-900/20 dark:border-white dark:bg-zinc-800")}
-            >
-              <ThumbsDown className={cn("size-8", thumb === "DOWN" ? "text-zinc-900 dark:text-white" : "text-zinc-400")} /> Not great
-            </button>
+      {needsThumb && (
+        <section className="mt-6">
+          <h2 className="mb-2.5 text-[15px] font-medium">How did it go?</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["UP", ThumbsUp, "Went well"],
+                ["DOWN", ThumbsDown, "Not great"],
+              ] as const
+            ).map(([id, Icon, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setThumb(id)}
+                aria-pressed={thumb === id}
+                className={cn("btn !py-3 shadow-ring", thumb === id ? "bg-accent-900 text-accent ring-1 ring-accent" : "bg-white text-ink")}
+              >
+                <Icon className="size-4" aria-hidden /> {label}
+              </button>
+            ))}
           </div>
         </section>
       )}
 
-      <section>
-        <label className="label text-base" htmlFor="note">
-          {chosen === "NEITHER" ? "2." : "3."} Anything to add? <span className="font-normal text-zinc-400">(optional, +{props.rewards.note} ⚡ for {props.rewards.noteMin}+ characters)</span>
+      <section className="mt-6">
+        <label className="mb-2 flex items-center gap-1 text-[13px] text-zinc-600" htmlFor="note">
+          Anything to add?
+          <span className="text-accent">
+            +{props.rewards.note} <Zap className="inline size-3 fill-pp text-pp" aria-hidden /> for {props.rewards.noteMin}+ characters
+          </span>
         </label>
         <textarea id="note" className="input" rows={3} maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} placeholder="She played with it all weekend!" />
         <div className="mt-2 flex items-center gap-3">
           {photo ? (
             <div className="relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo} alt="Your after photo" className="size-16 rounded-xl object-cover" />
-              <button className="absolute -right-2 -top-2 rounded-full bg-zinc-900 p-0.5 text-white" onClick={() => setPhoto(null)} aria-label="Remove photo">
+              <img src={photo} alt="Your after photo" className="size-14 rounded-lg object-cover" />
+              <button className="absolute -right-2 -top-2 rounded-full bg-ink p-0.5 text-white" onClick={() => setPhoto(null)} aria-label="Remove photo">
                 <X className="size-3.5" />
               </button>
             </div>
           ) : (
-            <label className="btn-ghost cursor-pointer !px-3 !py-1.5">
-              <ImagePlus className="size-4" /> Add an “after” photo
+            <label className="btn-ghost cursor-pointer !px-2 !py-1 text-[13px]">
+              <ImagePlus className="size-4" aria-hidden /> Add an “after” photo
               <input type="file" accept="image/*" className="sr-only" onChange={(e) => onPhoto(e.target.files?.[0])} />
             </label>
           )}
-          <span className="text-xs text-zinc-400">Please don’t include children’s faces.</span>
+          <span className="text-xs text-zinc-400">No children’s faces, please.</span>
         </div>
       </section>
 
-      {!props.editing && props.eligible && (
-        <div className="rounded-2xl bg-pp-soft p-4 text-sm text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-          ⚡ You’ll earn <b>+{props.rewards.loop}</b> priority, <b>+{props.rewards.fast}</b> more if you report within 48h of the deadline. Voters who called it earn points too.
-        </div>
-      )}
-
-      <button className="btn-primary w-full py-3 text-base" disabled={!canSubmit || (props.isOpen && !props.eligible)} onClick={submit}>
-        {busy ? "Saving…" : props.editing ? "Update" : "Close the loop"}
+      <div className="flex-1" />
+      <button className="btn-primary mt-6 w-full py-3" disabled={!canSubmit} onClick={submit}>
+        {busy ? (
+          "Saving…"
+        ) : props.editing ? (
+          "Update outcome"
+        ) : (
+          <>
+            Share the outcome{reward > 0 && <> · +{reward}</>} <Zap className="size-4 fill-white" aria-hidden />
+          </>
+        )}
       </button>
     </div>
   );

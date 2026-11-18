@@ -1,12 +1,57 @@
+/** `tone` maps to the colour pairs in globals.css (e.g. pink → bg-pink-soft text-pink). */
 export const CATEGORIES = [
-  { id: "gifts", name: "Gifts", emoji: "🎁", featured: true, sort: 1 },
-  { id: "baby-names", name: "Baby names", emoji: "🍼", featured: false, sort: 2 },
-  { id: "big-purchases", name: "Big purchases", emoji: "🛒", featured: false, sort: 3 },
-  { id: "what-to-wear", name: "What to wear", emoji: "👗", featured: false, sort: 4 },
-  { id: "home-design", name: "Home & design", emoji: "🏡", featured: false, sort: 5 },
-  { id: "words", name: "Words that matter", emoji: "✍️", featured: false, sort: 6 },
-  { id: "other", name: "Other", emoji: "✨", featured: false, sort: 7 },
+  { id: "gifts", name: "Gifts", short: "Gifts", emoji: "🎁", tone: "pink", featured: true, sort: 1 },
+  { id: "baby-names", name: "Baby names", short: "Baby names", emoji: "🍼", tone: "teal", featured: false, sort: 2 },
+  { id: "home-design", name: "Home & design", short: "Home", emoji: "🏡", tone: "green", featured: false, sort: 3 },
+  { id: "what-to-wear", name: "What to wear", short: "What to wear", emoji: "👗", tone: "violet", featured: false, sort: 4 },
+  { id: "big-purchases", name: "Big purchases", short: "Big purchases", emoji: "🛒", tone: "amber", featured: false, sort: 5 },
+  { id: "words", name: "Words that matter", short: "Words", emoji: "✍️", tone: "blue", featured: false, sort: 6 },
+  { id: "other", name: "Other", short: "Other", emoji: "✨", tone: "neutral", featured: false, sort: 7 },
 ] as const;
+
+export type Tone = (typeof CATEGORIES)[number]["tone"] | "coral";
+/** Static class strings so Tailwind can see them. */
+export const TONE_CLASSES: Record<Tone, { soft: string; solid: string }> = {
+  pink: { soft: "bg-pink-soft text-pink", solid: "bg-pink text-white" },
+  teal: { soft: "bg-teal-soft text-teal", solid: "bg-teal text-white" },
+  green: { soft: "bg-green-soft text-green", solid: "bg-green text-white" },
+  violet: { soft: "bg-violet-soft text-violet", solid: "bg-violet text-white" },
+  amber: { soft: "bg-amber-soft text-amber-700", solid: "bg-amber text-white" },
+  blue: { soft: "bg-accent-900 text-accent", solid: "bg-accent text-white" },
+  coral: { soft: "bg-b-soft text-b", solid: "bg-b text-white" },
+  neutral: { soft: "bg-surface text-zinc-600", solid: "bg-zinc-700 text-white" },
+};
+export const AVATAR_TONES: Tone[] = ["pink", "teal", "green", "violet"];
+
+/**
+ * One-tap reason chips shown after a vote (3 per battle). A chip counts as a valid reason for the
+ * reason bonus even though it is shorter than `reasonMinChars`.
+ */
+export const REASON_SUGGESTIONS: Record<string, readonly string[]> = {
+  gifts: ["Lasts longer", "More fun", "Better value"],
+  "baby-names": ["Sounds better", "Easier to spell", "Ages well"],
+  "home-design": ["Looks better", "More practical", "Easier to keep clean"],
+  "what-to-wear": ["More flattering", "Fits the occasion", "More comfortable"],
+  "big-purchases": ["Better value", "More reliable", "Better reviews"],
+  words: ["Clearer", "Warmer", "More personal"],
+  other: ["Just feels right", "More practical", "Better value"],
+};
+export const reasonSuggestions = (categoryId: string) => REASON_SUGGESTIONS[categoryId] ?? REASON_SUGGESTIONS.other;
+
+/** Guess a category from the two option names (review sheet "we guessed"). */
+export function guessCategory(text: string): CategoryId {
+  const t = text.toLowerCase();
+  const rules: [CategoryId, RegExp][] = [
+    ["baby-names", /\b(name|names|baby|boy|girl)\b/],
+    ["what-to-wear", /\b(dress|shirt|jacket|coat|shoes?|boots|sneakers|outfit|suit|jeans|skirt|tie|hat|wear)\b/],
+    ["gifts", /\b(lego|toy|set|game|gift|kit|book|puzzle|doll|easel|crayons?|art|plush|blocks)\b/],
+    ["home-design", /\b(sofa|couch|rug|paint|wall|lamp|chair|table|kitchen|tile|curtains?|bed|room|wallpaper|shelf|cabinet)\b/],
+    ["big-purchases", /\b(car|laptop|phone|tv|iphone|pixel|macbook|stroller|fridge|washer|camera|bike|vacuum)\b/],
+    ["words", /\b(caption|speech|toast|message|text|email|card|wording|letter)\b/],
+  ];
+  for (const [id, re] of rules) if (re.test(t)) return id;
+  return "gifts";
+}
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id) as [CategoryId, ...CategoryId[]];
@@ -66,6 +111,9 @@ export const ECONOMY_DEFAULTS = {
   degenerateMinVotes: 30,
   degenerateRatio: 0.9,
   priorityCap: 200,
+  /** Display tiers on the ⚡ meter: Normal below tierHighAt, High below tierTopAt, Top at/above. */
+  tierHighAt: 20,
+  tierTopAt: 40,
 } as const;
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 

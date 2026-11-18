@@ -14,7 +14,7 @@ const providers: NextAuthConfig["providers"] = [];
 providers.push(
   Resend({
     apiKey: process.env.AUTH_RESEND_KEY || "dev",
-    from: process.env.EMAIL_FROM || "PickTwo <onboarding@resend.dev>",
+    from: process.env.EMAIL_FROM || "crowdpick <onboarding@resend.dev>",
     async sendVerificationRequest({ identifier, url }) {
       await sendEmail({ to: identifier, ...magicLinkEmail(url) }, { devLog: `Magic sign-in link for ${identifier}: ${url}` });
     },

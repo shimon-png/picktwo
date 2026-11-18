@@ -10,7 +10,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-2 font-display text-xl font-extrabold">Admin</h1>
+        <h1 className="mr-2 text-xl font-medium">Admin</h1>
         <Link href="/admin" className="chip">Metrics</Link>
         <Link href="/admin/reports" className="chip">Moderation</Link>
         <Link href="/admin/config" className="chip">Config</Link>

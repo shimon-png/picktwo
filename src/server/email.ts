@@ -12,7 +12,7 @@ export async function sendEmail(mail: Mail, opts: { devLog?: string } = {}) {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      from: process.env.EMAIL_FROM || "PickTwo <onboarding@resend.dev>",
+      from: process.env.EMAIL_FROM || "crowdpick <onboarding@resend.dev>",
       to: mail.to,
       subject: mail.subject,
       html: mail.html,
@@ -22,21 +22,21 @@ export async function sendEmail(mail: Mail, opts: { devLog?: string } = {}) {
   if (!res.ok) console.error("[email] Resend error", res.status, await res.text());
 }
 
-const shell = (body: string) => `<!doctype html><html><body style="margin:0;background:#f4f4f5;font-family:Inter,Arial,sans-serif">
+const shell = (body: string) => `<!doctype html><html><body style="margin:0;background:#F4F5F8;font-family:Inter,Arial,sans-serif">
 <div style="max-width:480px;margin:24px auto;background:#fff;border-radius:16px;padding:28px">
-<div style="font-weight:800;font-size:20px;margin-bottom:16px"><span style="color:#5B5BD6">Pick</span><span style="color:#F2665E">Two</span></div>
+<div style="font-weight:500;font-size:20px;letter-spacing:-0.5px;margin-bottom:16px;color:#1A1F2E">crowdpick<span style="color:#3170E8">.ai</span></div>
 ${body}
-<p style="color:#a1a1aa;font-size:12px;margin-top:28px">You're receiving this because you use PickTwo. <a href="${appUrl("/settings")}" style="color:#a1a1aa">Notification settings</a></p>
+<p style="color:#a1a1aa;font-size:12px;margin-top:28px">You're receiving this because you use crowdpick.ai. <a href="${appUrl("/settings")}" style="color:#a1a1aa">Notification settings</a></p>
 </div></body></html>`;
 
-const btn = (href: string, label: string, color = "#18181b") =>
+const btn = (href: string, label: string, color = "#3170E8") =>
   `<a href="${href}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:600;margin:4px 4px 4px 0">${label}</a>`;
 
 export function magicLinkEmail(url: string) {
   return {
-    subject: "Your PickTwo sign-in link",
-    html: shell(`<p style="font-size:16px">Tap below to sign in. This link expires in 24 hours.</p>${btn(url, "Sign in to PickTwo")}`),
-    text: `Sign in to PickTwo: ${url}`,
+    subject: "Your crowdpick sign-in link",
+    html: shell(`<p style="font-size:16px">Tap below to sign in. This link expires in 24 hours.</p>${btn(url, "Sign in to crowdpick")}`),
+    text: `Sign in to crowdpick: ${url}`,
   };
 }
 
@@ -57,8 +57,8 @@ export function reportBackEmail(opts: {
     subject,
     html: shell(`<p style="font-size:16px"><b>${escapeHtml(opts.title)}</b> got ${total} vote${total === 1 ? "" : "s"}.</p>
 <p style="font-size:15px">Which did you choose? Closing the loop earns you <b>+10 ⚡ priority</b> so your next question gets answered faster.</p>
-${btn(`${base}&c=A`, `I picked ${escapeHtml(opts.labelA)}`, "#5B5BD6")}
-${btn(`${base}&c=B`, `I picked ${escapeHtml(opts.labelB)}`, "#F2665E")}
+${btn(`${base}&c=A`, `I picked ${escapeHtml(opts.labelA)}`, "#3170E8")}
+${btn(`${base}&c=B`, `I picked ${escapeHtml(opts.labelB)}`, "#E5484D")}
 ${btn(`${base}&c=NEITHER`, "Neither", "#71717a")}`),
     text: `${opts.title} — which did you pick? ${base}`,
   };

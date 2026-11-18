@@ -29,23 +29,37 @@ async function newUser(browser: Browser, name: string) {
   return page;
 }
 
+const SHOTS = process.env.E2E_SHOTS;
+async function snap(page: Page, name: string) {
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
+}
+
 test("post → vote (anon + signed in) → close the loop → called it", async ({ browser }) => {
-  // Poster creates a battle
+  // Poster creates a battle: options first, then the review sheet
   const poster = await newUser(browser, "poster");
   await poster.goto("/post");
-  await poster.getByRole("tab", { name: "Text" }).first().click();
+  await expect(poster.getByRole("button", { name: "Continue" })).toBeDisabled();
+  await poster.getByRole("button", { name: "Name for option A" }).click();
   await poster.getByLabel("Name of option A").fill("Lego Art Set");
   await poster.getByLabel("Name of option B").fill("Paint easel");
-  await poster.getByRole("button", { name: "Next" }).click();
-  await poster.getByLabel("Your question").fill(`Gift for my 6 y/o ${stamp}`);
-  await poster.getByLabel(/Context/).fill("Loves art, budget ~$50");
-  await poster.getByRole("button", { name: "5–8" }).click();
-  await poster.getByRole("button", { name: "1 hour" }).click();
-  await poster.getByRole("button", { name: "Next" }).click();
-  await poster.getByRole("button", { name: /Publish/ }).click();
-  await poster.waitForURL(/\/b\/[A-Za-z0-9]{8}/);
+  await snap(poster, "01-new-battle");
+  await poster.getByRole("button", { name: "Continue" }).click();
+  const sheet = poster.getByRole("dialog", { name: "Review & publish" });
+  await expect(sheet.getByLabel("Question")).toHaveValue("Lego Art Set or Paint easel?");
+  await expect(sheet.getByText("we guessed")).toBeVisible();
+  await sheet.getByLabel("Question").fill(`Gift for my 6 y/o ${stamp}`);
+  await sheet.getByLabel(/Context/).fill("Loves art, budget ~$50");
+  await sheet.getByRole("button", { name: "5–8" }).click();
+  await sheet.getByRole("button", { name: "1 hour" }).click();
+  await snap(poster, "02-review");
+  await sheet.getByRole("button", { name: "Publish & share" }).click();
+  await poster.waitForURL(/\/b\/[A-Za-z0-9]{8}\/published/);
+  await expect(poster.getByRole("heading", { name: "Your battle is live" })).toBeVisible();
+  await expect(poster.getByText("Get answered faster")).toBeVisible();
+  await snap(poster, "03-published");
+  await poster.getByRole("link", { name: "View my battle" }).click();
+  await poster.waitForURL(/\/b\/[A-Za-z0-9]{8}$/);
   const url = poster.url().split("?")[0];
-  await expect(poster.getByText(/Get votes fast/)).toBeVisible();
   await expect(poster.getByRole("link", { name: /priority points/ })).toBeVisible(); // ⚡ pill
 
   // Anonymous voter: results hidden until vote, then shown (A-4, A-6)
@@ -73,43 +87,73 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await v2.goto(url);
   await v2.waitForTimeout(1700);
   await v2.getByRole("button", { name: "Vote for Paint easel" }).click();
+  // One-tap reason chip earns the reason bonus
+  await v2.getByRole("button", { name: "Lasts longer" }).click();
+  await expect(v2.getByText(/for adding a reason/)).toBeVisible();
   await expect(v2.getByText(/3\s*votes/)).toBeVisible();
 
-  // Poster closes the loop early (≥3 votes)
-  await poster.goto(url.replace(/$/, "/report"));
-  await poster.getByRole("button", { name: "Vote for Lego Art Set" }).click();
-  await poster.getByRole("button", { name: /It worked out/ }).click();
-  await poster.getByLabel(/Anything to add/).fill("She played with it all weekend long!");
-  await poster.getByRole("button", { name: "Close the loop" }).click();
-  await expect(poster.getByText(/Loop closed — thank you/)).toBeVisible();
-  await poster.waitForURL(url);
-  await expect(poster.getByText("Loop closed", { exact: true })).toBeVisible();
+  // Owner results: relevance line, top reasons, sticky close-the-loop
+  await poster.reload();
+  await expect(poster.getByText(/3 votes · \d+ from parents of 5–8 year olds/)).toBeVisible();
+  await expect(poster.getByText("Top reasons")).toBeVisible();
+  await snap(poster, "04-results");
+  await poster.getByRole("link", { name: /Decided\? Close the loop/ }).click();
+  await poster.waitForURL(url + "/report");
 
-  // Poster's ledger shows the reward
-  await poster.goto("/priority");
-  await expect(poster.getByText("Closed the loop")).toBeVisible();
+  // Close the loop
+  await expect(poster.getByText(/Voters said Lego Art Set · 67% of 3 votes/)).toBeVisible();
+  await poster.getByRole("button", { name: "Picked Lego Art Set" }).click();
+  await poster.getByRole("button", { name: /Went well/ }).click();
+  await poster.getByLabel(/Anything to add/).fill("She played with it all weekend long!");
+  await snap(poster, "05-close-loop");
+  await poster.getByRole("button", { name: /Share the outcome/ }).click();
+  await expect(poster.getByText(/Loop closed — thank you/)).toBeVisible();
+  await poster.waitForURL(/\/you$/);
+  await expect(poster.getByText(/Closed · picked Lego Art Set/)).toBeVisible();
+  // Ledger shows the reward
+  await expect(poster.getByText(/^Closed the loop/)).toBeVisible();
   await expect(poster.getByText("Closed within 48h")).toBeVisible();
+  await snap(poster, "06-you");
+  await poster.goto(url);
+  await expect(poster.getByText("Loop closed", { exact: true })).toBeVisible();
 
   // Voter 1 called it
   await v1.goto("/activity");
   await expect(v1.getByText(/You called it/)).toBeVisible();
-  await v1.goto("/priority");
+  await v1.goto("/you");
   await expect(v1.getByText("Called it!")).toBeVisible();
 });
 
-test("swipe deck votes and skips", async ({ browser }) => {
+test("vote stack: tap to vote, reason chip, next, skip", async ({ browser }) => {
   const p = await newUser(browser, "swiper");
   await p.goto("/vote");
-  const title1 = await p.locator("main a.font-display").first().textContent();
+  const card = p.locator("main article").first();
+  const title1 = await card.getAttribute("aria-label");
+  await snap(p, "07-vote-stack");
   await p.waitForTimeout(1600);
   await p.getByRole("button", { name: /^Vote for/ }).first().click();
-  await expect(p.getByText(/%/).first()).toBeVisible();
-  await p.waitForTimeout(2000);
-  const title2 = await p.locator("main a.font-display").first().textContent();
+  await expect(card.getByText(/\d+%/).first()).toBeVisible();
+  await expect(p.getByText(/Why\? optional/)).toBeVisible();
+  await snap(p, "08-vote-voted");
+  await p.getByRole("button", { name: /^Next/ }).click();
+  await p.waitForTimeout(500);
+  const title2 = await p.locator("main article").first().getAttribute("aria-label");
   expect(title2).not.toEqual(title1);
-  await p.getByRole("button", { name: "Not for me" }).click();
-  await p.waitForTimeout(600);
-  expect(await p.locator("main a.font-display").first().textContent()).not.toEqual(title2);
+  await p.getByRole("button", { name: "Skip" }).click();
+  await p.waitForTimeout(500);
+  expect(await p.locator("main article").first().getAttribute("aria-label")).not.toEqual(title2);
+});
+
+test("homepage: anonymous one-tap vote", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const p = await ctx.newPage();
+  await p.goto("/");
+  await expect(p.getByText("Ask people like you.")).toBeVisible();
+  await expect(p.getByText("Tap one to vote · no account needed")).toBeVisible();
+  await snap(p, "09-home");
+  await p.waitForTimeout(1600);
+  await p.getByRole("button", { name: /^Vote for/ }).first().click();
+  await expect(p.getByText(/Counted\. \d+ (people|person) weighed in/)).toBeVisible();
 });
 
 test("non-admin gets 404 on /admin (A-20)", async ({ browser }) => {

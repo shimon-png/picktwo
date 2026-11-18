@@ -1,6 +1,6 @@
 # Community guidelines
 
-PickTwo works because people help each other make real decisions. Keep it kind, honest and safe.
+crowdpick.ai works because people help each other make real decisions. Keep it kind, honest and safe.
 
 ## Do
 - Post real decisions you're actually making.

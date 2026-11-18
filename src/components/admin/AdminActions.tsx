@@ -72,7 +72,7 @@ export function AdminSeed() {
   }
   return (
     <section className="card space-y-2 p-4">
-      <h2 className="font-semibold">Demo content</h2>
+      <h2 className="font-medium">Demo content</h2>
       <p className="text-sm text-zinc-500">Adds ~18 sample gift/name/purchase battles (some with outcomes) so the feed isn’t empty at launch. Safe to run once.</p>
       <button className="btn-outline" disabled={busy} onClick={run}>Seed demo battles</button>
     </section>

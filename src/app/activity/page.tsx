@@ -42,14 +42,14 @@ export default async function ActivityPage() {
   const items = await listNotifications(user.id);
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-2xl font-extrabold">Activity</h1>
+      <h1 className=" text-2xl font-medium">Activity</h1>
       <MarkRead />
       {items.length === 0 && <div className="card p-6 text-center text-zinc-500">Nothing yet. Post a battle or vote to get things going!</div>}
       <ul className="space-y-2">
         {items.map((n) => {
           const r = render(n.type, n.payload);
           const inner = (
-            <div className={`card flex items-start gap-3 p-3 ${!n.readAt ? "border-a/40 bg-a-soft/30 dark:bg-a/10" : ""}`}>
+            <div className={`card flex items-start gap-3 p-3 ${!n.readAt ? "border-a/40 bg-a-soft/30" : ""}`}>
               <span className="mt-0.5">{r.icon}</span>
               <div className="flex-1 text-[15px]">
                 {r.text}

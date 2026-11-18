@@ -38,6 +38,7 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
       minVotes={economy.minVotesForLoop}
       initial={{ chosen: prefill ?? null, thumb: existing?.thumb ?? null, note: existing?.note ?? "" }}
       editing={!!existing}
+      fastEligible={b.status === "OPEN" || Date.now() - b.deadline.getTime() <= economy.loopClosedFastHours * 3600_000}
       rewards={{ loop: economy.loopClosedPoints, fast: economy.loopClosedFastBonus, note: economy.outcomeNotePoints, noteMin: economy.outcomeNoteMinChars }}
     />
   );

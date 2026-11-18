@@ -63,7 +63,7 @@ const VOTER_PROFILES: { name: string; kidAges: string[]; country: string }[] = [
 export async function seed({ demo = true }: { demo?: boolean } = {}) {
   await db
     .insert(categories)
-    .values(CATEGORIES.map((c) => ({ ...c })))
+    .values(CATEGORIES.map(({ id, name, emoji, featured, sort }) => ({ id, name, emoji, featured, sort })))
     .onConflictDoNothing();
 
   const admins = (process.env.ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -75,7 +75,7 @@ export async function seed({ demo = true }: { demo?: boolean } = {}) {
 
   const [system] = await db
     .insert(users)
-    .values({ handle: "picktwo", name: "PickTwo", bio: "Official demo battles", isAdultConfirmed: true, onboardedAt: new Date(), ppBalance: 120, country: "US" })
+    .values({ handle: "picktwo", name: "crowdpick", bio: "Official demo battles", isAdultConfirmed: true, onboardedAt: new Date(), ppBalance: 120, country: "US" })
     .returning();
   const voters = await db
     .insert(users)

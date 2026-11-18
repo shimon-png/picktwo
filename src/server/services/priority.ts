@@ -69,3 +69,26 @@ export function reminderDue(deadline: Date, reminderCount: number, now = new Dat
   if (reminderCount >= REMINDER_OFFSETS_HOURS.length) return false;
   return now.getTime() >= deadline.getTime() + REMINDER_OFFSETS_HOURS[reminderCount] * 3600_000;
 }
+
+/**
+ * Display tier for the ⚡ meter (crowdpick redesign): Normal → High → Top by balance.
+ * Progress is how far the balance is through the current tier (Top is always 100%).
+ */
+export type PointsTierName = "Normal" | "High" | "Top";
+export type PointsTier = {
+  tier: PointsTierName;
+  next: PointsTierName | null;
+  toNext: number;
+  progress: number;
+  /** Fill 0–1 for each of the three segment bars (Normal / High / Top). */
+  segments: [number, number, number];
+};
+
+export function pointsTier(points: number, highAt = 20, topAt = 40): PointsTier {
+  const p = Math.max(0, Math.floor(points));
+  const clamp = (x: number) => Math.min(1, Math.max(0, x));
+  const segments: [number, number, number] = [clamp(p / highAt), clamp((p - highAt) / (topAt - highAt)), p >= topAt ? 1 : 0];
+  if (p >= topAt) return { tier: "Top", next: null, toNext: 0, progress: 1, segments };
+  if (p >= highAt) return { tier: "High", next: "Top", toNext: topAt - p, progress: (p - highAt) / (topAt - highAt), segments };
+  return { tier: "Normal", next: "High", toNext: highAt - p, progress: p / highAt, segments };
+}

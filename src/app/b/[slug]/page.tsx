@@ -42,7 +42,7 @@ export default async function BattlePage({ params, searchParams }: Props) {
     if (e instanceof AppError && (e.code === "UNAUTHORIZED" || e.code === "FORBIDDEN"))
       return (
         <div className="card mx-auto mt-10 max-w-md space-y-4 p-6 text-center">
-          <h1 className="font-display text-xl font-extrabold">🔒 Friends only</h1>
+          <h1 className=" text-xl font-medium">🔒 Friends only</h1>
           <p className="text-zinc-600">{e.message}</p>
           {!viewer.user && (
             <Link className="btn-primary" href={`/signin?callbackUrl=/b/${slug}`}>

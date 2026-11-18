@@ -1,8 +1,8 @@
-# PickTwo
+# crowdpick.ai (formerly PickTwo)
 
 **Help me choose, and tell me whether I chose well.**
 
-PickTwo is a social app for real decisions. Post a "this or that" battle, get fast votes from friends and people like you, then report back which option you picked and how it went (👍 / 👎). Helping others and closing the loop earns you **⚡ priority**, so your own questions get answered faster.
+crowdpick.ai is a social app for real decisions. Post a "this or that" battle, get fast votes from friends and people like you, then report back which option you picked and how it went (👍 / 👎). Helping others and closing the loop earns you **⚡ priority**, so your own questions get answered faster.
 
 - 📄 Product spec: [`PRD.md`](./PRD.md)
 - 🤖 Notes for Claude Code: [`CLAUDE.md`](./CLAUDE.md)

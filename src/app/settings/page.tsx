@@ -16,9 +16,9 @@ export default async function SettingsPage() {
   }
   return (
     <div className="space-y-8">
-      <h1 className="font-display text-2xl font-extrabold">Settings</h1>
+      <h1 className=" text-2xl font-medium">Settings</h1>
       <section className="space-y-3">
-        <h2 className="text-lg font-bold">Profile</h2>
+        <h2 className="text-lg font-medium">Profile</h2>
         <ProfileForm
           mode="settings"
           initial={{
