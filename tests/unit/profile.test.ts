@@ -33,3 +33,14 @@ describe("profileInput required fields", () => {
     expect(profileInput.safeParse({ ...base, ageRange: "AGE_12" }).success).toBe(false);
   });
 });
+
+describe("profileInput kids answer", () => {
+  it("keeps No and Prefer not to say as separate answers", () => {
+    expect(profileInput.parse({ ...base, kidsStatus: "NO" }).kidsStatus).toBe("NO");
+    expect(profileInput.parse({ ...base, kidsStatus: "UNDISCLOSED" }).kidsStatus).toBe("UNDISCLOSED");
+  });
+  it("is optional but rejects unknown values", () => {
+    expect(profileInput.safeParse({ ...base, kidsStatus: null }).success).toBe(true);
+    expect(profileInput.safeParse({ ...base, kidsStatus: "MAYBE" }).success).toBe(false);
+  });
+});
