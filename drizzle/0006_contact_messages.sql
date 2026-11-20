@@ -1,4 +1,4 @@
-CREATE TABLE "contact_message" (
+CREATE TABLE IF NOT EXISTS "contact_message" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text,
 	"email" text NOT NULL,
@@ -13,4 +13,4 @@ CREATE TABLE "contact_message" (
 	"handled_at" timestamp with time zone
 );
 --> statement-breakpoint
-CREATE INDEX "contact_message_status" ON "contact_message" USING btree ("status","created_at");
+CREATE INDEX IF NOT EXISTS "contact_message_status" ON "contact_message" USING btree ("status","created_at");
