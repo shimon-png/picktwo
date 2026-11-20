@@ -19,6 +19,7 @@ const imageRef = z
 
 export const optionInput = z.object({
   label: z.string().trim().min(1, "Give this option a name").max(60),
+  description: z.string().trim().max(140).optional(),
   imageUrl: imageRef,
   url: optionalUrl,
   urlTitle: z.string().max(300).optional(),

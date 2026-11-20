@@ -176,6 +176,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
               <OptionFace
                 side={s}
                 label={o.label}
+                description={o.description}
                 image={o.imageUrl || o.urlImage}
                 percent={res ? (s === "A" ? res.a : res.b) : null}
                 ring={v.isOwner || !v.isOpen ? leader === s : v.myVote?.side === s}

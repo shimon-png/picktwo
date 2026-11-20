@@ -159,6 +159,8 @@ export const options = pgTable(
     battleId: text("battle_id").notNull().references(() => battles.id, { onDelete: "cascade" }),
     side: sideEnum("side").notNull(),
     label: text("label").notNull(),
+    /** Optional one-liner shown under the option name. */
+    description: text("description"),
     imageUrl: text("image_url"),
     url: text("url"),
     urlTitle: text("url_title"),
