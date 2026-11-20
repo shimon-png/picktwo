@@ -31,7 +31,7 @@ export function HeroBattle({ b }: { b: BattleCard }) {
   }
 
   return (
-    <div className="card p-3.5">
+    <div className="relative rounded-[22px] bg-white p-4 shadow-lift">
       <div className="flex items-center gap-2 text-xs text-zinc-500">
         <Avatar name={handle} seed={b.authorHandle ?? b.id} />
         <span className="truncate">
@@ -42,7 +42,7 @@ export function HeroBattle({ b }: { b: BattleCard }) {
       </div>
       <h2 className="mt-2.5 text-lg leading-snug">{b.title}</h2>
       {b.context && <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500">{b.context}</p>}
-      <div className="mt-3 grid h-[170px] grid-cols-2 gap-2">
+      <div className="mt-3 grid h-[190px] grid-cols-2 gap-2">
         {(["A", "B"] as const).map((s) => (
           <button
             key={s}
@@ -64,7 +64,7 @@ export function HeroBattle({ b }: { b: BattleCard }) {
           </button>
         ))}
       </div>
-      <p className="mt-2.5 text-xs text-zinc-500" aria-live="polite">
+      <p className="mt-3 text-center text-[13px] text-zinc-500" aria-live="polite">
         {res ? (
           <>
             Counted. {res.total} {res.total === 1 ? "person" : "people"} weighed in —{" "}
