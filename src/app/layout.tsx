@@ -7,8 +7,7 @@ import { linkDevice } from "@/server/services/votes";
 import { unreadCount } from "@/server/services/notifications";
 import { countOpenLoops } from "@/server/services/points";
 import { getEconomy } from "@/server/services/config";
-import { Nav, ChromeOnly } from "@/components/layout/Nav";
-import { Logo } from "@/components/layout/Logo";
+import { Nav, ChromeOnly, ContentShell, HeaderLogo } from "@/components/layout/Nav";
 import { PriorityPill } from "@/components/priority/PriorityPill";
 import { Toaster } from "@/components/ui/Toaster";
 import { appUrl } from "@/lib/utils";
@@ -43,11 +42,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
           Skip to content
         </a>
-        <div className="md:pl-56">
+        <ContentShell>
           <ChromeOnly>
             <header className="sticky top-0 z-30 bg-white/90 backdrop-blur">
               <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
-                <Logo className="md:invisible" />
+                <HeaderLogo />
                 {user ? (
                   <PriorityPill initial={user.ppBalance} openLoops={openLoops} highAt={economy.tierHighAt} topAt={economy.tierTopAt} />
                 ) : (
@@ -61,7 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main id="main" className="mx-auto max-w-2xl px-4 pb-28 pt-2 md:pb-12">
             {children}
           </main>
-        </div>
+        </ContentShell>
         <Nav unread={unread} />
         <Toaster />
       </body>
