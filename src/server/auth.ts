@@ -2,11 +2,13 @@ import NextAuth, { type NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import Credentials from "next-auth/providers/credentials";
+import { CredentialsSignin } from "next-auth";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { users, accounts, sessions, verificationTokens } from "./db/schema";
 import { sendEmail, magicLinkEmail } from "./email";
+import { verifySigninCode } from "./services/signin-code";
 
 const providers: NextAuthConfig["providers"] = [];
 
@@ -17,6 +19,27 @@ providers.push(
     from: process.env.EMAIL_FROM || "crowdpick <onboarding@resend.dev>",
     async sendVerificationRequest({ identifier, url }) {
       await sendEmail({ to: identifier, ...magicLinkEmail(url) }, { devLog: `Magic sign-in link for ${identifier}: ${url}` });
+    },
+  }),
+);
+
+class CodeError extends CredentialsSignin {
+  constructor(code: string) {
+    super();
+    this.code = code;
+  }
+}
+
+// Email + 6-digit code (the main way to sign in / sign up). Codes come from POST /api/signin-code.
+providers.push(
+  Credentials({
+    id: "code",
+    name: "Email code",
+    credentials: { email: { label: "Email", type: "email" }, code: { label: "Code", type: "text" } },
+    async authorize(creds) {
+      const r = await verifySigninCode(String(creds?.email || ""), String(creds?.code || ""));
+      if ("error" in r) throw new CodeError(r.error);
+      return { id: r.user.id, email: r.user.email, name: r.user.name, image: r.user.image };
     },
   }),
 );

@@ -40,6 +40,16 @@ export function magicLinkEmail(url: string) {
   };
 }
 
+export function signinCodeEmail(code: string, minutes: number) {
+  return {
+    subject: `${code} is your crowdpick code`,
+    html: shell(`<p style="font-size:16px">Your crowdpick sign-in code:</p>
+<p style="font-size:34px;font-weight:600;letter-spacing:8px;margin:12px 0;color:#1A1F2E">${code}</p>
+<p style="color:#52525b;font-size:14px">It expires in ${minutes} minutes. If you didn't ask for it, you can ignore this email.</p>`),
+    text: `Your crowdpick sign-in code is ${code}. It expires in ${minutes} minutes.`,
+  };
+}
+
 export function reportBackEmail(opts: {
   title: string;
   slug: string;

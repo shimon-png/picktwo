@@ -119,6 +119,8 @@ export const ECONOMY_DEFAULTS = {
   /** Display tiers on the ⚡ meter: Normal below tierHighAt, High below tierTopAt, Top at/above. */
   tierHighAt: 20,
   tierTopAt: 40,
+  /** Battles a signed-out visitor can vote on before the "Sign up to keep voting" gate. */
+  guestVoteLimit: 5,
 } as const;
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 

@@ -186,3 +186,44 @@ test("contact form: terms link → form → thank-you", async ({ page }) => {
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByText("Thanks, we got your message")).toBeVisible();
 });
+
+test("guest gate: 5 free votes, then sign up with an emailed code (needs DEV_LOGIN, no Resend key)", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
+  const page = await ctx.newPage();
+  await page.goto("/vote");
+  const feed = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];
+  test.skip(feed.length < 7, "needs at least 7 open battles");
+  for (const it of feed.slice(0, 5)) expect((await page.request.post(`/api/battles/${it.slug}/vote`, { data: { side: "A" } })).ok()).toBe(true);
+  const sixth = await page.request.post(`/api/battles/${feed[5].slug}/vote`, { data: { side: "A" } });
+  expect(sixth.status()).toBe(401);
+  await page.reload();
+  const gate = page.getByRole("region", { name: "Sign up to keep voting" });
+  await expect(gate.getByText("Step 1 of 4")).toBeVisible();
+  await gate.getByLabel("Your email").fill(`gate-${stamp}@test.dev`);
+  await gate.getByRole("button", { name: "Email me a code" }).click();
+  const code = (await gate.getByText(/Dev mode: your code is/).innerText()).match(/\d{6}/)![0];
+  await gate.getByLabel("Code").fill(code);
+  await gate.getByRole("button", { name: "Verify" }).click();
+  await gate.getByRole("button", { name: "Female", exact: true }).click();
+  await gate.getByRole("button", { name: "35–44" }).click();
+  await gate.getByRole("button", { name: "Continue" }).click();
+  await gate.getByLabel(/ZIP code/).fill("94110");
+  await gate.getByRole("button", { name: "Finish and keep voting" }).click();
+  await expect(page.getByText(/to High priority|Top priority/)).toBeVisible();
+  // Guest votes carried over: none of the 5 battles come back.
+  const after = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];
+  const votedSlugs = new Set(feed.slice(0, 5).map((f) => f.slug));
+  expect(after.some((a) => votedSlugs.has(a.slug))).toBe(false);
+});
+
+test("vote stack: the pick can be changed until Next", async ({ browser }) => {
+  const page = await newUser(browser, "changer");
+  await page.goto("/vote");
+  const [a, b] = await page.getByRole("button", { name: /^Vote for/ }).all();
+  await a.click();
+  await expect(a).toHaveAttribute("aria-pressed", "true");
+  await b.click();
+  await expect(b).toHaveAttribute("aria-pressed", "true");
+  await expect(a).toHaveAttribute("aria-pressed", "false");
+});

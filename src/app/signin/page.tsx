@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { signIn, enabledProviders } from "@/server/auth";
 import { getCurrentUser } from "@/server/viewer";
+import { SignupFlow } from "@/components/auth/SignupFlow";
 
 export const metadata = { title: "Sign in" };
 
@@ -15,16 +15,6 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   const callbackUrl = safeCallback(sp.callbackUrl);
   if (await getCurrentUser()) redirect(callbackUrl);
 
-  async function emailAction(form: FormData) {
-    "use server";
-    const email = String(form.get("email") || "").trim().toLowerCase();
-    try {
-      await signIn("resend", { email, redirectTo: callbackUrl });
-    } catch (e) {
-      if (e instanceof AuthError) redirect(`/signin?error=email&callbackUrl=${encodeURIComponent(callbackUrl)}`);
-      throw e;
-    }
-  }
   async function googleAction() {
     "use server";
     await signIn("google", { redirectTo: callbackUrl });
@@ -70,13 +60,7 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
             </button>
           </form>
         )}
-        <form action={emailAction} className="space-y-2">
-          <label htmlFor="email" className="label">
-            Email
-          </label>
-          <input id="email" name="email" type="email" required className="input" placeholder="you@example.com" autoComplete="email" />
-          <button className="btn-primary w-full py-3">Email me a sign-in link</button>
-        </form>
+        <SignupFlow next={callbackUrl} />
         {enabledProviders.dev && (
           <form action={devAction} className="space-y-2 border-t border-dashed border-zinc-300 pt-4">
             <p className="text-xs font-medium uppercase tracking-wide text-amber-600">Demo login (DEV_LOGIN=true)</p>
@@ -85,9 +69,6 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           </form>
         )}
       </div>
-      <p className="text-center text-xs text-zinc-400">
-        By continuing you agree to our <Link href="/legal/terms" className="underline">Terms</Link> and <Link href="/legal/privacy" className="underline">Privacy Policy</Link>. crowdpick is for adults 18+.
-      </p>
     </div>
   );
 }
