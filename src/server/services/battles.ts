@@ -83,6 +83,7 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
         battleId: b.id,
         side: (i === 0 ? "A" : "B") as "A" | "B",
         label: o.label,
+        description: o.description || null,
         imageUrl: o.imageUrl || null,
         url: o.url || null,
         urlTitle: o.urlTitle || null,
@@ -419,6 +420,8 @@ export type BattleCard = {
   createdAt: string;
   labelA: string;
   labelB: string;
+  descA: string | null;
+  descB: string | null;
   imageA: string | null;
   imageB: string | null;
   authorHandle: string | null;
@@ -477,6 +480,8 @@ export async function hydrateCards(
       createdAt: b.createdAt.toISOString(),
       labelA: A?.label ?? "A",
       labelB: B?.label ?? "B",
+      descA: A?.description ?? null,
+      descB: B?.description ?? null,
       imageA: A?.imageUrl || A?.urlImage || null,
       imageB: B?.imageUrl || B?.urlImage || null,
       authorHandle,

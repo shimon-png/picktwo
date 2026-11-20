@@ -257,6 +257,7 @@ export function SwipeDeck({
                 <OptionFace
                   side={s}
                   label={s === "A" ? card.labelA : card.labelB}
+                  description={s === "A" ? card.descA : card.descB}
                   image={s === "A" ? card.imageA : card.imageB}
                   percent={result ? (s === "A" ? result.a : result.b) : null}
                   ring={voted === s}

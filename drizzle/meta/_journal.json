@@ -15,6 +15,20 @@
       "when": 1794780631952,
       "tag": "0001_seed_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795183584410,
+      "tag": "0002_option_description",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795183585361,
+      "tag": "0003_seed_contests",
+      "breakpoints": true
     }
   ]
 }

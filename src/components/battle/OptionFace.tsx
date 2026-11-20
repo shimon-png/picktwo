@@ -5,6 +5,7 @@ export type OptionData = {
   id: string;
   side: "A" | "B";
   label: string;
+  description?: string | null;
   imageUrl: string | null;
   url: string | null;
   urlImage: string | null;
@@ -19,6 +20,7 @@ export type OptionData = {
 export function OptionFace({
   side,
   label,
+  description,
   image,
   percent,
   ring,
@@ -28,6 +30,7 @@ export function OptionFace({
 }: {
   side: "A" | "B";
   label: string;
+  description?: string | null;
   image?: string | null;
   percent?: number | null;
   ring?: boolean;
@@ -69,6 +72,9 @@ export function OptionFace({
           </span>
         )}
         <span className={cn("mt-1 line-clamp-2 block text-[13px]", image ? "text-white" : "text-ink")}>{label}</span>
+        {description && (
+          <span className={cn("mt-0.5 line-clamp-2 block text-[11px] leading-snug", image ? "text-white/80" : "text-zinc-500")}>{description}</span>
+        )}
       </span>
       {(ring || hot) && (
         <span
