@@ -1,0 +1,185 @@
+# Base design snapshot (revert point)
+
+Saved 2026-11-20 before the vibrant-redesign exploration, so we can always return to it.
+
+- **Revert point:** `main` @ `22fb55954aba67dc655326ff3a711893ff5bd085` (Merge PR #8). To restore the look: `git checkout 22fb559 -- src/app/globals.css src/components public/brand`.
+- **Theme:** crowdpick.ai light theme v3. White page, cool-neutral surface `oklch(0.972 0.008 265)`, ink `oklch(0.22 0.03 265)`.
+- **Option colours:** A = blue `oklch(0.58 0.21 258)`, B = coral `oklch(0.64 0.21 22)`. ⚡ points = amber `oklch(0.74 0.17 60)`.
+- **Type:** Inter Variable, headings weight 500, no bold. 15px base.
+- **Radii:** buttons 8, cards 14, stack card 16, sheet 20.
+
+Full token file at that commit, verbatim:
+
+```css
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * crowdpick.ai design tokens (light theme, v3). OKLCH is the source of truth.
+ * The zinc ramp is remapped to the design's cool neutral (hue 265) so every existing
+ * zinc-* utility picks up the new palette.
+ */
+@theme {
+  /* Primary — blue, hue 258 (A / accent) */
+  --color-accent: oklch(0.58 0.21 258);
+  --color-accent-100: oklch(0.3 0.12 258);
+  --color-accent-200: oklch(0.38 0.15 258);
+  --color-accent-300: oklch(0.48 0.19 258);
+  --color-accent-400: oklch(0.54 0.21 258);
+  --color-accent-500: oklch(0.62 0.2 258);
+  --color-accent-600: oklch(0.72 0.15 258);
+  --color-accent-700: oklch(0.84 0.09 258);
+  --color-accent-800: oklch(0.91 0.05 258);
+  --color-accent-900: oklch(0.955 0.03 258);
+
+  /* Option A is the accent; option B is coral */
+  --color-a: oklch(0.58 0.21 258);
+  --color-a-soft: oklch(0.95 0.03 258);
+  --color-b: oklch(0.64 0.21 22);
+  --color-b-soft: oklch(0.95 0.035 22);
+
+  /* ⚡ priority points — amber */
+  --color-pp: oklch(0.74 0.17 60);
+  --color-pp-soft: oklch(0.96 0.05 80);
+  --color-ok: oklch(0.62 0.17 145);
+
+  /* Category / step colours (solid + tint at L .95) */
+  --color-pink: oklch(0.64 0.22 350);
+  --color-pink-soft: oklch(0.95 0.035 350);
+  --color-teal: oklch(0.62 0.13 185);
+  --color-teal-soft: oklch(0.95 0.035 185);
+  --color-green: oklch(0.62 0.17 145);
+  --color-green-soft: oklch(0.95 0.045 145);
+  --color-violet: oklch(0.56 0.21 295);
+  --color-violet-soft: oklch(0.95 0.035 295);
+  --color-amber: oklch(0.74 0.17 60);
+  --color-amber-soft: oklch(0.96 0.05 80);
+
+  /* Lemon section band */
+  --color-section: oklch(0.93 0.13 98);
+  --color-section-glow: oklch(0.97 0.09 105);
+
+  /* Surfaces */
+  --color-surface: oklch(0.972 0.008 265);
+  --color-ink: oklch(0.22 0.03 265);
+
+  /* Neutral ramp (remaps zinc-*) */
+  --color-zinc-50: oklch(0.985 0.004 265);
+  --color-zinc-100: oklch(0.955 0.008 265);
+  --color-zinc-200: oklch(0.915 0.01 265);
+  --color-zinc-300: oklch(0.84 0.012 265);
+  --color-zinc-400: oklch(0.66 0.016 265);
+  --color-zinc-500: oklch(0.55 0.018 265);
+  --color-zinc-600: oklch(0.45 0.018 265);
+  --color-zinc-700: oklch(0.37 0.018 265);
+  --color-zinc-800: oklch(0.3 0.018 265);
+  --color-zinc-900: oklch(0.22 0.03 265);
+  --color-zinc-950: oklch(0.17 0.03 265);
+
+  --shadow-ring: 0 0 0 1px oklch(0.91 0.01 265);
+  --shadow-card: 0 0 0 1px oklch(0.91 0.01 265), 0 8px 24px rgba(20, 30, 70, 0.1);
+  --shadow-lift: 0 0 0 1px oklch(0.88 0.01 265), 0 18px 44px rgba(20, 30, 70, 0.16);
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body {
+  @apply bg-white text-ink antialiased;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+h1,
+h2,
+h3 {
+  @apply font-medium;
+  letter-spacing: -0.02em;
+}
+
+@utility display {
+  @apply font-medium;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+@utility card {
+  @apply rounded-[14px] bg-surface;
+}
+@utility card-ring {
+  @apply rounded-[14px] bg-white shadow-ring;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-[15px] font-medium transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45;
+}
+@utility btn-primary {
+  @apply btn bg-accent text-white hover:bg-accent-400;
+}
+@utility btn-accent-outline {
+  @apply btn border border-accent text-accent hover:bg-accent/12;
+}
+@utility btn-ghost {
+  @apply btn text-accent hover:bg-accent-900;
+}
+@utility btn-outline {
+  @apply btn border border-ink/12 bg-white text-ink hover:bg-surface;
+}
+@utility btn-pp {
+  @apply btn bg-pp-soft text-amber-800 hover:brightness-95;
+}
+@utility input {
+  @apply w-full rounded-lg border border-ink/12 bg-surface px-3 py-2.5 text-[15px] outline-none placeholder:text-zinc-400 focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/15;
+}
+@utility chip {
+  @apply inline-flex items-center gap-1 rounded-md bg-surface px-2.5 py-1.5 text-[13px] text-zinc-700 transition hover:bg-zinc-200;
+}
+@utility chip-on {
+  @apply bg-accent-900 text-accent ring-1 ring-accent/40 hover:bg-accent-800;
+}
+@utility tag {
+  @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs;
+}
+@utility label {
+  @apply mb-1.5 block text-[13px] text-zinc-600;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.96); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop { animation: pop 0.25s ease-out; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-toast { animation: toast-in 0.25s ease-out; }
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.animate-sheet { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+/* Homepage hero: battles auto-skip (swipe out left, next slides in) */
+@keyframes hero-in {
+  from { opacity: 0; transform: translateX(48px) rotate(3deg) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hero-out {
+  to { opacity: 0; transform: translateX(-115%) rotate(-10deg); }
+}
+@keyframes hero-progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
+.hero-card-in { animation: hero-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.hero-card-out { animation: hero-out 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }
+```
