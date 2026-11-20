@@ -29,6 +29,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
           handle: suggested.length >= 3 ? suggested : "",
           bio: user.bio ?? "",
           kidAges: user.kidAges,
+          kidsStatus: user.kidsStatus ?? (user.kidAges.length ? "YES" : ""),
           country: user.country ?? "",
           region: user.region ?? "",
           zipCode: user.zipCode ?? "",

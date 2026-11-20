@@ -62,6 +62,8 @@ export const users = pgTable("user", {
   zipCode: text("zip_code"),
   sex: text("sex"),
   ageRange: text("age_range"),
+  /** Answer to "Do you have kids?": YES / NO / UNDISCLOSED (null = not answered). */
+  kidsStatus: text("kids_status"),
   kidAges: text("kid_ages").array().$type<KidAge[]>().notNull().default([]),
   interests: text("interests").array().notNull().default([]),
   ppBalance: integer("pp_balance").notNull().default(10),
