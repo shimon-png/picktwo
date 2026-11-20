@@ -20,3 +20,6 @@ _Last updated: November 2026_
 
 ## Children
 crowdpick.ai is for adults 18+. Please don't upload photos where a child's face is visible. Reports of child-safety concerns are prioritised by our moderation team.
+
+## Contact
+Questions about your data, or want it exported or deleted? [Contact the crowdpick.ai team](/contact).

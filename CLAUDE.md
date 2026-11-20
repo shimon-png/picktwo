@@ -22,6 +22,7 @@ PickTwo is a standalone, mobile-first Next.js app deployed on Vercel. The produc
 - **No categories in the product.** No picker, filter or labels. The `category` table and `battle.category_id` stay for existing data; new battles store `DEFAULT_CATEGORY_ID` ("other"). Reputation and ranking still key on it, so they now act as overall scores.
 - One-tap reason chips: `REASON_CHIPS` (same for every battle); a chip counts as a valid reason for the reason bonus (`castVote`).
 - **Admin "post as":** admins (`isAdmin()`: `ADMIN` role or `ADMIN_EMAILS`) see a "Post as" username field on the review sheet. `createBattle` posts under that user, creating an email-less profile if the handle doesn't exist; non-admins get 403.
+- **Contact us:** `/contact` form → `POST /api/contact` (IP rate limit + honeypot + min fill time) → `contact_message` table via `services/contact.ts`. Admins read them at `/admin/messages` (unread badge in the admin bar and on You). Set `CONTACT_ALERT_EMAIL` to also get an email per message once Resend is configured. Legal markdown supports `[text](/path)` links.
 
 ## Commands
 

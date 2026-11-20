@@ -3,8 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { Bell, ChevronRight, GraduationCap, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
-import { getCurrentUser } from "@/server/viewer";
+import { Bell, ChevronRight, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
+import { getCurrentUser, isAdmin } from "@/server/viewer";
+import { unreadContactCount } from "@/server/services/contact";
 import { db } from "@/server/db";
 import { battles, pointLedger, votes } from "@/server/db/schema";
 import { getEconomy } from "@/server/services/config";
@@ -40,12 +41,14 @@ export default async function YouPage() {
   if (!user) redirect("/signin?callbackUrl=/you");
   if (profileIncomplete(user)) redirect(onboardingUrl("/you"));
   const e = await getEconomy();
+  const admin = isAdmin(user);
   const [mine, openLoops, unread, ledger] = await Promise.all([
     battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 30),
     countOpenLoops(user.id, e),
     unreadCount(user.id),
     db.select().from(pointLedger).where(eq(pointLedger.userId, user.id)).orderBy(desc(pointLedger.createdAt)).limit(15),
   ]);
+  const newMessages = admin ? await unreadContactCount() : 0;
   const reasonCounts = new Map<string, number>();
   if (mine.length) {
     const rows = await db
@@ -141,6 +144,8 @@ export default async function YouPage() {
             [`/u/${user.handle}`, User, "Public profile", 0],
             ["/settings", Settings, "Settings", 0],
             [TOUR_URL, GraduationCap, "Tutorial", 0],
+            ["/contact", LifeBuoy, "Contact us & feedback", 0],
+            ...(admin ? ([["/admin/messages", Mail, "Admin · contact messages", newMessages]] as const) : []),
           ] as const
         ).map(([href, Icon, label, badge]) => (
           <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface">

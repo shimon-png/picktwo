@@ -170,3 +170,14 @@ test("non-admin gets 404 on /admin (A-20)", async ({ browser }) => {
   const res = await p.goto("/admin");
   expect(res?.status()).toBe(404);
 });
+
+test("contact form: terms link → form → thank-you", async ({ page }) => {
+  await page.goto("/legal/terms");
+  await page.getByRole("link", { name: "Contact the crowdpick.ai team" }).click();
+  await page.waitForURL("**/contact");
+  await page.getByLabel("Email").fill(`contact-${stamp}@test.dev`);
+  await page.getByLabel("Message").fill("Testing the contact form end to end.");
+  await page.waitForTimeout(2600); // the form ignores submits faster than a human could type
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Thanks, we got your message")).toBeVisible();
+});

@@ -345,6 +345,26 @@ export const appConfig = pgTable("app_config", {
   updatedAt: now("updated_at"),
 });
 
+// Contact-us form submissions, read in /admin/messages.
+export const contactMessages = pgTable(
+  "contact_message",
+  {
+    id: id(),
+    name: text("name"),
+    email: text("email").notNull(),
+    topic: text("topic").notNull(),
+    message: text("message").notNull(),
+    userId: text("user_id"),
+    pageUrl: text("page_url"),
+    userAgent: text("user_agent"),
+    status: text("status").notNull().default("NEW"), // NEW | HANDLED
+    createdAt: now("created_at"),
+    handledBy: text("handled_by"),
+    handledAt: ts("handled_at"),
+  },
+  (t) => [index("contact_message_status").on(t.status, t.createdAt)],
+);
+
 // ---------- Relations ----------
 export const battlesRelations = relations(battles, ({ one, many }) => ({
   author: one(users, { fields: [battles.authorId], references: [users.id] }),
@@ -369,3 +389,4 @@ export type Battle = typeof battles.$inferSelect;
 export type Option = typeof options.$inferSelect;
 export type Vote = typeof votes.$inferSelect;
 export type Outcome = typeof outcomes.$inferSelect;
+export type ContactMessage = typeof contactMessages.$inferSelect;
