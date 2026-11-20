@@ -149,7 +149,7 @@ export function SwipeDeck({
 
   const header = (
     <div className="sticky top-14 z-20 -mx-4 bg-white/95 px-4 pb-3 backdrop-blur">
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs text-zinc-500" data-tour="status">
         {tierLine ?? (
           <>
             Votes count without an account.{" "}
@@ -233,7 +233,7 @@ export function SwipeDeck({
             </span>
             <span className="ml-auto shrink-0">{timeLeft(card.deadline)}</span>
           </div>
-          <h1 className="mt-2.5 text-[21px] leading-snug">
+          <h1 className="mt-2.5 text-[21px] leading-snug" data-tour="question">
             <Link href={`/b/${card.slug}?src=feed`} data-nodrag className="hover:underline">
               {card.title}
             </Link>
@@ -246,6 +246,7 @@ export function SwipeDeck({
                 key={s}
                 type="button"
                 className="h-full min-h-0 active:scale-[0.98]"
+                data-tour={s === "A" ? "option-a" : "option-b"}
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
                 aria-pressed={voted === s}
                 disabled={!!voted}
@@ -335,7 +336,7 @@ export function SwipeDeck({
           ) : (
             <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
               <span>← A · swipe or tap · B →</span>
-              <button type="button" data-nodrag className="btn-ghost !px-2 !py-1 text-[13px] text-ink" onClick={skip}>
+              <button type="button" data-nodrag data-tour="skip" className="btn-ghost !px-2 !py-1 text-[13px] text-ink" onClick={skip}>
                 Skip
               </button>
             </div>

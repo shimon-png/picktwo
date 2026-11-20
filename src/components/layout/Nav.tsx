@@ -67,6 +67,7 @@ export function Nav({ unread }: { unread: number }) {
               <Link
                 href={it.href}
                 aria-current={active ? "page" : undefined}
+                data-tour={`nav-${it.label.toLowerCase()}`}
                 className={cn(
                   "relative flex flex-col items-center gap-0.5 py-2 text-xs text-zinc-500 md:flex-row md:gap-3 md:rounded-lg md:px-3 md:text-[15px]",
                   active && "text-pink md:bg-pink-soft",

@@ -1,8 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { Bell, ChevronRight, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
+import { Bell, ChevronRight, GraduationCap, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
 import { getCurrentUser } from "@/server/viewer";
 import { db } from "@/server/db";
 import { battles, pointLedger, votes } from "@/server/db/schema";
@@ -12,6 +13,7 @@ import { countOpenLoops } from "@/server/services/points";
 import { unreadCount } from "@/server/services/notifications";
 import { pointsTier } from "@/server/services/priority";
 import { TONE_CLASSES, type Tone } from "@/lib/constants";
+import { TOUR_URL } from "@/lib/tour";
 import { cn, timeAgo, timeLeft } from "@/lib/utils";
 
 export const metadata = { title: "You" };
@@ -36,7 +38,7 @@ const LEDGER_LABELS: Record<string, string> = {
 export default async function YouPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/signin?callbackUrl=/you");
-  if (!user.onboardedAt) redirect("/onboarding?next=/you");
+  if (profileIncomplete(user)) redirect(onboardingUrl("/you"));
   const e = await getEconomy();
   const [mine, openLoops, unread, ledger] = await Promise.all([
     battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 30),
@@ -138,6 +140,7 @@ export default async function YouPage() {
             ["/activity", Bell, "Activity", unread],
             [`/u/${user.handle}`, User, "Public profile", 0],
             ["/settings", Settings, "Settings", 0],
+            [TOUR_URL, GraduationCap, "Tutorial", 0],
           ] as const
         ).map(([href, Icon, label, badge]) => (
           <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface">
