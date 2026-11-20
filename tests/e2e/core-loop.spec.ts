@@ -14,6 +14,9 @@ async function onboard(page: Page, handle: string) {
   if (!page.url().includes("/onboarding")) await page.goto("/onboarding");
   await page.getByLabel("Display name").fill(handle);
   await page.getByLabel("Username").fill(handle);
+  await page.getByLabel("ZIP code").fill("10001");
+  await page.getByRole("button", { name: "Male", exact: true }).click();
+  await page.getByRole("button", { name: "25–34" }).click();
   await page.getByRole("button", { name: "Yes" }).click();
   await page.getByRole("button", { name: "5–8" }).click();
   await page.getByText("I’m 18 or older").click();
@@ -23,6 +26,8 @@ async function onboard(page: Page, handle: string) {
 
 async function newUser(browser: Browser, name: string) {
   const ctx = await browser.newContext();
+  // Skip the first-visit tutorial overlay on /vote; it would block taps.
+  await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
   const page = await ctx.newPage();
   await login(page, `${name}-${stamp}@test.dev`);
   await onboard(page, `${name}_${stamp}`.slice(0, 20));
