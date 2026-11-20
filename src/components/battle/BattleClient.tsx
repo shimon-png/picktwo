@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronUp, ExternalLink, Lock, Pencil, StopCircle, ThumbsDown, ThumbsUp, Trash2, Users, Zap } from "lucide-react";
 import { api, setPP, toast } from "@/lib/client";
 import { cn, formatPrice, timeAgo, timeLeft } from "@/lib/utils";
-import { TONE_CLASSES, categoryById, kidAgeLabel } from "@/lib/constants";
+import { TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import type { BattleView, ReasonView } from "@/server/services/battles";
 import { Avatar } from "@/components/ui/Avatar";
 import { OptionFace } from "./OptionFace";
@@ -94,7 +94,6 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
   const { A, B } = v.options;
   const res = v.results;
   const leader = res && res.total > 0 ? (res.a === res.b ? null : res.a > res.b ? "A" : "B") : null;
-  const cat = categoryById(v.category.id);
   const kidAges: string[] = v.tags?.kidAge ?? [];
   const loopPoints = v.loopRewards.loop;
   const allReasons = [...v.reasons.A, ...v.reasons.B].sort((x, y) => score(y) - score(x));
@@ -126,7 +125,6 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
           ) : (
             <span className="tag bg-surface text-zinc-600">Voting closed</span>
           )}
-          <span className={cn("tag", TONE_CLASSES[cat.tone].soft)}>{cat.short}</span>
           {kidAges.map((k) => (
             <span key={k} className={cn("tag", TONE_CLASSES.teal.soft)}>
               Kid {kidAgeLabel(k)}

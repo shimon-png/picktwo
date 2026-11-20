@@ -10,7 +10,7 @@ import { notify } from "./notifications";
 import { getBattleRow, assertCanView } from "./battles";
 import { track } from "../analytics";
 import { pct } from "@/lib/utils";
-import { reasonSuggestions } from "@/lib/constants";
+import { isReasonChip } from "@/lib/constants";
 
 const VOTE_MILESTONES = [1, 10, 50, 100];
 
@@ -31,7 +31,7 @@ export async function castVote(
   const user = viewer.user;
   // A one-tap suggested reason chip counts as a reason even though it's short.
   const reasonEarns =
-    isValidReason(input.reason, economy.reasonMinChars) || (!!input.reason && reasonSuggestions(b.categoryId).includes(input.reason.trim()));
+    isValidReason(input.reason, economy.reasonMinChars) || (!!input.reason && isReasonChip(input.reason));
 
   const res = await db.transaction(async (tx) => {
     const owner = user ? eq(votes.userId, user.id) : eq(votes.deviceId, viewer.deviceId!);

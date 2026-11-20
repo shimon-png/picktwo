@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/server/viewer";
+import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { getEconomy } from "@/server/services/config";
 import { countOpenLoops } from "@/server/services/points";
 import { ComposeForm } from "@/components/compose/ComposeForm";
@@ -18,6 +18,7 @@ export default async function PostPage() {
       tiers={{ highAt: economy.tierHighAt, topAt: economy.tierTopAt }}
       openLoops={openLoops}
       accountConsent={user.dataConsent}
+      isAdmin={isAdmin(user)}
     />
   );
 }

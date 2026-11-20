@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { loopFactor, posterPriority, priorityFactor, priorityTier, pointsTier, voteQualityIssue, isValidReason, reminderDue } from "@/server/services/priority";
-import { guessCategory } from "@/lib/constants";
+import { createBattleInput } from "@/lib/validators";
+import { isReasonChip } from "@/lib/constants";
 
 const base = {
   signedIn: true,
@@ -112,12 +113,30 @@ describe("pointsTier (⚡ meter)", () => {
   });
 });
 
-describe("guessCategory", () => {
-  it("guesses from option names", () => {
-    expect(guessCategory("Lego Art Set Paint easel")).toBe("gifts");
-    expect(guessCategory("Navy dress Black jumpsuit jacket")).toBe("what-to-wear");
-    expect(guessCategory("Grey sofa Green sofa")).toBe("home-design");
-    expect(guessCategory("Olivia Amelia names")).toBe("baby-names");
-    expect(guessCategory("something else")).toBe("gifts");
+describe("createBattleInput.postAs (admin post-as)", () => {
+  const base = {
+    title: "Red or blue?",
+    deadlineHours: 24,
+    options: [{ label: "Red" }, { label: "Blue" }],
+  };
+  it("normalises @Handle to handle", () => {
+    expect(createBattleInput.parse({ ...base, postAs: "@Maya_K" }).postAs).toBe("maya_k");
+  });
+  it("treats empty as not set", () => {
+    expect(createBattleInput.parse({ ...base, postAs: "" }).postAs).toBeUndefined();
+  });
+  it("rejects invalid usernames", () => {
+    expect(() => createBattleInput.parse({ ...base, postAs: "a b" })).toThrow();
+    expect(() => createBattleInput.parse({ ...base, postAs: "ab" })).toThrow();
+  });
+  it("no longer takes a category", () => {
+    expect("categoryId" in createBattleInput.parse({ ...base, categoryId: "gifts" })).toBe(false);
+  });
+});
+
+describe("reason chips", () => {
+  it("recognises the one-tap chips", () => {
+    expect(isReasonChip("Just feels right")).toBe(true);
+    expect(isReasonChip("nope")).toBe(false);
   });
 });

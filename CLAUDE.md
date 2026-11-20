@@ -15,11 +15,13 @@ PickTwo is a standalone, mobile-first Next.js app deployed on Vercel. The produc
 ## Design system (crowdpick.ai redesign)
 
 - Brand is **crowdpick.ai** (repo/package name stays `picktwo`). Mark + wordmark: `components/layout/Logo.tsx`, SVGs in `public/brand/`.
-- Tokens live in `src/app/globals.css` `@theme` (OKLCH). The `zinc-*` ramp is remapped to the design neutral, so prefer `text-ink`, `bg-surface`, `accent-*`, `a`/`b` (option colours) and the tone pairs (`pink`, `teal`, `green`, `violet`, `amber` + `-soft`). Category → tone mapping is `CATEGORIES[].tone` / `TONE_CLASSES` in `lib/constants.ts` (static class strings so Tailwind sees them).
+- Tokens live in `src/app/globals.css` `@theme` (OKLCH). The `zinc-*` ramp is remapped to the design neutral, so prefer `text-ink`, `bg-surface`, `accent-*`, `a`/`b` (option colours) and the tone pairs (`pink`, `teal`, `green`, `violet`, `amber` + `-soft`). Tone pairs are `TONE_CLASSES` in `lib/constants.ts` (static class strings so Tailwind sees them).
 - Headings are Inter weight 500 (no bold); buttons radius 8, cards 14, stack card 16, sheet 20.
 - IA: 3 tabs — **Vote** (`/vote`, also home when signed in), **Post** (`/post`), **You** (`/you`; `/priority` redirects there). Full-screen flows hide the header + tab bar via `isFullScreen()` in `components/layout/Nav.tsx`.
 - ⚡ display tiers (Normal / High / Top) come from `pointsTier()` in `services/priority.ts`, thresholds `tierHighAt` / `tierTopAt` in the economy config. Feed ranking still uses the continuous `priorityFactor()`.
-- One-tap reason chips: `REASON_SUGGESTIONS` per category; a chip counts as a valid reason for the reason bonus (`castVote`).
+- **No categories in the product.** No picker, filter or labels. The `category` table and `battle.category_id` stay for existing data; new battles store `DEFAULT_CATEGORY_ID` ("other"). Reputation and ranking still key on it, so they now act as overall scores.
+- One-tap reason chips: `REASON_CHIPS` (same for every battle); a chip counts as a valid reason for the reason bonus (`castVote`).
+- **Admin "post as":** admins (`isAdmin()`: `ADMIN` role or `ADMIN_EMAILS`) see a "Post as" username field on the review sheet. `createBattle` posts under that user, creating an email-less profile if the handle doesn't exist; non-admins get 403.
 
 ## Commands
 
