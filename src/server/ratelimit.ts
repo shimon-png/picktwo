@@ -13,6 +13,8 @@ export const RULES = {
   unfurl: { limit: 20, windowSec: 60 },
   upload: { limit: 30, windowSec: 3600 },
   report: { limit: 10, windowSec: 3600 },
+  contactHour: { limit: 5, windowSec: 3600 },
+  contactDay: { limit: 20, windowSec: 86400 },
   generic: { limit: 60, windowSec: 60 },
 } satisfies Record<string, Rule>;
 

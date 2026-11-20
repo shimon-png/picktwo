@@ -14,11 +14,26 @@ import { isReasonChip } from "@/lib/constants";
 
 const VOTE_MILESTONES = [1, 10, 50, 100];
 
-export async function castVote(
-  slug: string,
-  viewer: { user: User | null; deviceId: string | null },
-  input: { side: "A" | "B"; reason?: string; dwellMs?: number; source?: string },
-) {
+type VoteViewer = { user: User | null; deviceId: string | null };
+type VoteInput = { side: "A" | "B"; reason?: string; dwellMs?: number; source?: string };
+
+function isUniqueViolation(e: unknown): boolean {
+  const err = e as { code?: string; cause?: unknown } | null;
+  return !!err && (err.code === "23505" || isUniqueViolation(err.cause));
+}
+
+export async function castVote(slug: string, viewer: VoteViewer, input: VoteInput) {
+  try {
+    return await castVoteOnce(slug, viewer, input);
+  } catch (e) {
+    // Two requests for the same voter raced (e.g. vote tap then an instant reason chip):
+    // both saw no row and tried to insert. Retry once; the row now exists, so it updates.
+    if (isUniqueViolation(e)) return castVoteOnce(slug, viewer, input);
+    throw e;
+  }
+}
+
+async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) {
   const b = await getBattleRow(slug);
   if (!b) throw new AppError("NOT_FOUND", "Battle not found");
   await assertCanView(b, viewer.user);

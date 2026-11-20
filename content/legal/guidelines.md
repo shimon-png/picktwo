@@ -15,3 +15,5 @@ crowdpick.ai works because people help each other make real decisions. Keep it k
 
 ## Reporting
 Use the Report button on any battle, reason or profile. Child-safety reports are reviewed first and may hide content immediately.
+
+For anything else, [contact the crowdpick.ai team](/contact).

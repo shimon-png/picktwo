@@ -23,4 +23,4 @@ Option links may earn crowdpick.ai a commission. This never changes how battles 
 crowdpick.ai is provided "as is". Votes are opinions, not professional advice.
 
 ## Contact
-Questions? Contact the crowdpick.ai team.
+Questions? [Contact the crowdpick.ai team](/contact).

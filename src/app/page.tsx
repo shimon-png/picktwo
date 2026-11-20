@@ -176,6 +176,7 @@ export default async function HomePage() {
         <Link href="/legal/terms">Terms</Link>
         <Link href="/legal/privacy">Privacy</Link>
         <Link href="/legal/guidelines">Community guidelines</Link>
+        <Link href="/contact">Contact us</Link>
       </footer>
     </div>
   );

@@ -106,3 +106,24 @@ export const reportInput = z.object({
   reason: z.enum(["spam", "inappropriate", "minor_safety", "harassment", "other"]),
   details: z.string().max(500).optional(),
 });
+
+export const CONTACT_TOPICS = [
+  { id: "question", label: "Question" },
+  { id: "bug", label: "Report a problem" },
+  { id: "account", label: "Account or privacy" },
+  { id: "safety", label: "Safety concern" },
+  { id: "feedback", label: "Feedback or idea" },
+  { id: "other", label: "Something else" },
+] as const;
+
+export const contactInput = z.object({
+  name: z.string().trim().max(80).optional().or(z.literal("").transform(() => undefined)),
+  email: z.string().trim().toLowerCase().email("Please enter a valid email so we can reply").max(254),
+  topic: z.enum(CONTACT_TOPICS.map((t) => t.id) as [string, ...string[]]),
+  message: z.string().trim().min(10, "Please tell us a bit more (10+ characters)").max(4000),
+  pageUrl: z.string().max(500).optional(),
+  // Honeypot: real people never see or fill this field.
+  website: z.string().max(200).optional(),
+  // ms since the form rendered; bots submit instantly.
+  elapsedMs: z.number().int().nonnegative().optional(),
+});

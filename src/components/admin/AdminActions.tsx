@@ -24,6 +24,27 @@ export function ReportActions({ id }: { id: string }) {
   );
 }
 
+export function MessageActions({ id, status }: { id: string; status: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function act(action: "handled" | "reopen") {
+    setBusy(true);
+    try {
+      await api(`/api/admin/messages/${id}`, { body: { action } });
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return status === "NEW" ? (
+    <button className="chip !py-1 text-xs" disabled={busy} onClick={() => act("handled")}>Mark handled</button>
+  ) : (
+    <button className="chip !py-1 text-xs" disabled={busy} onClick={() => act("reopen")}>Mark as new</button>
+  );
+}
+
 export function ConfigEditor({ economy, features }: { economy: Record<string, number>; features: Record<string, unknown> }) {
   const [e, setE] = useState(economy);
   const [busy, setBusy] = useState(false);

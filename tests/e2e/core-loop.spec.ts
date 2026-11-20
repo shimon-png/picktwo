@@ -14,6 +14,9 @@ async function onboard(page: Page, handle: string) {
   if (!page.url().includes("/onboarding")) await page.goto("/onboarding");
   await page.getByLabel("Display name").fill(handle);
   await page.getByLabel("Username").fill(handle);
+  await page.getByLabel("ZIP code").fill("10001");
+  await page.getByRole("button", { name: "Male", exact: true }).click();
+  await page.getByRole("button", { name: "25–34" }).click();
   await page.getByRole("button", { name: "Yes" }).click();
   await page.getByRole("button", { name: "5–8" }).click();
   await page.getByText("I’m 18 or older").click();
@@ -23,6 +26,8 @@ async function onboard(page: Page, handle: string) {
 
 async function newUser(browser: Browser, name: string) {
   const ctx = await browser.newContext();
+  // Skip the first-visit tutorial overlay on /vote; it would block taps.
+  await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
   const page = await ctx.newPage();
   await login(page, `${name}-${stamp}@test.dev`);
   await onboard(page, `${name}_${stamp}`.slice(0, 20));
@@ -169,4 +174,15 @@ test("non-admin gets 404 on /admin (A-20)", async ({ browser }) => {
   const p = await newUser(browser, "nonadmin");
   const res = await p.goto("/admin");
   expect(res?.status()).toBe(404);
+});
+
+test("contact form: terms link → form → thank-you", async ({ page }) => {
+  await page.goto("/legal/terms");
+  await page.getByRole("link", { name: "Contact the crowdpick.ai team" }).click();
+  await page.waitForURL("**/contact");
+  await page.getByLabel("Email").fill(`contact-${stamp}@test.dev`);
+  await page.getByLabel("Message").fill("Testing the contact form end to end.");
+  await page.waitForTimeout(2600); // the form ignores submits faster than a human could type
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Thanks, we got your message")).toBeVisible();
 });
