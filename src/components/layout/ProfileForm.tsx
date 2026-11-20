@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Zap, MessageCircle, ThumbsUp } from "lucide-react";
 import { api, toast } from "@/lib/client";
-import { AGE_RANGES, INTERESTS, KID_AGES, SEX_OPTIONS } from "@/lib/constants";
+import { AGE_RANGES, INTERESTS, KID_AGES, KIDS_STATUS_OPTIONS, SEX_OPTIONS } from "@/lib/constants";
 import { ZIP_RE } from "@/lib/validators";
 import { ChipGroup } from "@/components/compose/ComposeForm";
 
@@ -12,6 +12,7 @@ type Init = {
   handle: string;
   bio: string;
   kidAges: string[];
+  kidsStatus: string;
   country: string;
   region: string;
   zipCode: string;
@@ -35,18 +36,20 @@ export function ProfileForm({
   returning?: boolean;
 }) {
   const [f, setF] = useState(initial);
-  const [hasKids, setHasKids] = useState(initial.kidAges.length > 0);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<"form" | "intro">("form");
   const router = useRouter();
   const zipValid = ZIP_RE.test(f.zipCode.trim().toUpperCase());
   const requiredDone = zipValid && !!f.sex && !!f.ageRange;
+  const hasKids = f.kidsStatus === "YES";
   const set = <K extends keyof Init>(k: K, v: Init[K]) => setF((x) => ({ ...x, [k]: v }));
 
   async function save() {
     setBusy(true);
     try {
-      await api("/api/me/profile", { body: { ...f, kidAges: hasKids ? f.kidAges : [], isAdultConfirmed: f.isAdultConfirmed || undefined } });
+      await api("/api/me/profile", {
+        body: { ...f, kidsStatus: f.kidsStatus || null, kidAges: hasKids ? f.kidAges : [], isAdultConfirmed: f.isAdultConfirmed || undefined },
+      });
       if (mode === "onboarding" && !returning) setStep("intro");
       else if (mode === "onboarding") {
         router.push(next);
@@ -154,9 +157,18 @@ export function ProfileForm({
       />
       <fieldset className="space-y-2">
         <legend className="label">Do you have kids?</legend>
-        <div className="flex gap-2">
-          <button type="button" className={`chip ${hasKids ? "chip-on" : ""}`} onClick={() => setHasKids(true)} aria-pressed={hasKids}>Yes</button>
-          <button type="button" className={`chip ${!hasKids ? "chip-on" : ""}`} onClick={() => setHasKids(false)} aria-pressed={!hasKids}>No / prefer not to say</button>
+        <div className="flex flex-wrap gap-2">
+          {KIDS_STATUS_OPTIONS.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              className={`chip ${f.kidsStatus === o.id ? "chip-on" : ""}`}
+              onClick={() => set("kidsStatus", o.id)}
+              aria-pressed={f.kidsStatus === o.id}
+            >
+              {o.label}
+            </button>
+          ))}
         </div>
         {hasKids && (
           <>

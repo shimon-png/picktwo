@@ -64,6 +64,12 @@ export const AGE_RANGES = [
   { id: "AGE_65_PLUS", label: "65+" },
 ] as const;
 export const AGE_RANGE_IDS = ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_64", "AGE_65_PLUS"] as const;
+export const KIDS_STATUS_OPTIONS = [
+  { id: "YES", label: "Yes" },
+  { id: "NO", label: "No" },
+  { id: "UNDISCLOSED", label: "Prefer not to say" },
+] as const;
+export const KIDS_STATUS_IDS = ["YES", "NO", "UNDISCLOSED"] as const;
 export const kidAgeLabel = (id: string) => KID_AGES.find((k) => k.id === id)?.label ?? id;
 
 export const RECIPIENTS = ["Child", "Partner", "Parent", "Friend", "Myself", "Other"] as const;

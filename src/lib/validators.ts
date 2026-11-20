@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AGE_RANGE_IDS, KID_AGE_IDS, SEX_IDS } from "./constants";
+import { AGE_RANGE_IDS, KID_AGE_IDS, KIDS_STATUS_IDS, SEX_IDS } from "./constants";
 
 const optionalUrl = z
   .string()
@@ -85,6 +85,7 @@ export const profileInput = z.object({
     .regex(/^[a-z0-9_]{3,20}$/, "3–20 letters, numbers or underscores"),
   bio: z.string().trim().max(160).optional().default(""),
   isAdultConfirmed: z.literal(true, { errorMap: () => ({ message: "You must be 18 or older" }) }),
+  kidsStatus: z.enum(KIDS_STATUS_IDS).nullable().optional(),
   kidAges: z.array(z.enum(KID_AGE_IDS)).default([]),
   zipCode: z
     .string()

@@ -26,6 +26,7 @@ export default async function SettingsPage() {
             handle: user.handle ?? "",
             bio: user.bio ?? "",
             kidAges: user.kidAges,
+            kidsStatus: user.kidsStatus ?? (user.kidAges.length ? "YES" : ""),
             country: user.country ?? "",
             region: user.region ?? "",
             zipCode: user.zipCode ?? "",
