@@ -51,7 +51,7 @@ export function Nav({ unread }: { unread: number }) {
     <nav
       aria-label="Main"
       className={cn(
-        "fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:inset-y-0 md:left-0 md:right-auto md:w-56 md:border-r md:border-t-0 md:pt-5",
+        "fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-page/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:inset-y-0 md:left-0 md:right-auto md:w-56 md:border-r md:border-t-0 md:pt-5",
         hidesSidebar(path) && "md:hidden",
       )}
     >
@@ -70,7 +70,7 @@ export function Nav({ unread }: { unread: number }) {
                 data-tour={`nav-${it.label.toLowerCase()}`}
                 className={cn(
                   "relative flex flex-col items-center gap-0.5 py-2 text-xs text-zinc-500 md:flex-row md:gap-3 md:rounded-lg md:px-3 md:text-[15px]",
-                  active && "text-pink md:bg-pink-soft",
+                  active && "text-ink md:bg-surface",
                 )}
               >
                 <Icon className={cn("size-5", active && "stroke-[2.25]")} aria-hidden />

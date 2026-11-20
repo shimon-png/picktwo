@@ -298,7 +298,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       {/* Top reasons */}
       {res && allReasons.length > 0 && (
         <section aria-label="Reasons" className="space-y-2">
-          <h2 className="text-[15px] font-medium">Top reasons</h2>
+          <h2 className="font-sans text-[15px] font-medium">Top reasons</h2>
           <ReasonList reasons={allReasons} signedIn={signedIn} isOwner={v.isOwner} onChange={refresh} />
         </section>
       )}
@@ -312,7 +312,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       {/* Owner: share + manage */}
       {v.isOwner && (
         <section className="space-y-3 border-t border-ink/10 pt-5" aria-label="Share and manage">
-          <h2 className="text-[15px] font-medium">Get more votes</h2>
+          <h2 className="font-sans text-[15px] font-medium">Get more votes</h2>
           <CopyLink url={shareUrl} />
           <ShareGrid url={shareUrl} title={v.title} />
           <div className="flex flex-wrap gap-1 pt-1">
@@ -353,7 +353,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       )}
 
       {showStickyLoop && (
-        <div className="fixed inset-x-0 bottom-[calc(3.6rem+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t from-white via-white to-white/0 px-4 pb-3 pt-6 md:bottom-0 md:pl-60">
+        <div className="fixed inset-x-0 bottom-[calc(3.6rem+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t from-page via-page to-page/0 px-4 pb-3 pt-6 md:bottom-0 md:pl-60">
           <Link href={`/b/${v.slug}/report`} className="btn-primary mx-auto w-full max-w-2xl py-3">
             Decided? Close the loop · +{loopPoints} <Zap className="size-4 fill-white" aria-hidden />
           </Link>
