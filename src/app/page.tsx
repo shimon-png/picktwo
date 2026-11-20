@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { ArrowRight, Camera, MessageCircleHeart, Sparkles, ThumbsDown, ThumbsUp, Users, Zap } from "lucide-react";
 import { getViewer } from "@/server/viewer";
@@ -21,7 +22,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const viewer = await getViewer();
   const user = viewer.user;
-  if (user && !user.onboardedAt) redirect("/onboarding");
+  if (user && profileIncomplete(user)) redirect(onboardingUrl());
   // Signed in: the Vote stack is home.
   if (user) redirect("/vote");
 

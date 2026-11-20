@@ -29,6 +29,13 @@
       "when": 1795183585361,
       "tag": "0003_seed_contests",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795193934601,
+      "tag": "0004_profile_required_fields",
+      "breakpoints": true
     }
   ]
 }

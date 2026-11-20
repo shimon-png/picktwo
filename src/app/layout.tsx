@@ -47,13 +47,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <header className="sticky top-0 z-30 bg-white/90 backdrop-blur">
               <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
                 <HeaderLogo />
-                {user ? (
-                  <PriorityPill initial={user.ppBalance} openLoops={openLoops} highAt={economy.tierHighAt} topAt={economy.tierTopAt} />
-                ) : (
-                  <Link href="/signin" className="btn-outline !px-3 !py-1.5 text-sm">
-                    Sign in
-                  </Link>
-                )}
+                <div data-tour="account">
+                  {user ? (
+                    <PriorityPill initial={user.ppBalance} openLoops={openLoops} highAt={economy.tierHighAt} topAt={economy.tierTopAt} />
+                  ) : (
+                    <Link href="/signin" className="btn-outline !px-3 !py-1.5 text-sm">
+                      Sign in
+                    </Link>
+                  )}
+                </div>
               </div>
             </header>
           </ChromeOnly>

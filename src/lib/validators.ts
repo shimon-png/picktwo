@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { KID_AGE_IDS } from "./constants";
+import { AGE_RANGE_IDS, KID_AGE_IDS, SEX_IDS } from "./constants";
 
 const optionalUrl = z
   .string()
@@ -73,6 +73,9 @@ export const outcomeInput = z
   })
   .refine((v) => v.chosen === "NEITHER" || !!v.thumb, { message: "Pick 👍 or 👎", path: ["thumb"] });
 
+/** US ZIP (12345 / 12345-6789) or a general postal code (3–10 letters, digits, spaces, dashes). */
+export const ZIP_RE = /^(\d{5}(-\d{4})?|[A-Z0-9][A-Z0-9 -]{1,8}[A-Z0-9])$/;
+
 export const profileInput = z.object({
   name: z.string().trim().min(1).max(50),
   handle: z
@@ -83,6 +86,13 @@ export const profileInput = z.object({
   bio: z.string().trim().max(160).optional().default(""),
   isAdultConfirmed: z.literal(true, { errorMap: () => ({ message: "You must be 18 or older" }) }),
   kidAges: z.array(z.enum(KID_AGE_IDS)).default([]),
+  zipCode: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(ZIP_RE, "Enter a valid ZIP / postal code"),
+  sex: z.enum(SEX_IDS, { errorMap: () => ({ message: "Choose an option for sex" }) }),
+  ageRange: z.enum(AGE_RANGE_IDS, { errorMap: () => ({ message: "Choose your age range" }) }),
   country: z.string().trim().max(60).optional().default(""),
   region: z.string().trim().max(60).optional().default(""),
   interests: z.array(z.string().max(30)).max(12).default([]),

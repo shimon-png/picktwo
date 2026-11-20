@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Zap, MessageCircle, ThumbsUp } from "lucide-react";
 import { api, toast } from "@/lib/client";
-import { INTERESTS, KID_AGES } from "@/lib/constants";
+import { AGE_RANGES, INTERESTS, KID_AGES, SEX_OPTIONS } from "@/lib/constants";
+import { ZIP_RE } from "@/lib/validators";
 import { ChipGroup } from "@/components/compose/ComposeForm";
 
 type Init = {
@@ -13,24 +14,44 @@ type Init = {
   kidAges: string[];
   country: string;
   region: string;
+  zipCode: string;
+  sex: string;
+  ageRange: string;
   interests: string[];
   dataConsent: boolean;
   isAdultConfirmed: boolean;
 };
 
-export function ProfileForm({ initial, mode, next = "/" }: { initial: Init; mode: "onboarding" | "settings"; next?: string }) {
+export function ProfileForm({
+  initial,
+  mode,
+  next = "/",
+  returning = false,
+}: {
+  initial: Init;
+  mode: "onboarding" | "settings";
+  next?: string;
+  /** Already-onboarded user sent back to fill in newly required fields: skip the priority intro. */
+  returning?: boolean;
+}) {
   const [f, setF] = useState(initial);
   const [hasKids, setHasKids] = useState(initial.kidAges.length > 0);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<"form" | "intro">("form");
   const router = useRouter();
+  const zipValid = ZIP_RE.test(f.zipCode.trim().toUpperCase());
+  const requiredDone = zipValid && !!f.sex && !!f.ageRange;
   const set = <K extends keyof Init>(k: K, v: Init[K]) => setF((x) => ({ ...x, [k]: v }));
 
   async function save() {
     setBusy(true);
     try {
       await api("/api/me/profile", { body: { ...f, kidAges: hasKids ? f.kidAges : [], isAdultConfirmed: f.isAdultConfirmed || undefined } });
-      if (mode === "onboarding") setStep("intro");
+      if (mode === "onboarding" && !returning) setStep("intro");
+      else if (mode === "onboarding") {
+        router.push(next);
+        router.refresh();
+      }
       else {
         toast("Saved", "ok");
         router.refresh();
@@ -99,6 +120,38 @@ export function ProfileForm({ initial, mode, next = "/" }: { initial: Init; mode
           <input id="bio" className="input" maxLength={160} value={f.bio} onChange={(e) => set("bio", e.target.value)} />
         </div>
       )}
+      <div>
+        <label className="label" htmlFor="zip">
+          ZIP code <span className="text-b">*</span>
+        </label>
+        <input
+          id="zip"
+          className="input"
+          inputMode="numeric"
+          autoComplete="postal-code"
+          maxLength={10}
+          required
+          aria-invalid={!!f.zipCode && !zipValid}
+          value={f.zipCode}
+          onChange={(e) => set("zipCode", e.target.value)}
+          placeholder="e.g. 10001"
+        />
+        {!!f.zipCode && !zipValid && <p className="mt-1 text-xs text-b">Enter a valid ZIP / postal code</p>}
+      </div>
+      <ChipGroup
+        label={<>Sex <span className="text-b">*</span></>}
+        options={SEX_OPTIONS.map((o) => ({ id: o.id, label: o.label }))}
+        value={f.sex ? [f.sex] : []}
+        onChange={(v) => set("sex", v[0] ?? "")}
+        single
+      />
+      <ChipGroup
+        label={<>Your age <span className="text-b">*</span></>}
+        options={AGE_RANGES.map((o) => ({ id: o.id, label: o.label }))}
+        value={f.ageRange ? [f.ageRange] : []}
+        onChange={(v) => set("ageRange", v[0] ?? "")}
+        single
+      />
       <fieldset className="space-y-2">
         <legend className="label">Do you have kids?</legend>
         <div className="flex gap-2">
@@ -134,7 +187,8 @@ export function ProfileForm({ initial, mode, next = "/" }: { initial: Init; mode
           <span>I’m 18 or older and agree to the <a href="/legal/terms" className="underline" target="_blank">Terms</a> and <a href="/legal/guidelines" className="underline" target="_blank">Community guidelines</a>.</span>
         </label>
       )}
-      <button className="btn-primary w-full py-3" disabled={busy || !f.name || f.handle.length < 3 || !f.isAdultConfirmed} onClick={save}>
+      {!requiredDone && <p className="text-xs text-zinc-500"><span className="text-b">*</span> ZIP code, sex and age are required.</p>}
+      <button className="btn-primary w-full py-3" disabled={busy || !f.name || f.handle.length < 3 || !f.isAdultConfirmed || !requiredDone} onClick={save}>
         {busy ? "Saving…" : mode === "onboarding" ? "Continue" : "Save profile"}
       </button>
     </div>

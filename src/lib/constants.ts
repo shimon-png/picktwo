@@ -48,6 +48,22 @@ export const KID_AGES = [
   { id: "AGE_13_17", label: "13–17" },
 ] as const;
 export const KID_AGE_IDS = ["AGE_0_2", "AGE_3_4", "AGE_5_8", "AGE_9_12", "AGE_13_17"] as const;
+/** Required profile fields (the user's own sex and age range; ZIP is validated in validators.ts). */
+export const SEX_OPTIONS = [
+  { id: "MALE", label: "Male" },
+  { id: "FEMALE", label: "Female" },
+  { id: "UNDISCLOSED", label: "Prefer not to say" },
+] as const;
+export const SEX_IDS = ["MALE", "FEMALE", "UNDISCLOSED"] as const;
+export const AGE_RANGES = [
+  { id: "AGE_18_24", label: "18–24" },
+  { id: "AGE_25_34", label: "25–34" },
+  { id: "AGE_35_44", label: "35–44" },
+  { id: "AGE_45_54", label: "45–54" },
+  { id: "AGE_55_64", label: "55–64" },
+  { id: "AGE_65_PLUS", label: "65+" },
+] as const;
+export const AGE_RANGE_IDS = ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54", "AGE_55_64", "AGE_65_PLUS"] as const;
 export const kidAgeLabel = (id: string) => KID_AGES.find((k) => k.id === id)?.label ?? id;
 
 export const RECIPIENTS = ["Child", "Partner", "Parent", "Friend", "Myself", "Other"] as const;
