@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- standalone design-deck script, not app code */
 const { chromium } = require('playwright');
 (async () => {
   const b = await chromium.launch();

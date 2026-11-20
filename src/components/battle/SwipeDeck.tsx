@@ -14,8 +14,12 @@ import { OptionFace } from "./OptionFace";
 type Side = "A" | "B";
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
 
-const HIGHLIGHT_PX = 40;
-const VOTE_PX = 90;
+/** Drag-to-grow: the photo you drag towards widens. `share` is B's width share, 0..1 (0.5 = 50/50). */
+const PICK_AT = 0.8; // let go past 80/20 to pick
+const SWITCH_AT = 0.6; // once picked, dragging past 60/40 the other way switches
+const PICKED_SHARE = 0.72; // resting split after a pick, so the other photo stays tappable
+const HOT_AT = 0.62;
+const FILL_MS = 200;
 const FLY_MS = 280;
 
 export function SwipeDeck({
@@ -43,10 +47,13 @@ export function SwipeDeck({
   const [draft, setDraft] = useState("");
   const [fly, setFly] = useState<-1 | 1 | 0>(0);
   const [dx, setDx] = useState(0);
+  const [fill, setFill] = useState(false);
   const [pp, setPp] = useState(initialPP);
   const [session, setSession] = useState({ votes: 0, points: 0 });
   const shownAt = useRef(Date.now());
   const drag = useRef<{ x: number; moved: boolean } | null>(null);
+  const [dragW, setDragW] = useState(320);
+  const splitRef = useRef<HTMLDivElement>(null);
   const seen = useRef(new Set(initial.map((i) => i.id)));
   const card = queue[0];
   const peek = queue[1];
@@ -88,6 +95,7 @@ export function SwipeDeck({
       setQueue((q) => q.slice(1));
       setFly(0);
       setDx(0);
+      setFill(false);
       setVoted(null);
       setResult(null);
       setReason(null);
@@ -170,8 +178,11 @@ export function SwipeDeck({
   }
 
   function next() {
-    if (!voted || fly) return;
-    advance(voted === "A" ? -1 : 1);
+    if (!voted || fly || fill) return;
+    // The picked photo fills the card, then the card flies off towards it.
+    setFill(true);
+    setDx(0);
+    setTimeout(() => advance(voted === "A" ? -1 : 1), FILL_MS);
   }
 
   // Keyboard: ← A, → B, ↓ skip, Enter next
@@ -239,9 +250,11 @@ export function SwipeDeck({
   const chips = REASON_CHIPS;
   const style: React.CSSProperties = fly
     ? { transform: `translateX(${fly * 460}px) rotate(${fly * 16}deg)`, opacity: 0, transition: `transform ${FLY_MS}ms ease, opacity ${FLY_MS}ms ease` }
-    : dx
-      ? { transform: `translateX(${dx}px) rotate(${dx / 22}deg)` }
-      : { transition: "transform 200ms ease" };
+    : { transition: "transform 200ms ease" };
+  // B's width share: resting point (50/50, or the picked side's split) plus the drag.
+  const restShare = fill ? (voted === "B" ? 1 : 0) : voted === "B" ? PICKED_SHARE : voted === "A" ? 1 - PICKED_SHARE : 0.5;
+  const share = Math.min(1, Math.max(0, restShare + dx / dragW));
+  const dragging = !!dx && !fill;
 
   return (
     <div>
@@ -254,8 +267,9 @@ export function SwipeDeck({
           className="animate-pop absolute inset-0 flex touch-pan-y select-none flex-col rounded-2xl bg-surface p-3.5 shadow-ring"
           style={style}
           onPointerDown={(e) => {
-            if (fly || (e.target as HTMLElement).closest("[data-nodrag]")) return;
+            if (fly || fill || (e.target as HTMLElement).closest("[data-nodrag]")) return;
             drag.current = { x: e.clientX, moved: false };
+            setDragW(splitRef.current?.offsetWidth || 320);
           }}
           onPointerMove={(e) => {
             if (!drag.current) return;
@@ -270,9 +284,10 @@ export function SwipeDeck({
             const d = drag.current;
             drag.current = null;
             if (!d?.moved) return;
-            if (dx <= -VOTE_PX) vote("A");
-            else if (dx >= VOTE_PX) vote("B");
-            else setDx(0);
+            const at = voted ? SWITCH_AT : PICK_AT;
+            if (share >= at) vote("B");
+            else if (share <= 1 - at) vote("A");
+            setDx(0);
           }}
           onPointerCancel={() => {
             drag.current = null;
@@ -296,12 +311,16 @@ export function SwipeDeck({
           </h1>
           {card.context && <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500">{card.context}</p>}
 
-          <div className="mt-3 grid min-h-0 flex-1 grid-cols-2 gap-2">
+          <div ref={splitRef} className={cn("mt-3 flex min-h-0 flex-1", fill ? "gap-0" : "gap-2")}>
             {(["A", "B"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
-                className="h-full min-h-0 active:scale-[0.98]"
+                className="h-full min-h-0 min-w-0 overflow-hidden active:scale-[0.98]"
+                style={{
+                  flex: `0 1 ${(s === "B" ? share : 1 - share) * 100}%`,
+                  transition: dragging ? "none" : `flex-basis ${FILL_MS}ms ease`,
+                }}
                 data-tour={s === "A" ? "option-a" : "option-b"}
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
                 aria-pressed={voted === s}
@@ -317,8 +336,9 @@ export function SwipeDeck({
                   image={s === "A" ? card.imageA : card.imageB}
                   percent={result ? (s === "A" ? result.a : result.b) : null}
                   ring={voted === s}
-                  hot={voted !== s && ((s === "A" && dx <= -HIGHLIGHT_PX) || (s === "B" && dx >= HIGHLIGHT_PX))}
+                  hot={voted !== s && (s === "B" ? share >= HOT_AT : share <= 1 - HOT_AT)}
                   big
+                  compact={(s === "B" ? share : 1 - share) < 0.3}
                 />
               </button>
             ))}
