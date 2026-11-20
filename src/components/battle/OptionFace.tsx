@@ -27,6 +27,7 @@ export function OptionFace({
   hot,
   className,
   big,
+  compact,
 }: {
   side: "A" | "B";
   label: string;
@@ -37,6 +38,8 @@ export function OptionFace({
   hot?: boolean;
   className?: string;
   big?: boolean;
+  /** Squeezed narrow by the drag-to-grow deck: keep the photo and %, hide the text. */
+  compact?: boolean;
 }) {
   const isA = side === "A";
   return (
@@ -71,8 +74,8 @@ export function OptionFace({
             {percent}%
           </span>
         )}
-        <span className={cn("mt-1 line-clamp-2 block text-[13px]", image ? "text-white" : "text-ink")}>{label}</span>
-        {description && (
+        {!compact && <span className={cn("mt-1 line-clamp-2 block text-[13px]", image ? "text-white" : "text-ink")}>{label}</span>}
+        {description && !compact && (
           <span className={cn("mt-0.5 line-clamp-2 block text-[11px] leading-snug", image ? "text-white/80" : "text-zinc-500")}>{description}</span>
         )}
       </span>
