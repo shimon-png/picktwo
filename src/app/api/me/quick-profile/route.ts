@@ -1,0 +1,26 @@
+import { z } from "zod";
+import { handler } from "@/server/api";
+import { requireUser } from "@/server/viewer";
+import { rateLimit } from "@/server/ratelimit";
+import { profileInput } from "@/lib/validators";
+import { profileIncomplete } from "@/lib/profile";
+import { saveQuickProfile } from "@/server/services/profile";
+
+const input = profileInput.pick({ zipCode: true, sex: true, ageRange: true });
+
+/** What the sign-up flow still needs from this user. */
+export const GET = handler(async () => {
+  const u = await requireUser();
+  return { complete: !profileIncomplete(u), sex: u.sex, ageRange: u.ageRange, zipCode: u.zipCode };
+});
+
+/** Last steps of the sign-up flow: the required sex / age range / ZIP. Finishes onboarding. */
+export const POST = handler(async (req) => {
+  const u = await requireUser();
+  await rateLimit("quickProfile", u.id);
+  const p = input.parse(await req.json());
+  await saveQuickProfile(u, p);
+  return { ok: true };
+});
+
+export type QuickProfileInput = z.infer<typeof input>;

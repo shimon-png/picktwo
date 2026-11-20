@@ -3,6 +3,7 @@ import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { getViewer } from "@/server/viewer";
 import { getFeed } from "@/server/services/feed";
 import { getEconomy } from "@/server/services/config";
+import { guestVotesLeft } from "@/server/services/votes";
 import { SwipeDeck } from "@/components/battle/SwipeDeck";
 import { Tutorial } from "@/components/layout/Tutorial";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function VotePage() {
   const viewer = await getViewer();
   if (viewer.user && profileIncomplete(viewer.user)) redirect(onboardingUrl("/vote"));
-  const [items, economy] = await Promise.all([getFeed(viewer, { limit: 20 }), getEconomy()]);
+  const [items, economy, guestLeft] = await Promise.all([getFeed(viewer, { limit: 20 }), getEconomy(), guestVotesLeft(viewer)]);
   return (
     <>
       <SwipeDeck
@@ -20,6 +21,8 @@ export default async function VotePage() {
       signedIn={!!viewer.user}
       pp={viewer.user?.ppBalance ?? null}
       tiers={{ highAt: economy.tierHighAt, topAt: economy.tierTopAt }}
+      guestLeft={guestLeft}
+      guestLimit={economy.guestVoteLimit}
       />
       <Tutorial signedIn={!!viewer.user} />
     </>

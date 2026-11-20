@@ -2,7 +2,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Zap } from "lucide-react";
-import { api, setPP, toast } from "@/lib/client";
+import { ApiError, api, setPP, toast } from "@/lib/client";
+import { doneIds, markDone, unmarkDone } from "@/lib/seen";
+import { SignupGate } from "@/components/auth/SignupGate";
 import { cn, pct, timeLeft } from "@/lib/utils";
 import { AVATAR_TONES, REASON_CHIPS, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
@@ -10,7 +12,7 @@ import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
 
 type Side = "A" | "B";
-type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null };
+type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
 
 const HIGHLIGHT_PX = 40;
 const VOTE_PX = 90;
@@ -21,13 +23,19 @@ export function SwipeDeck({
   signedIn,
   pp: initialPP,
   tiers,
+  guestLeft: initialGuestLeft,
+  guestLimit,
 }: {
   initial: BattleCard[];
   signedIn: boolean;
   pp: number | null;
   tiers: { highAt: number; topAt: number };
+  /** Free votes left for a signed-out visitor (null when signed in). */
+  guestLeft: number | null;
+  guestLimit: number;
 }) {
   const [queue, setQueue] = useState(initial);
+  const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
   const [voted, setVoted] = useState<Side | null>(null);
   const [result, setResult] = useState<{ a: number; b: number; total: number } | null>(null);
   const [reason, setReason] = useState<string | null>(null);
@@ -47,6 +55,12 @@ export function SwipeDeck({
     shownAt.current = Date.now();
   }, [card?.id]);
 
+  // Never show a battle this browser already voted on or skipped (e.g. a cached feed after switching tabs).
+  useEffect(() => {
+    const done = doneIds();
+    if (done.size) setQueue((q) => q.filter((i) => !done.has(i.id)));
+  }, []);
+
   // Keep the tier line in sync with balance changes from anywhere (e.g. the reason bonus).
   useEffect(() => {
     const on = (e: Event) => setPp((e as CustomEvent<number>).detail);
@@ -57,7 +71,8 @@ export function SwipeDeck({
   const loadMore = useCallback(async () => {
     try {
       const r = await api<{ items: BattleCard[] }>("/api/feed");
-      const fresh = r.items.filter((i) => !seen.current.has(i.id));
+      const done = doneIds();
+      const fresh = r.items.filter((i) => !seen.current.has(i.id) && !done.has(i.id));
       fresh.forEach((i) => seen.current.add(i.id));
       if (fresh.length) setQueue((q) => [...q, ...fresh]);
     } catch {}
@@ -81,20 +96,48 @@ export function SwipeDeck({
     }, FLY_MS);
   }, []);
 
+  const gated = !signedIn && guestLeft !== null && guestLeft <= 0;
+
+  // The pick stays changeable (tap the other photo, drag the other way, ← / →) until Next.
   async function vote(side: Side) {
-    if (!card || voted || fly) return;
+    if (!card || fly || gated || voted === side) return;
+    const prev = voted;
     setVoted(side);
     setDx(0);
     const dwellMs = Date.now() - shownAt.current;
     setResult(pct(card.votesA + (side === "A" ? 1 : 0), card.votesB + (side === "B" ? 1 : 0)));
+    // A reason was for the old pick; clear it on the server too.
+    const clearReason = !!prev && !!reason;
+    if (prev) {
+      setReason(null);
+      setWriting(false);
+      setDraft("");
+    }
+    // Remember it right away, so leaving the tab before the request finishes can't bring it back.
+    markDone(card.id);
     try {
-      const r = await api<VoteRes>(`/api/battles/${card.slug}/vote`, { body: { side, dwellMs, source: "feed" } });
+      const r = await api<VoteRes>(`/api/battles/${card.slug}/vote`, {
+        body: { side, source: "feed", ...(prev ? {} : { dwellMs }), ...(clearReason ? { reason: "" } : {}) },
+      });
+      if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
       setResult(r.results);
       setPP(r.ppBalance);
       if (r.ppBalance != null) setPp(r.ppBalance);
-      setSession((s) => ({ votes: s.votes + 1, points: s.points + r.points }));
+      setSession((s) => ({ votes: s.votes + (prev ? 0 : 1), points: s.points + r.points }));
       if (r.points > 0) toast(`+${r.points} for voting`, "pp");
     } catch (e) {
+      if (prev) {
+        setVoted(prev);
+        toast((e as Error).message, "error");
+        return;
+      }
+      unmarkDone(card.id);
+      if (e instanceof ApiError && e.code === "SIGNUP_REQUIRED") {
+        setVoted(null);
+        setResult(null);
+        setGuestLeft(0);
+        return;
+      }
       toast((e as Error).message, "error");
     }
   }
@@ -121,6 +164,7 @@ export function SwipeDeck({
 
   function skip() {
     if (!card || voted || fly) return;
+    markDone(card.id);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
     advance(-1);
   }
@@ -152,9 +196,13 @@ export function SwipeDeck({
       <p className="text-xs text-zinc-500" data-tour="status">
         {tierLine ?? (
           <>
-            Votes count without an account.{" "}
+            {guestLeft != null && guestLeft > 0
+              ? `${guestLeft} free vote${guestLeft === 1 ? "" : "s"} left.`
+              : guestLeft === 0
+                ? "You’ve used your free votes."
+                : "Votes count without an account."}{" "}
             <Link href="/signin?callbackUrl=/vote" className="text-accent">
-              Sign in to earn ⚡
+              Sign up to earn ⚡
             </Link>
           </>
         )}
@@ -174,6 +222,14 @@ export function SwipeDeck({
             Post a battle
           </Link>
         </div>
+      </div>
+    );
+
+  if (gated && !voted)
+    return (
+      <div>
+        {header}
+        <SignupGate limit={guestLimit} next="/vote" />
       </div>
     );
 
@@ -198,7 +254,7 @@ export function SwipeDeck({
           className="animate-pop absolute inset-0 flex touch-pan-y select-none flex-col rounded-2xl bg-surface p-3.5 shadow-ring"
           style={style}
           onPointerDown={(e) => {
-            if (voted || fly || (e.target as HTMLElement).closest("[data-nodrag]")) return;
+            if (fly || (e.target as HTMLElement).closest("[data-nodrag]")) return;
             drag.current = { x: e.clientX, moved: false };
           }}
           onPointerMove={(e) => {
@@ -249,7 +305,6 @@ export function SwipeDeck({
                 data-tour={s === "A" ? "option-a" : "option-b"}
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
                 aria-pressed={voted === s}
-                disabled={!!voted}
                 onClick={() => {
                   if (drag.current?.moved || dx) return;
                   vote(s);
@@ -262,7 +317,7 @@ export function SwipeDeck({
                   image={s === "A" ? card.imageA : card.imageB}
                   percent={result ? (s === "A" ? result.a : result.b) : null}
                   ring={voted === s}
-                  hot={!voted && ((s === "A" && dx <= -HIGHLIGHT_PX) || (s === "B" && dx >= HIGHLIGHT_PX))}
+                  hot={voted !== s && ((s === "A" && dx <= -HIGHLIGHT_PX) || (s === "B" && dx >= HIGHLIGHT_PX))}
                   big
                 />
               </button>

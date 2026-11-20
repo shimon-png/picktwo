@@ -17,6 +17,26 @@ const VOTE_MILESTONES = [1, 10, 50, 100];
 type VoteViewer = { user: User | null; deviceId: string | null };
 type VoteInput = { side: "A" | "B"; reason?: string; dwellMs?: number; source?: string };
 
+type Exec = Pick<typeof db, "execute">;
+
+/**
+ * Votes a signed-out device has cast, including votes it carried into an account it signed in to
+ * (so signing out doesn't hand out a fresh batch of free votes).
+ */
+export async function guestVotesUsed(deviceId: string, exec: Exec = db): Promise<number> {
+  const rows = await exec.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM vote v
+    WHERE v.device_id = ${deviceId} OR v.user_id = (SELECT d.user_id FROM device d WHERE d.id = ${deviceId})`);
+  return Number(rows[0]?.n ?? 0);
+}
+
+/** Free votes left before the sign-up gate (null for signed-in viewers). */
+export async function guestVotesLeft(viewer: VoteViewer): Promise<number | null> {
+  if (viewer.user) return null;
+  const { guestVoteLimit } = await getEconomy();
+  if (!viewer.deviceId) return guestVoteLimit;
+  return Math.max(0, guestVoteLimit - (await guestVotesUsed(viewer.deviceId)));
+}
+
 function isUniqueViolation(e: unknown): boolean {
   const err = e as { code?: string; cause?: unknown } | null;
   return !!err && (err.code === "23505" || isUniqueViolation(err.cause));
@@ -85,6 +105,9 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
       }
     } else {
       isNew = true;
+      // Signed-out visitors get a few free votes, then must sign up (the client shows the gate first).
+      if (!user && (await guestVotesUsed(viewer.deviceId!, tx)) >= economy.guestVoteLimit)
+        throw new AppError("SIGNUP_REQUIRED", "Sign up to keep voting — it takes 4 quick steps.");
       // Quality checks for points (PRD 5.5)
       let issue: ReturnType<typeof voteQualityIssue> = "anonymous";
       if (user) {
@@ -159,11 +182,14 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
       .from(battles)
       .where(eq(battles.id, b.id));
     let ppBalance: number | null = null;
+    let guestLeft: number | null = null;
     if (user) {
       const [u] = await tx.select({ pp: users.ppBalance }).from(users).where(eq(users.id, user.id));
       ppBalance = u.pp;
+    } else {
+      guestLeft = Math.max(0, economy.guestVoteLimit - (await guestVotesUsed(viewer.deviceId!, tx)));
     }
-    return { voteId, points, results: pct(fresh.votesA, fresh.votesB), ppBalance, isNew };
+    return { voteId, points, results: pct(fresh.votesA, fresh.votesB), ppBalance, guestVotesLeft: guestLeft, isNew };
   });
 
   if (res.isNew)

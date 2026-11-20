@@ -367,6 +367,15 @@ export const contactMessages = pgTable(
   (t) => [index("contact_message_status").on(t.status, t.createdAt)],
 );
 
+/** One-time sign-in codes (email → 6-digit code). One live code per email; hashed, short-lived, attempt-limited. */
+export const emailCodes = pgTable("email_code", {
+  email: text("email").primaryKey(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  createdAt: now("created_at"),
+});
+
 // ---------- Relations ----------
 export const battlesRelations = relations(battles, ({ one, many }) => ({
   author: one(users, { fields: [battles.authorId], references: [users.id] }),

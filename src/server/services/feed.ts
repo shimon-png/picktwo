@@ -19,8 +19,9 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     ? sql`NOT EXISTS (SELECT 1 FROM vote v WHERE v.battle_id = ${battles.id} AND (v.user_id = ${user.id}${viewer.deviceId ? sql` OR v.device_id = ${viewer.deviceId}` : sql``}))
        AND NOT EXISTS (SELECT 1 FROM skip s WHERE s.battle_id = ${battles.id} AND (s.user_id = ${user.id}${viewer.deviceId ? sql` OR s.device_id = ${viewer.deviceId}` : sql``}))`
     : viewer.deviceId
-      ? sql`NOT EXISTS (SELECT 1 FROM vote v WHERE v.battle_id = ${battles.id} AND v.device_id = ${viewer.deviceId})
-         AND NOT EXISTS (SELECT 1 FROM skip s WHERE s.battle_id = ${battles.id} AND s.device_id = ${viewer.deviceId})`
+      ? // Signed out: this device's votes/skips, plus those of an account it was linked to (merged on sign-in).
+        sql`NOT EXISTS (SELECT 1 FROM vote v WHERE v.battle_id = ${battles.id} AND (v.device_id = ${viewer.deviceId} OR v.user_id = (SELECT d.user_id FROM device d WHERE d.id = ${viewer.deviceId})))
+         AND NOT EXISTS (SELECT 1 FROM skip s WHERE s.battle_id = ${battles.id} AND (s.device_id = ${viewer.deviceId} OR s.user_id = (SELECT d.user_id FROM device d WHERE d.id = ${viewer.deviceId})))`
       : sql`true`;
 
   const friends = user ? await friendIds(user.id) : new Set<string>();

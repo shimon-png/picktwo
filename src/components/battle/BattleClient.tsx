@@ -3,7 +3,9 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronUp, ExternalLink, Lock, Pencil, StopCircle, ThumbsDown, ThumbsUp, Trash2, Users, Zap } from "lucide-react";
-import { api, setPP, toast } from "@/lib/client";
+import { ApiError, api, setPP, toast } from "@/lib/client";
+import { markDone } from "@/lib/seen";
+import { SignupGate } from "@/components/auth/SignupGate";
 import { cn, formatPrice, timeAgo, timeLeft } from "@/lib/utils";
 import { TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import type { BattleView, ReasonView } from "@/server/services/battles";
@@ -21,6 +23,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
   const [reason, setReason] = useState(initial.myVote?.reason ?? "");
   const [reasonSaved, setReasonSaved] = useState(!!initial.myVote?.reason);
   const [editing, setEditing] = useState(false);
+  const [gate, setGate] = useState(false);
   const mountedAt = useRef(Date.now());
   const router = useRouter();
 
@@ -45,12 +48,14 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
     setV({ ...v, myVote: { id: v.myVote?.id ?? "pending", side, reason: v.myVote?.reason ?? null } });
     try {
       const r = await api<VoteRes>(`/api/battles/${v.slug}/vote`, { body: { side, dwellMs: Date.now() - mountedAt.current, source } });
+      markDone(v.id);
       if (r.points > 0) toast(`+${r.points} for voting — thanks for helping!`, "pp");
       setPP(r.ppBalance);
       await refresh();
     } catch (e) {
       setV(prev);
-      toast((e as Error).message, "error");
+      if (e instanceof ApiError && e.code === "SIGNUP_REQUIRED") setGate(true);
+      else toast((e as Error).message, "error");
     } finally {
       setBusy(false);
     }
@@ -354,6 +359,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
           </Link>
         </div>
       )}
+      {gate && <SignupGate next={`/b/${v.slug}`} onClose={() => setGate(false)} />}
     </article>
   );
 }
