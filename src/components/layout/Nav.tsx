@@ -10,6 +10,23 @@ export function isFullScreen(path: string) {
   return path.startsWith("/post") || /^\/b\/[^/]+\/(report|published)/.test(path);
 }
 
+/** The logged-out homepage is a landing page: no desktop sidebar. */
+export function hidesSidebar(path: string) {
+  return path === "/";
+}
+
+/** Page wrapper that leaves room for the desktop sidebar (except where it's hidden). */
+export function ContentShell({ children }: { children: React.ReactNode }) {
+  const path = usePathname();
+  return <div className={hidesSidebar(path) ? undefined : "md:pl-56"}>{children}</div>;
+}
+
+/** Header logo: on desktop the sidebar shows the logo, so the header hides its copy unless there's no sidebar. */
+export function HeaderLogo() {
+  const path = usePathname();
+  return <Logo className={hidesSidebar(path) ? undefined : "md:invisible"} />;
+}
+
 /** Renders children unless the current route is a full-screen flow. */
 export function ChromeOnly({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -33,7 +50,10 @@ export function Nav({ unread }: { unread: number }) {
   return (
     <nav
       aria-label="Main"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:inset-y-0 md:left-0 md:right-auto md:w-56 md:border-r md:border-t-0 md:pt-5"
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:inset-y-0 md:left-0 md:right-auto md:w-56 md:border-r md:border-t-0 md:pt-5",
+        hidesSidebar(path) && "md:hidden",
+      )}
     >
       <div className="mb-6 hidden px-5 md:block">
         <Logo />

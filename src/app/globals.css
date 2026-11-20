@@ -155,3 +155,17 @@ h3 {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+/* Homepage hero: battles auto-skip (swipe out left, next slides in) */
+@keyframes hero-in {
+  from { opacity: 0; transform: translateX(48px) rotate(3deg) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes hero-out {
+  to { opacity: 0; transform: translateX(-115%) rotate(-10deg); }
+}
+@keyframes hero-progress {
+  from { width: 0; }
+  to { width: 100%; }
+}
+.hero-card-in { animation: hero-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.hero-card-out { animation: hero-out 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }

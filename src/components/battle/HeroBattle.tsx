@@ -9,7 +9,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { OptionFace } from "./OptionFace";
 
 /** Homepage live battle: one tap votes anonymously (device cookie) and reveals the split. */
-export function HeroBattle({ b }: { b: BattleCard }) {
+export function HeroBattle({ b, onVoted }: { b: BattleCard; onVoted?: () => void }) {
   const [picked, setPicked] = useState<"A" | "B" | null>(null);
   const [res, setRes] = useState<{ a: number; b: number; total: number } | null>(null);
   const shownAt = useRef(Date.now());
@@ -19,6 +19,7 @@ export function HeroBattle({ b }: { b: BattleCard }) {
   async function vote(side: "A" | "B") {
     if (picked) return;
     setPicked(side);
+    onVoted?.();
     setRes(pct(b.votesA + (side === "A" ? 1 : 0), b.votesB + (side === "B" ? 1 : 0)));
     try {
       const r = await api<{ results: { a: number; b: number; total: number } }>(`/api/battles/${b.slug}/vote`, {

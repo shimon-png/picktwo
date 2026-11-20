@@ -9,7 +9,7 @@ import { getEconomy } from "@/server/services/config";
 import { battleCards, type BattleCard } from "@/server/services/battles";
 import { db } from "@/server/db";
 import { battles, outcomes, votes } from "@/server/db/schema";
-import { HeroBattle } from "@/components/battle/HeroBattle";
+import { HeroRotator } from "@/components/battle/HeroRotator";
 import { Mark } from "@/components/layout/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { track } from "@/server/analytics";
@@ -28,7 +28,7 @@ export default async function HomePage() {
   track("landing_viewed", {}, { deviceId: viewer.deviceId });
   const weekAgo = new Date(Date.now() - 7 * 86400_000);
   const [feed, stories, [{ weekVotes }], economy] = await Promise.all([
-    getFeed({ user: null, deviceId: viewer.deviceId }, { limit: 9 }),
+    getFeed({ user: null, deviceId: viewer.deviceId }, { limit: 12 }),
     battleCards(and(eq(battles.visibility, "PUBLIC"), eq(battles.status, "CLOSED"), isNotNull(outcomes.id)), 20),
     db.select({ weekVotes: sql<number>`count(*)::int` }).from(votes).where(gte(votes.createdAt, weekAgo)),
     getEconomy(),
@@ -40,8 +40,9 @@ export default async function HomePage() {
     return seenStories.has(k) ? false : (seenStories.add(k), true);
   });
   const live = feed[0];
-  const deciding = feed.slice(1);
-  const asker = live ? (live.authorName?.split(" ")[0] ?? (live.authorHandle ? `@${live.authorHandle}` : null)) : null;
+  // Hero cycles through the first few; the carousel shows the rest (or everything but the first when there are few).
+  const heroBattles = feed.slice(0, 5);
+  const deciding = feed.length > 8 ? feed.slice(5) : feed.slice(1);
 
   return (
     <div className="-mx-4 -mt-2 overflow-x-clip">
@@ -84,12 +85,7 @@ export default async function HomePage() {
             <div aria-hidden className="absolute inset-x-6 -top-3 h-24 -rotate-6 rounded-[22px] bg-pink-soft shadow-ring" />
             <div aria-hidden className="absolute inset-x-6 -top-3 h-24 rotate-6 rounded-[22px] bg-accent-900 shadow-ring" />
             <div className="relative">
-              {asker && (
-                <div className="absolute -top-4 left-4 z-10 rounded-full bg-ink px-3 py-1 text-xs text-white shadow-card">
-                  {asker} needs a second opinion 👇
-                </div>
-              )}
-              <HeroBattle b={live} />
+              <HeroRotator battles={heroBattles} />
             </div>
           </div>
         )}
