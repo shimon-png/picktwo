@@ -1,11 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowRight, Zap } from "lucide-react";
 import { api, setPP, toast } from "@/lib/client";
 import { cn, pct, timeLeft } from "@/lib/utils";
-import { AVATAR_TONES, CATEGORIES, TONE_CLASSES, kidAgeLabel, reasonSuggestions } from "@/lib/constants";
+import { AVATAR_TONES, REASON_CHIPS, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
 import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
@@ -19,18 +18,15 @@ const FLY_MS = 280;
 
 export function SwipeDeck({
   initial,
-  category,
   signedIn,
   pp: initialPP,
   tiers,
 }: {
   initial: BattleCard[];
-  category: string | null;
   signedIn: boolean;
   pp: number | null;
   tiers: { highAt: number; topAt: number };
 }) {
-  const router = useRouter();
   const [queue, setQueue] = useState(initial);
   const [voted, setVoted] = useState<Side | null>(null);
   const [result, setResult] = useState<{ a: number; b: number; total: number } | null>(null);
@@ -60,12 +56,12 @@ export function SwipeDeck({
 
   const loadMore = useCallback(async () => {
     try {
-      const r = await api<{ items: BattleCard[] }>(`/api/feed${category ? `?category=${category}` : ""}`);
+      const r = await api<{ items: BattleCard[] }>("/api/feed");
       const fresh = r.items.filter((i) => !seen.current.has(i.id));
       fresh.forEach((i) => seen.current.add(i.id));
       if (fresh.length) setQueue((q) => [...q, ...fresh]);
     } catch {}
-  }, [category]);
+  }, []);
 
   useEffect(() => {
     if (queue.length < 3) loadMore();
@@ -153,7 +149,7 @@ export function SwipeDeck({
 
   const header = (
     <div className="sticky top-14 z-20 -mx-4 bg-white/95 px-4 pb-3 backdrop-blur">
-      <p className="mb-2.5 text-xs text-zinc-500">
+      <p className="text-xs text-zinc-500">
         {tierLine ?? (
           <>
             Votes count without an account.{" "}
@@ -163,27 +159,6 @@ export function SwipeDeck({
           </>
         )}
       </p>
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]" role="tablist" aria-label="Categories">
-        <button
-          role="tab"
-          aria-selected={!category}
-          className={cn("shrink-0 rounded-md px-2.5 py-1 text-[13px]", !category ? TONE_CLASSES.blue.solid : TONE_CLASSES.blue.soft)}
-          onClick={() => router.push("/vote")}
-        >
-          For you
-        </button>
-        {CATEGORIES.filter((c) => c.id !== "other").map((c) => (
-          <button
-            key={c.id}
-            role="tab"
-            aria-selected={category === c.id}
-            className={cn("shrink-0 rounded-md px-2.5 py-1 text-[13px]", category === c.id ? TONE_CLASSES[c.tone].solid : TONE_CLASSES[c.tone].soft)}
-            onClick={() => router.push(`/vote?category=${c.id}`)}
-          >
-            {c.short}
-          </button>
-        ))}
-      </div>
     </div>
   );
 
@@ -205,7 +180,7 @@ export function SwipeDeck({
   const handle = card.authorHandle ? `@${card.authorHandle}` : (card.authorName ?? "someone");
   const parentOf = card.authorKidAges[0] ? `parent of a ${kidAgeLabel(card.authorKidAges[0])} y/o` : null;
   const avatarTone = AVATAR_TONES[session.votes % AVATAR_TONES.length];
-  const chips = reasonSuggestions(card.categoryId);
+  const chips = REASON_CHIPS;
   const style: React.CSSProperties = fly
     ? { transform: `translateX(${fly * 460}px) rotate(${fly * 16}deg)`, opacity: 0, transition: `transform ${FLY_MS}ms ease, opacity ${FLY_MS}ms ease` }
     : dx

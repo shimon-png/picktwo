@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CATEGORY_IDS, KID_AGE_IDS } from "./constants";
+import { KID_AGE_IDS } from "./constants";
 
 const optionalUrl = z
   .string()
@@ -30,7 +30,6 @@ export const optionInput = z.object({
 export const createBattleInput = z.object({
   title: z.string().trim().min(3).max(100),
   context: z.string().trim().max(280).optional().default(""),
-  categoryId: z.enum(CATEGORY_IDS),
   tags: z
     .object({
       kidAge: z.array(z.enum(KID_AGE_IDS)).max(5).optional(),
@@ -43,6 +42,15 @@ export const createBattleInput = z.object({
   deadlineHours: z.number().min(1).max(24 * 30),
   dataConsent: z.boolean().default(false),
   options: z.tuple([optionInput, optionInput]),
+  /** Admin only: publish under this username (created if it doesn't exist). */
+  postAs: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .transform((s) => s.replace(/^@/, ""))
+    .pipe(z.string().regex(/^[a-z0-9_]{3,20}$/, "Username: 3–20 letters, numbers or underscores"))
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
 });
 export type CreateBattleInput = z.infer<typeof createBattleInput>;
 

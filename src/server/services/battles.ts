@@ -13,7 +13,7 @@ import {
 } from "../db/schema";
 import { AppError } from "../errors";
 import { createSlug } from "@/lib/id";
-import { categoryById, kidAgeLabel, reasonSuggestions } from "@/lib/constants";
+import { DEFAULT_CATEGORY_ID, REASON_CHIPS, kidAgeLabel } from "@/lib/constants";
 import type { CreateBattleInput } from "@/lib/validators";
 import { assertCleanText, moderateImage } from "../moderation";
 import { awardPoints, countOpenLoops } from "./points";
@@ -23,9 +23,31 @@ import { track } from "../analytics";
 import { pct } from "@/lib/utils";
 
 // ---------------- Create ----------------
-export async function createBattle(user: User, input: CreateBattleInput) {
-  if (!user.isAdultConfirmed || !user.handle) throw new AppError("FORBIDDEN", "Finish setting up your profile first");
-  assertCleanText(input.title, input.context, input.options[0].label, input.options[1].label);
+/**
+ * Admin "post as": resolve the username to a user, creating a profile for it if it doesn't exist.
+ * Created profiles have no email, so nobody can sign in as them.
+ */
+async function resolvePostAs(handle: string): Promise<User> {
+  const [existing] = await db.select().from(users).where(eq(users.handle, handle));
+  if (existing) {
+    if (existing.bannedAt) throw new AppError("FORBIDDEN", `@${handle} is banned`);
+    return existing;
+  }
+  const [created] = await db
+    .insert(users)
+    .values({ handle, name: handle, isAdultConfirmed: true, onboardedAt: new Date() })
+    .onConflictDoNothing({ target: users.handle })
+    .returning();
+  if (created) return created;
+  const [raced] = await db.select().from(users).where(eq(users.handle, handle));
+  return raced;
+}
+
+export async function createBattle(actor: User, input: CreateBattleInput, opts: { asAdmin?: boolean } = {}) {
+  if (!actor.isAdultConfirmed || !actor.handle) throw new AppError("FORBIDDEN", "Finish setting up your profile first");
+  if (input.postAs && !opts.asAdmin) throw new AppError("FORBIDDEN", "Only admins can post as another user");
+  assertCleanText(input.title, input.context, input.options[0].label, input.options[1].label, input.postAs);
+  const user = input.postAs && input.postAs !== actor.handle ? await resolvePostAs(input.postAs) : actor;
   for (const o of input.options) {
     if (o.imageUrl && o.imageUrl.startsWith("https://")) {
       const m = await moderateImage(o.imageUrl);
@@ -49,7 +71,7 @@ export async function createBattle(user: User, input: CreateBattleInput) {
         authorId: user.id,
         title: input.title,
         context: input.context || null,
-        categoryId: input.categoryId,
+        categoryId: DEFAULT_CATEGORY_ID,
         tags: input.tags,
         visibility: input.visibility,
         deadline,
@@ -78,9 +100,13 @@ export async function createBattle(user: User, input: CreateBattleInput) {
     await tx.update(users).set({ lastActiveAt: new Date() }).where(eq(users.id, user.id));
     return { battle: b, bonus };
   });
-  track("battle_published", { category: input.categoryId, visibility: input.visibility, hours: input.deadlineHours }, { userId: user.id });
+  track(
+    "battle_published",
+    { visibility: input.visibility, hours: input.deadlineHours, ...(user.id !== actor.id ? { postedBy: actor.id } : {}) },
+    { userId: user.id },
+  );
   const openLoops = await countOpenLoops(user.id, economy);
-  return { slug: result.battle.slug, bonus: result.bonus, openLoops };
+  return { slug: result.battle.slug, bonus: user.id === actor.id ? result.bonus : 0, openLoops, postedAs: user.id === actor.id ? null : user.handle };
 }
 
 // ---------------- Close (lazy + cron) ----------------
@@ -223,7 +249,6 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     slug: b.slug,
     title: b.title,
     context: b.context,
-    category: categoryById(b.categoryId),
     tags: b.tags,
     visibility: b.visibility,
     status: b.status,
@@ -248,7 +273,7 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     boostCost: economy.boostCost,
     viewerPP: viewer.user?.ppBalance ?? null,
     relevantVotes,
-    reasonSuggestions: reasonSuggestions(b.categoryId),
+    reasonSuggestions: REASON_CHIPS,
     loopRewards: {
       loop: economy.loopClosedPoints,
       fast: economy.loopClosedFastBonus,

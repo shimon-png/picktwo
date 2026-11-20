@@ -9,7 +9,7 @@ import { friendIds, hydrateCards, type BattleCard } from "./battles";
 
 export type FeedItem = BattleCard & { score: number; debug?: Record<string, number> };
 
-export async function getFeed(viewer: { user: User | null; deviceId: string | null }, opts: { category?: string; limit?: number; debug?: boolean } = {}) {
+export async function getFeed(viewer: { user: User | null; deviceId: string | null }, opts: { limit?: number; debug?: boolean } = {}) {
   const limit = opts.limit ?? 20;
   const economy = await getEconomy();
   const now = new Date();
@@ -59,7 +59,6 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
         visibilityCond,
         user ? sql`${battles.authorId} <> ${user.id}` : sql`true`,
         blocked.length ? notInArray(battles.authorId, blocked) : sql`true`,
-        opts.category ? eq(battles.categoryId, opts.category) : sql`true`,
         sql`${users.bannedAt} IS NULL`,
         seenCond,
       ),

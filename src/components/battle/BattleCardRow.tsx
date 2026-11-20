@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type { BattleCard } from "@/server/services/battles";
-import { categoryById } from "@/lib/constants";
 import { cn, pct, timeLeft } from "@/lib/utils";
 
 function Thumb({ img, label, side }: { img: string | null; label: string; side: "A" | "B" }) {
@@ -21,7 +20,6 @@ function Thumb({ img, label, side }: { img: string | null; label: string; side: 
 
 export function BattleCardRow({ b, showAuthor = true, src = "home" }: { b: BattleCard; showAuthor?: boolean; src?: string }) {
   const p = pct(b.votesA, b.votesB);
-  const cat = categoryById(b.categoryId);
   const closed = b.status !== "OPEN";
   const chosenLabel = b.outcome?.chosen === "A" ? b.labelA : b.outcome?.chosen === "B" ? b.labelB : null;
   return (
@@ -33,7 +31,7 @@ export function BattleCardRow({ b, showAuthor = true, src = "home" }: { b: Battl
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{b.title}</div>
         <div className="truncate text-xs text-zinc-500">
-          {cat.emoji} {b.labelA} vs {b.labelB}
+          {b.labelA} vs {b.labelB}
           {showAuthor && b.authorHandle ? ` · @${b.authorHandle}` : ""}
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs">

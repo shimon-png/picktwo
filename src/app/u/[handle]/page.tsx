@@ -9,7 +9,6 @@ import { battleCards, friendIds, visibleStatuses } from "@/server/services/battl
 import { BattleCardRow } from "@/components/battle/BattleCardRow";
 import { FollowButton } from "@/components/layout/FollowButton";
 import { ReportButton } from "@/components/battle/ReportButton";
-import { categoryById } from "@/lib/constants";
 
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
@@ -54,7 +53,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   ]);
   const loopRate = stats.past ? Math.round((100 * stats.closed) / stats.past) : null;
   const badges: string[] = [];
-  for (const r of reps) if (r.resolved >= 20 && r.score >= 0.7) badges.push(`Top ${categoryById(r.categoryId).name.toLowerCase()} picker`);
+  // Reputation is still stored per (legacy) category; the badge uses the overall record.
+  const repResolved = reps.reduce((n, r) => n + r.resolved, 0);
+  const repCorrect = reps.reduce((n, r) => n + r.correct, 0);
+  if (repResolved >= 20 && repCorrect / repResolved >= 0.7) badges.push("Top picker");
   if (stats.past >= 5 && loopRate !== null && loopRate >= 90) badges.push("Loop closer");
 
   return (

@@ -46,7 +46,8 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await poster.getByRole("button", { name: "Continue" }).click();
   const sheet = poster.getByRole("dialog", { name: "Review & publish" });
   await expect(sheet.getByLabel("Question")).toHaveValue("Lego Art Set or Paint easel?");
-  await expect(sheet.getByText("we guessed")).toBeVisible();
+  await expect(sheet.getByText(/Category/)).toHaveCount(0);
+  await expect(sheet.getByLabel(/Post as/)).toHaveCount(0); // admin-only
   await sheet.getByLabel("Question").fill(`Gift for my 6 y/o ${stamp}`);
   await sheet.getByLabel(/Context/).fill("Loves art, budget ~$50");
   await sheet.getByRole("button", { name: "5–8" }).click();
@@ -88,7 +89,7 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await v2.waitForTimeout(1700);
   await v2.getByRole("button", { name: "Vote for Paint easel" }).click();
   // One-tap reason chip earns the reason bonus
-  await v2.getByRole("button", { name: "Lasts longer" }).click();
+  await v2.getByRole("button", { name: "Just feels right" }).click();
   await expect(v2.getByText(/for adding a reason/)).toBeVisible();
   await expect(v2.getByText(/3\s*votes/)).toBeVisible();
 
@@ -154,6 +155,14 @@ test("homepage: anonymous one-tap vote", async ({ browser }) => {
   await p.waitForTimeout(1600);
   await p.getByRole("button", { name: /^Vote for/ }).first().click();
   await expect(p.getByText(/Counted\. \d+ (people|person) weighed in/)).toBeVisible();
+});
+
+test("non-admin cannot post as another user", async ({ browser }) => {
+  const p = await newUser(browser, "notadmin");
+  const res = await p.request.post("/api/battles", {
+    data: { title: "Red or blue?", deadlineHours: 24, options: [{ label: "Red" }, { label: "Blue" }], postAs: "someone_else" },
+  });
+  expect(res.status()).toBe(403);
 });
 
 test("non-admin gets 404 on /admin (A-20)", async ({ browser }) => {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, X } from "lucide-react";
 import { api, setPP, toast } from "@/lib/client";
 import { cn } from "@/lib/utils";
-import { CATEGORIES, DEADLINE_PRESETS, KID_AGES, guessCategory } from "@/lib/constants";
+import { DEADLINE_PRESETS, KID_AGES } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
 import { Bar } from "@/components/ui/Bar";
 import { OptionEditor, type OptionDraft } from "./OptionEditor";
@@ -24,11 +24,13 @@ export function ComposeForm({
   tiers,
   openLoops,
   accountConsent,
+  isAdmin = false,
 }: {
   pp: number;
   tiers: { highAt: number; topAt: number };
   openLoops: number;
   accountConsent: boolean;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [a, setA] = useState<OptionDraft>({ label: "" });
@@ -37,8 +39,7 @@ export function ComposeForm({
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
   const [context, setContext] = useState("");
-  const [categoryId, setCategoryId] = useState<string>("gifts");
-  const [categoryPicked, setCategoryPicked] = useState(false);
+  const [postAs, setPostAs] = useState("");
   const [kidAge, setKidAge] = useState<string[]>([]);
   const [deadline, setDeadline] = useState<number>(24);
   const [visibility, setVisibility] = useState<Visibility>("PUBLIC");
@@ -69,7 +70,6 @@ export function ComposeForm({
 
   function openReview() {
     if (!ready) return;
-    if (!categoryPicked) setCategoryId(guessCategory(`${a.label} ${b.label} ${a.urlTitle ?? ""} ${b.urlTitle ?? ""}`));
     setReview(true);
   }
 
@@ -81,7 +81,7 @@ export function ComposeForm({
         body: {
           title: question.trim(),
           context: context.trim(),
-          categoryId,
+          ...(isAdmin && postAs.trim() ? { postAs: postAs.trim() } : {}),
           tags: kidAge.length ? { kidAge } : {},
           visibility,
           deadlineHours: deadline,
@@ -136,6 +136,28 @@ export function ComposeForm({
               <span className="text-xs text-zinc-500">All optional</span>
             </div>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+              {isAdmin && (
+                <div className="rounded-lg bg-violet-soft p-3">
+                  <label className="label !text-violet" htmlFor="post-as">
+                    Post as (admin) — username
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-zinc-500">@</span>
+                    <input
+                      id="post-as"
+                      className="input !bg-white"
+                      placeholder="Leave empty to post as you"
+                      maxLength={21}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      value={postAs}
+                      onChange={(e) => setPostAs(e.target.value.replace(/^@/, "").toLowerCase())}
+                    />
+                  </div>
+                  <p className="mt-1.5 text-xs text-zinc-600">The battle shows as posted by this user. A new profile is created if the username doesn’t exist.</p>
+                </div>
+              )}
               <div>
                 <label className="label" htmlFor="title">
                   Question
@@ -166,20 +188,6 @@ export function ComposeForm({
                 />
               </div>
 
-              <ChipGroup
-                label={
-                  <>
-                    Category{!categoryPicked && <span className="text-accent"> · we guessed</span>}
-                  </>
-                }
-                options={CATEGORIES.map((c) => ({ id: c.id, label: c.name }))}
-                value={[categoryId]}
-                onChange={(v) => {
-                  setCategoryId(v[0] ?? "other");
-                  setCategoryPicked(true);
-                }}
-                single
-              />
               <ChipGroup
                 label={<>Kid’s age · matches you with parents of same-age kids</>}
                 options={KID_AGES.map((k) => ({ id: k.id, label: k.label }))}

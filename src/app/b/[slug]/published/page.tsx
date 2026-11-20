@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CheckCircle2, Zap } from "lucide-react";
-import { getCurrentUser } from "@/server/viewer";
+import { getCurrentUser, isAdmin } from "@/server/viewer";
+import { db } from "@/server/db";
+import { users } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 import { getBattleRow } from "@/server/services/battles";
 import { getEconomy } from "@/server/services/config";
 import { pointsTier } from "@/server/services/priority";
@@ -18,7 +21,9 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
   if (!user) redirect(`/signin?callbackUrl=/b/${slug}`);
   const b = await getBattleRow(slug);
   if (!b) notFound();
-  if (b.authorId !== user.id) redirect(`/b/${slug}`);
+  const postedAs = b.authorId !== user.id;
+  if (postedAs && !isAdmin(user)) redirect(`/b/${slug}`);
+  const [author] = postedAs ? await db.select({ handle: users.handle }).from(users).where(eq(users.id, b.authorId)) : [null];
   const economy = await getEconomy();
   const t = pointsTier(user.ppBalance, economy.tierHighAt, economy.tierTopAt);
   const url = appUrl(`/b/${slug}`);
@@ -27,6 +32,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
     <div className="-mx-4 -mt-2 flex min-h-dvh flex-col bg-gradient-to-b from-accent-900/70 to-white to-40% px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10">
       <CheckCircle2 className="size-8 text-accent" aria-hidden />
       <h1 className="display mt-3 text-[26px]">Your battle is live</h1>
+      {postedAs && <p className="mt-1 text-[13px] text-violet">Posted as @{author?.handle}</p>}
       <p className="mt-2 text-[15px] text-zinc-600">Friends answer fastest. Send it to two or three people who know the situation.</p>
 
       <div className="mt-6 space-y-3">

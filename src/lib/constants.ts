@@ -1,15 +1,21 @@
-/** `tone` maps to the colour pairs in globals.css (e.g. pink → bg-pink-soft text-pink). */
+/**
+ * Categories are no longer part of the product (no picker, filter or labels). The table and the
+ * battle.category_id column remain for existing data; every new battle is stored as DEFAULT_CATEGORY_ID.
+ * This list only seeds the category table (FK target).
+ */
 export const CATEGORIES = [
-  { id: "gifts", name: "Gifts", short: "Gifts", emoji: "🎁", tone: "pink", featured: true, sort: 1 },
-  { id: "baby-names", name: "Baby names", short: "Baby names", emoji: "🍼", tone: "teal", featured: false, sort: 2 },
-  { id: "home-design", name: "Home & design", short: "Home", emoji: "🏡", tone: "green", featured: false, sort: 3 },
-  { id: "what-to-wear", name: "What to wear", short: "What to wear", emoji: "👗", tone: "violet", featured: false, sort: 4 },
-  { id: "big-purchases", name: "Big purchases", short: "Big purchases", emoji: "🛒", tone: "amber", featured: false, sort: 5 },
-  { id: "words", name: "Words that matter", short: "Words", emoji: "✍️", tone: "blue", featured: false, sort: 6 },
-  { id: "other", name: "Other", short: "Other", emoji: "✨", tone: "neutral", featured: false, sort: 7 },
+  { id: "gifts", name: "Gifts", emoji: "🎁", featured: true, sort: 1 },
+  { id: "baby-names", name: "Baby names", emoji: "🍼", featured: false, sort: 2 },
+  { id: "home-design", name: "Home & design", emoji: "🏡", featured: false, sort: 3 },
+  { id: "what-to-wear", name: "What to wear", emoji: "👗", featured: false, sort: 4 },
+  { id: "big-purchases", name: "Big purchases", emoji: "🛒", featured: false, sort: 5 },
+  { id: "words", name: "Words that matter", emoji: "✍️", featured: false, sort: 6 },
+  { id: "other", name: "Other", emoji: "✨", featured: false, sort: 7 },
 ] as const;
+export const DEFAULT_CATEGORY_ID = "other";
 
-export type Tone = (typeof CATEGORIES)[number]["tone"] | "coral";
+/** `tone` maps to the colour pairs in globals.css (e.g. pink → bg-pink-soft text-pink). */
+export type Tone = "pink" | "teal" | "green" | "violet" | "amber" | "blue" | "coral" | "neutral";
 /** Static class strings so Tailwind can see them. */
 export const TONE_CLASSES: Record<Tone, { soft: string; solid: string }> = {
   pink: { soft: "bg-pink-soft text-pink", solid: "bg-pink text-white" },
@@ -24,34 +30,11 @@ export const TONE_CLASSES: Record<Tone, { soft: string; solid: string }> = {
 export const AVATAR_TONES: Tone[] = ["pink", "teal", "green", "violet"];
 
 /**
- * One-tap reason chips shown after a vote (3 per battle). A chip counts as a valid reason for the
- * reason bonus even though it is shorter than `reasonMinChars`.
+ * One-tap reason chips shown after a vote. A chip counts as a valid reason for the reason bonus
+ * even though it is shorter than `reasonMinChars`.
  */
-export const REASON_SUGGESTIONS: Record<string, readonly string[]> = {
-  gifts: ["Lasts longer", "More fun", "Better value"],
-  "baby-names": ["Sounds better", "Easier to spell", "Ages well"],
-  "home-design": ["Looks better", "More practical", "Easier to keep clean"],
-  "what-to-wear": ["More flattering", "Fits the occasion", "More comfortable"],
-  "big-purchases": ["Better value", "More reliable", "Better reviews"],
-  words: ["Clearer", "Warmer", "More personal"],
-  other: ["Just feels right", "More practical", "Better value"],
-};
-export const reasonSuggestions = (categoryId: string) => REASON_SUGGESTIONS[categoryId] ?? REASON_SUGGESTIONS.other;
-
-/** Guess a category from the two option names (review sheet "we guessed"). */
-export function guessCategory(text: string): CategoryId {
-  const t = text.toLowerCase();
-  const rules: [CategoryId, RegExp][] = [
-    ["baby-names", /\b(name|names|baby|boy|girl)\b/],
-    ["what-to-wear", /\b(dress|shirt|jacket|coat|shoes?|boots|sneakers|outfit|suit|jeans|skirt|tie|hat|wear)\b/],
-    ["gifts", /\b(lego|toy|set|game|gift|kit|book|puzzle|doll|easel|crayons?|art|plush|blocks)\b/],
-    ["home-design", /\b(sofa|couch|rug|paint|wall|lamp|chair|table|kitchen|tile|curtains?|bed|room|wallpaper|shelf|cabinet)\b/],
-    ["big-purchases", /\b(car|laptop|phone|tv|iphone|pixel|macbook|stroller|fridge|washer|camera|bike|vacuum)\b/],
-    ["words", /\b(caption|speech|toast|message|text|email|card|wording|letter)\b/],
-  ];
-  for (const [id, re] of rules) if (re.test(t)) return id;
-  return "gifts";
-}
+export const REASON_CHIPS = ["Looks better", "More practical", "Just feels right"] as const;
+export const isReasonChip = (reason: string) => (REASON_CHIPS as readonly string[]).includes(reason.trim());
 
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id) as [CategoryId, ...CategoryId[]];
