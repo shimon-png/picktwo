@@ -43,8 +43,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
     return (
       <div className="card mx-auto mt-10 max-w-sm space-y-3 p-6 text-center">
         <div className="text-4xl">📬</div>
-        <h1 className="font-display text-xl font-extrabold">Check your email</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">We sent you a sign-in link. It expires in 24 hours.</p>
+        <h1 className=" text-xl font-medium">Check your email</h1>
+        <p className="text-zinc-600">We sent you a sign-in link. It expires in 24 hours.</p>
         {!enabledProviders.emailConfigured && <p className="text-xs text-zinc-400">(Dev mode: the link is printed in the server console.)</p>}
       </div>
     );
@@ -52,8 +52,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <div className="mx-auto mt-6 max-w-sm space-y-6">
       <div className="text-center">
-        <h1 className="font-display text-2xl font-extrabold">Welcome to PickTwo</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">Post battles, earn priority, and see how your picks turn out.</p>
+        <h1 className=" text-2xl font-medium">Welcome to crowdpick</h1>
+        <p className="text-zinc-600">Post battles, earn priority, and see how your picks turn out.</p>
       </div>
       {sp.error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">Something went wrong signing you in. Please try again.</p>}
       <div className="card space-y-4 p-5">
@@ -78,15 +78,15 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           <button className="btn-primary w-full py-3">Email me a sign-in link</button>
         </form>
         {enabledProviders.dev && (
-          <form action={devAction} className="space-y-2 border-t border-dashed border-zinc-300 pt-4 dark:border-zinc-700">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Demo login (DEV_LOGIN=true)</p>
+          <form action={devAction} className="space-y-2 border-t border-dashed border-zinc-300 pt-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-amber-600">Demo login (DEV_LOGIN=true)</p>
             <input name="email" type="email" required className="input" placeholder="any@email.com" aria-label="Demo email" />
             <button className="btn-pp w-full">Sign in instantly</button>
           </form>
         )}
       </div>
       <p className="text-center text-xs text-zinc-400">
-        By continuing you agree to our <Link href="/legal/terms" className="underline">Terms</Link> and <Link href="/legal/privacy" className="underline">Privacy Policy</Link>. PickTwo is for adults 18+.
+        By continuing you agree to our <Link href="/legal/terms" className="underline">Terms</Link> and <Link href="/legal/privacy" className="underline">Privacy Policy</Link>. crowdpick is for adults 18+.
       </p>
     </div>
   );

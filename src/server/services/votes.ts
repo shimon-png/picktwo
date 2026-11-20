@@ -10,6 +10,7 @@ import { notify } from "./notifications";
 import { getBattleRow, assertCanView } from "./battles";
 import { track } from "../analytics";
 import { pct } from "@/lib/utils";
+import { reasonSuggestions } from "@/lib/constants";
 
 const VOTE_MILESTONES = [1, 10, 50, 100];
 
@@ -28,6 +29,9 @@ export async function castVote(
 
   const economy = await getEconomy();
   const user = viewer.user;
+  // A one-tap suggested reason chip counts as a reason even though it's short.
+  const reasonEarns =
+    isValidReason(input.reason, economy.reasonMinChars) || (!!input.reason && reasonSuggestions(b.categoryId).includes(input.reason.trim()));
 
   const res = await db.transaction(async (tx) => {
     const owner = user ? eq(votes.userId, user.id) : eq(votes.deviceId, viewer.deviceId!);
@@ -55,7 +59,7 @@ export async function castVote(
       if (input.reason !== undefined) patch.reason = input.reason || null;
       if (Object.keys(patch).length) await tx.update(votes).set(patch).where(eq(votes.id, existing.id));
       // Late reason bonus (once) for a quality vote
-      if (user && existing.pointsAwarded > 0 && isValidReason(input.reason, economy.reasonMinChars)) {
+      if (user && existing.pointsAwarded > 0 && reasonEarns) {
         const today = await votePointsToday(tx, user.id);
         if (today < economy.dailyVotePointCap)
           points += await awardPoints(tx, user.id, economy.voteReasonBonus, "VOTE_REASON", {
@@ -119,7 +123,7 @@ export async function castVote(
         const today = await votePointsToday(tx, user.id);
         if (today < economy.dailyVotePointCap) {
           points += await awardPoints(tx, user.id, economy.votePoints, "VOTE", { battleId: b.id, voteId: v.id, idemKey: `vote:${v.id}` });
-          if (isValidReason(input.reason, economy.reasonMinChars) && today + points < economy.dailyVotePointCap)
+          if (reasonEarns && today + points < economy.dailyVotePointCap)
             points += await awardPoints(tx, user.id, economy.voteReasonBonus, "VOTE_REASON", {
               battleId: b.id,
               voteId: v.id,

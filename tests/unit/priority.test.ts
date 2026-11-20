@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { loopFactor, posterPriority, priorityFactor, priorityTier, voteQualityIssue, isValidReason, reminderDue } from "@/server/services/priority";
+import { loopFactor, posterPriority, priorityFactor, priorityTier, pointsTier, voteQualityIssue, isValidReason, reminderDue } from "@/server/services/priority";
+import { guessCategory } from "@/lib/constants";
 
 const base = {
   signedIn: true,
@@ -79,5 +80,44 @@ describe("report-back reminders (A-11)", () => {
     expect(reminderDue(deadline, 1, at(48))).toBe(true);
     expect(reminderDue(deadline, 2, at(168))).toBe(true);
     expect(reminderDue(deadline, 3, at(1000))).toBe(false);
+  });
+});
+
+describe("pointsTier (⚡ meter)", () => {
+  it("Normal below 20, with progress toward High", () => {
+    const t = pointsTier(15);
+    expect(t.tier).toBe("Normal");
+    expect(t.next).toBe("High");
+    expect(t.toNext).toBe(5);
+    expect(t.progress).toBeCloseTo(0.75);
+    expect(t.segments).toEqual([0.75, 0, 0]);
+  });
+  it("High from 20 to 39", () => {
+    expect(pointsTier(20).tier).toBe("High");
+    const t = pointsTier(30);
+    expect(t.toNext).toBe(10);
+    expect(t.progress).toBeCloseTo(0.5);
+    expect(t.segments).toEqual([1, 0.5, 0]);
+  });
+  it("Top at 40+ is full", () => {
+    const t = pointsTier(120);
+    expect(t.tier).toBe("Top");
+    expect(t.next).toBeNull();
+    expect(t.progress).toBe(1);
+    expect(t.segments).toEqual([1, 1, 1]);
+  });
+  it("respects custom thresholds and negative input", () => {
+    expect(pointsTier(-3).tier).toBe("Normal");
+    expect(pointsTier(10, 10, 30).tier).toBe("High");
+  });
+});
+
+describe("guessCategory", () => {
+  it("guesses from option names", () => {
+    expect(guessCategory("Lego Art Set Paint easel")).toBe("gifts");
+    expect(guessCategory("Navy dress Black jumpsuit jacket")).toBe("what-to-wear");
+    expect(guessCategory("Grey sofa Green sofa")).toBe("home-design");
+    expect(guessCategory("Olivia Amelia names")).toBe("baby-names");
+    expect(guessCategory("something else")).toBe("gifts");
   });
 });

@@ -24,15 +24,15 @@ export default async function AdminReports() {
       {rows.map(({ r, battleSlug, battleTitle, reasonText, userHandle }) => (
         <li key={r.id} className={`card space-y-2 p-3 ${r.reason === "minor_safety" ? "border-red-400" : ""}`}>
           <div className="flex justify-between text-xs text-zinc-500">
-            <span className={r.reason === "minor_safety" ? "font-bold text-red-600" : ""}>
+            <span className={r.reason === "minor_safety" ? "font-medium text-red-600" : ""}>
               {r.targetType} · {r.reason}
             </span>
             <span>{timeAgo(r.createdAt)}</span>
           </div>
           <div className="text-sm">
-            {r.targetType === "BATTLE" && battleSlug && <Link className="font-semibold underline" href={`/b/${battleSlug}`}>{battleTitle}</Link>}
+            {r.targetType === "BATTLE" && battleSlug && <Link className="font-medium underline" href={`/b/${battleSlug}`}>{battleTitle}</Link>}
             {r.targetType === "REASON" && <span>“{reasonText}”</span>}
-            {r.targetType === "USER" && userHandle && <Link className="font-semibold underline" href={`/u/${userHandle}`}>@{userHandle}</Link>}
+            {r.targetType === "USER" && userHandle && <Link className="font-medium underline" href={`/u/${userHandle}`}>@{userHandle}</Link>}
           </div>
           <ReportActions id={r.id} />
         </li>

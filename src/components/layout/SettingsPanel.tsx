@@ -29,7 +29,7 @@ export function SettingsPanel({ initial }: { initial: S }) {
   const Row = ({ k, label, desc }: { k: keyof S; label: string; desc: string }) => (
     <label className="flex items-start justify-between gap-4 py-3">
       <span>
-        <span className="block font-semibold">{label}</span>
+        <span className="block font-medium">{label}</span>
         <span className="block text-sm text-zinc-500">{desc}</span>
       </span>
       <input type="checkbox" role="switch" className="mt-1 size-5 accent-zinc-900" checked={s[k]} onChange={() => toggle(k)} />
@@ -38,15 +38,15 @@ export function SettingsPanel({ initial }: { initial: S }) {
   return (
     <>
       <section>
-        <h2 className="text-lg font-bold">Notifications</h2>
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <h2 className="text-lg font-medium">Notifications</h2>
+        <div className="divide-y divide-zinc-200">
           <Row k="notifyEmail" label="Email reminders" desc="Voting closed and report-back reminders for your battles" />
           <Row k="marketingEmail" label="Product news" desc="Occasional updates about new features" />
         </div>
       </section>
       <section>
-        <h2 className="text-lg font-bold">Data & privacy</h2>
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
+        <h2 className="text-lg font-medium">Data & privacy</h2>
+        <div className="divide-y divide-zinc-200">
           <Row k="dataConsent" label="Help improve recommendations" desc="Allow anonymised use of your battles, votes and outcomes. We never sell your identity." />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">

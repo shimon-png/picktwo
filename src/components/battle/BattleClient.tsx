@@ -2,18 +2,20 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Clock, Heart, Lock, Share2, ThumbsDown, ThumbsUp, Trash2, Zap, Pencil, StopCircle, Users } from "lucide-react";
+import { ArrowLeft, ChevronUp, ExternalLink, Lock, Pencil, StopCircle, ThumbsDown, ThumbsUp, Trash2, Users, Zap } from "lucide-react";
 import { api, setPP, toast } from "@/lib/client";
-import { cn, timeLeft, timeAgo } from "@/lib/utils";
-import { kidAgeLabel } from "@/lib/constants";
+import { cn, formatPrice, timeAgo, timeLeft } from "@/lib/utils";
+import { TONE_CLASSES, categoryById, kidAgeLabel } from "@/lib/constants";
 import type { BattleView, ReasonView } from "@/server/services/battles";
-import { OptionTile } from "./OptionTile";
-import { ShareButtons } from "./ShareButtons";
+import { Avatar } from "@/components/ui/Avatar";
+import { OptionFace } from "./OptionFace";
+import { CopyLink, ShareGrid, ShareIconButton } from "./ShareButtons";
 import { ReportButton } from "./ReportButton";
 
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null };
+type V = NonNullable<BattleView>;
 
-export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: { initial: NonNullable<BattleView>; signedIn: boolean; shareUrl: string; source?: string }) {
+export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: { initial: V; signedIn: boolean; shareUrl: string; source?: string }) {
   const [v, setV] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState(initial.myVote?.reason ?? "");
@@ -24,7 +26,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
 
   const refresh = useCallback(async () => {
     try {
-      setV(await api<NonNullable<BattleView>>(`/api/battles/${v.slug}`));
+      setV(await api<V>(`/api/battles/${v.slug}`));
     } catch {}
   }, [v.slug]);
 
@@ -39,14 +41,11 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
     if (busy || !v.isOpen || v.isOwner) return;
     if (v.myVote?.side === side) return;
     setBusy(true);
-    // optimistic
     const prev = v;
     setV({ ...v, myVote: { id: v.myVote?.id ?? "pending", side, reason: v.myVote?.reason ?? null } });
     try {
-      const r = await api<VoteRes>(`/api/battles/${v.slug}/vote`, {
-        body: { side, dwellMs: Date.now() - mountedAt.current, source },
-      });
-      if (r.points > 0) toast(`+${r.points} ⚡ — thanks for helping!`, "pp");
+      const r = await api<VoteRes>(`/api/battles/${v.slug}/vote`, { body: { side, dwellMs: Date.now() - mountedAt.current, source } });
+      if (r.points > 0) toast(`+${r.points} for voting — thanks for helping!`, "pp");
       setPP(r.ppBalance);
       await refresh();
     } catch (e) {
@@ -57,11 +56,12 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
     }
   }
 
-  async function saveReason() {
-    if (!v.myVote) return;
+  async function saveReason(text = reason) {
+    if (!v.myVote || !text.trim()) return;
+    setReason(text);
     try {
-      const r = await api<VoteRes>(`/api/battles/${v.slug}/vote`, { body: { side: v.myVote.side, reason, source } });
-      if (r.points > 0) toast(`+${r.points} ⚡ for adding a reason`, "pp");
+      const r = await api<VoteRes>(`/api/battles/${v.slug}/vote`, { body: { side: v.myVote.side, reason: text, source } });
+      if (r.points > 0) toast(`+${r.points} for adding a reason`, "pp");
       setPP(r.ppBalance);
       setReasonSaved(true);
       await refresh();
@@ -75,14 +75,14 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       if (action === "boost") {
         const r = await api<{ ppBalance: number }>(`/api/battles/${v.slug}/boost`, { method: "POST" });
         setPP(r.ppBalance);
-        toast("Boosted! Your battle will show up first for the next few hours ⚡", "pp");
+        toast("Boosted — your battle shows up first for the next few hours", "pp");
       } else if (action === "close") {
-        if (!confirmAction("Close voting now?")) return;
+        if (!window.confirm("Close voting now?")) return;
         await api(`/api/battles/${v.slug}`, { method: "PATCH", body: { action: "close" } });
       } else {
-        if (!confirmAction("Delete this battle? This can't be undone.")) return;
+        if (!window.confirm("Delete this battle? This can't be undone.")) return;
         await api(`/api/battles/${v.slug}`, { method: "DELETE" });
-        router.push("/");
+        router.push("/you");
         return;
       }
       await refresh();
@@ -93,120 +93,194 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
 
   const { A, B } = v.options;
   const res = v.results;
-  const crowdWinner = res ? (res.a === res.b ? null : res.a > res.b ? "A" : "B") : null;
-  const tags = [
-    ...(v.tags?.kidAge ?? []).map((k: string) => `Kid ${kidAgeLabel(k)}`),
-    v.tags?.recipient,
-    v.tags?.budget,
-    v.tags?.occasion,
-  ].filter(Boolean) as string[];
+  const leader = res && res.total > 0 ? (res.a === res.b ? null : res.a > res.b ? "A" : "B") : null;
+  const cat = categoryById(v.category.id);
+  const kidAges: string[] = v.tags?.kidAge ?? [];
+  const loopPoints = v.loopRewards.loop;
+  const allReasons = [...v.reasons.A, ...v.reasons.B].sort((x, y) => score(y) - score(x));
+  const chosenLabel = v.outcome ? (v.outcome.chosen === "A" ? A.label : v.outcome.chosen === "B" ? B.label : "neither") : null;
+  const showStickyLoop = v.isOwner && !v.outcome && v.canReportOutcome;
 
   return (
-    <article className="space-y-5">
-      {v.outcome && <OutcomeBanner v={v} crowdWinner={crowdWinner} />}
+    <article className={cn("space-y-5", showStickyLoop && "pb-20")}>
+      {v.isOwner && (
+        <div className="-mx-2 flex h-11 items-center gap-1">
+          <Link href="/you" className="rounded-lg p-2 hover:bg-surface" aria-label="Back">
+            <ArrowLeft className="size-5" />
+          </Link>
+          <span className="flex-1 text-[15px]">Your battle</span>
+          <ShareIconButton url={shareUrl} title={v.title} />
+        </div>
+      )}
+
+      {v.outcome && <OutcomeBanner v={v} leader={leader} />}
 
       <header className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-zinc-500">
-          <span className="rounded-full bg-zinc-200/70 px-2 py-0.5 dark:bg-zinc-800">
-            {v.category.emoji} {v.category.name}
-          </span>
-          <span className={cn("inline-flex items-center gap-1", v.isOpen ? "text-zinc-600 dark:text-zinc-400" : "text-zinc-500")}>
-            <Clock className="size-3.5" /> {v.isOpen ? timeLeft(v.deadline) : "Voting closed"}
-          </span>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {v.isOpen ? (
+            <span className="tag bg-accent-900 text-accent">
+              <span className="size-1.5 rounded-full bg-accent" aria-hidden /> Live · {timeLeft(v.deadline)}
+            </span>
+          ) : v.outcome ? (
+            <span className="tag bg-violet-soft text-violet">Closed · picked {chosenLabel}</span>
+          ) : (
+            <span className="tag bg-surface text-zinc-600">Voting closed</span>
+          )}
+          <span className={cn("tag", TONE_CLASSES[cat.tone].soft)}>{cat.short}</span>
+          {kidAges.map((k) => (
+            <span key={k} className={cn("tag", TONE_CLASSES.teal.soft)}>
+              Kid {kidAgeLabel(k)}
+            </span>
+          ))}
           {v.visibility !== "PUBLIC" && (
-            <span className="inline-flex items-center gap-1">
-              {v.visibility === "FRIENDS" ? <Users className="size-3.5" /> : <Lock className="size-3.5" />}
+            <span className="tag bg-surface text-zinc-600">
+              {v.visibility === "FRIENDS" ? <Users className="size-3" aria-hidden /> : <Lock className="size-3" aria-hidden />}
               {v.visibility === "FRIENDS" ? "Friends only" : "Link only"}
             </span>
           )}
           {v.boostActive && (
-            <span className="inline-flex items-center gap-1 text-amber-600">
-              <Zap className="size-3.5 fill-pp text-pp" /> Boosted
+            <span className="tag bg-amber-soft text-amber-700">
+              <Zap className="size-3 fill-pp text-pp" aria-hidden /> Boosted
             </span>
           )}
         </div>
         {editing ? (
-          <EditForm v={v} onDone={async () => { setEditing(false); await refresh(); }} />
+          <EditForm
+            v={v}
+            onDone={async () => {
+              setEditing(false);
+              await refresh();
+            }}
+          />
         ) : (
           <>
-            <h1 className="font-display text-2xl font-extrabold leading-tight sm:text-3xl">{v.title}</h1>
-            {v.context && <p className="text-[15px] text-zinc-600 dark:text-zinc-400">{v.context}</p>}
+            <h1 className="text-[22px] leading-snug">{v.title}</h1>
+            {v.context && <p className="text-[13px] text-zinc-500">{v.context}</p>}
           </>
         )}
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {tags.map((t) => (
-              <span key={t} className="rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
-                {t}
-              </span>
+        {!v.isOwner && (
+          <div className="flex items-center gap-2 text-xs text-zinc-500">
+            <Avatar name={v.author.name || v.author.handle || "?"} seed={v.author.handle ?? undefined} />
+            <Link href={`/u/${v.author.handle}`} className="hover:underline">
+              {v.author.name || `@${v.author.handle}`}
+            </Link>
+            · {timeAgo(v.createdAt)}
+          </div>
+        )}
+      </header>
+
+      <div>
+        <div className={cn("grid grid-cols-2 gap-2", res ? "h-[140px]" : "h-[200px]")}>
+          {(["A", "B"] as const).map((s) => {
+            const o = s === "A" ? A : B;
+            const canVote = v.isOpen && !v.isOwner;
+            const face = (
+              <OptionFace
+                side={s}
+                label={o.label}
+                image={o.imageUrl || o.urlImage}
+                percent={res ? (s === "A" ? res.a : res.b) : null}
+                ring={v.isOwner || !v.isOpen ? leader === s : v.myVote?.side === s}
+              />
+            );
+            return canVote ? (
+              <button
+                key={s}
+                type="button"
+                className="h-full active:scale-[0.98]"
+                onClick={() => vote(s)}
+                disabled={busy}
+                aria-label={`Vote for ${o.label}`}
+                aria-pressed={v.myVote?.side === s}
+              >
+                {face}
+              </button>
+            ) : (
+              <div key={s} className="h-full">
+                {face}
+              </div>
+            );
+          })}
+        </div>
+        {(A.url || B.url || A.priceCents != null || B.priceCents != null) && (
+          <div className="mt-1.5 grid grid-cols-2 gap-2 text-xs text-zinc-500">
+            {[A, B].map((o) => (
+              <div key={o.id} className="flex items-center gap-2 px-0.5">
+                {o.priceCents != null && <span>{formatPrice(o.priceCents, o.currency)}</span>}
+                {o.url && (
+                  <a href={`/go/${o.id}`} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-0.5 text-accent" aria-label={`Open link for ${o.label}`}>
+                    View <ExternalLink className="size-3" aria-hidden />
+                  </a>
+                )}
+              </div>
             ))}
           </div>
         )}
-        <div className="text-sm text-zinc-500">
-          Asked by{" "}
-          <Link href={`/u/${v.author.handle}`} className="font-semibold text-zinc-800 hover:underline dark:text-zinc-200">
-            {v.author.name || `@${v.author.handle}`}
-          </Link>{" "}
-          · {timeAgo(v.createdAt)}
-        </div>
-      </header>
+        {res && (
+          <div className="mt-3 flex h-1.5 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+            <span className="h-full rounded-l-full bg-accent transition-[width] duration-500" style={{ width: `${res.total ? res.a : 50}%` }} />
+            <span className="h-full flex-1 rounded-r-full bg-b" />
+          </div>
+        )}
+        <p className="mt-2 text-[13px] text-zinc-500">
+          {res ? (
+            <>
+              {res.total} vote{res.total === 1 ? "" : "s"}
+              {v.relevantVotes && v.relevantVotes.count > 0 && ` · ${v.relevantVotes.count} from parents of ${v.relevantVotes.ageLabel} year olds`}
+              {v.myVote && v.isOpen && " · tap the other option to change your vote"}
+            </>
+          ) : v.isOpen && !v.isOwner ? (
+            "Tap to vote — results appear after you pick"
+          ) : null}
+        </p>
+      </div>
 
-      <div className="flex gap-3">
-        {(["A", "B"] as const).map((s) => {
-          const o = s === "A" ? A : B;
-          return (
-            <OptionTile
-              key={s}
-              option={o}
-              percent={res ? (s === "A" ? res.a : res.b) : null}
-              selected={v.myVote?.side === s}
-              winner={crowdWinner === s}
-              picked={v.outcome?.chosen === s}
-              thumb={v.outcome?.chosen === s ? v.outcome.thumb : null}
-              onClick={v.isOpen && !v.isOwner ? () => vote(s) : undefined}
-              disabled={busy}
+      {/* Reason after voting */}
+      {v.myVote && v.isOpen && !v.isOwner && (
+        <section className="space-y-2">
+          <p className="flex items-center gap-1 text-xs text-zinc-500">
+            Why {v.myVote.side === "A" ? A.label : B.label}? optional
+            {signedIn && (
+              <>
+                {" "}
+                · <Zap className="size-3 fill-pp text-pp" aria-hidden /> +1 for a reason
+              </>
+            )}
+          </p>
+          {!reasonSaved && (
+            <div className="flex flex-wrap gap-1.5">
+              {v.reasonSuggestions.map((c) => (
+                <button key={c} type="button" className="chip" onClick={() => saveReason(c)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              className="input"
+              placeholder="Or write one line…"
+              maxLength={140}
+              value={reason}
+              onChange={(e) => {
+                setReason(e.target.value);
+                setReasonSaved(false);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && reason.trim() && saveReason()}
+              aria-label="Reason for your vote"
             />
-          );
-        })}
-      </div>
-
-      <div className="text-center text-sm text-zinc-500">
-        {res ? (
-          <>
-            <span className="font-semibold text-zinc-800 dark:text-zinc-200">{res.total}</span> vote{res.total === 1 ? "" : "s"}
-            {v.myVote && v.isOpen && <> · tap the other option to change your vote</>}
-          </>
-        ) : v.isOpen ? (
-          v.isOwner ? null : <span className="font-medium">Tap to vote — results appear after you pick</span>
-        ) : null}
-      </div>
-
-      {/* Reason input after voting */}
-      {v.myVote && v.isOpen && (
-        <div className="card flex items-center gap-2 p-2 pl-3">
-          <input
-            className="flex-1 bg-transparent py-1.5 text-[15px] outline-none placeholder:text-zinc-400"
-            placeholder={`Why ${v.myVote.side === "A" ? A.label : B.label}? (one line, optional)`}
-            maxLength={140}
-            value={reason}
-            onChange={(e) => {
-              setReason(e.target.value);
-              setReasonSaved(false);
-            }}
-            onKeyDown={(e) => e.key === "Enter" && reason.trim() && saveReason()}
-            aria-label="Reason for your vote"
-          />
-          <button className="btn-primary !px-3 !py-1.5" disabled={!reason.trim() || reasonSaved} onClick={saveReason}>
-            {reasonSaved ? "Saved" : "Add"}
-          </button>
-        </div>
+            <button className="btn-outline shrink-0" disabled={!reason.trim() || reasonSaved} onClick={() => saveReason()}>
+              {reasonSaved ? "Saved" : "Add"}
+            </button>
+          </div>
+        </section>
       )}
 
       {/* Anonymous voter nudge */}
       {!signedIn && v.myVote && (
-        <div className="card flex flex-col items-center gap-3 p-5 text-center">
-          <p className="font-semibold">See how your vote compares with parents like you — and get your own questions answered.</p>
-          <div className="flex gap-2">
+        <div className="card space-y-3 p-4 text-center">
+          <p className="text-[15px]">See how your vote compares with parents like you — and get your own questions answered.</p>
+          <div className="flex justify-center gap-2">
             <Link href={`/signin?callbackUrl=/b/${v.slug}`} className="btn-primary">
               Create free account
             </Link>
@@ -217,97 +291,94 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
         </div>
       )}
 
-      {/* Owner controls */}
+      {/* Top reasons */}
+      {res && allReasons.length > 0 && (
+        <section aria-label="Reasons" className="space-y-2">
+          <h2 className="text-[15px] font-medium">Top reasons</h2>
+          <ReasonList reasons={allReasons} signedIn={signedIn} isOwner={v.isOwner} onChange={refresh} />
+        </section>
+      )}
+
+      {v.isOwner && !v.outcome && !v.canReportOutcome && v.isOpen && (
+        <p className="card p-3.5 text-[13px] text-zinc-600">
+          Once you have {v.minVotesForLoop}+ votes or the deadline passes, you can close the loop and earn +{loopPoints} ⚡.
+        </p>
+      )}
+
+      {/* Owner: share + manage */}
       {v.isOwner && (
-        <section className="card space-y-3 p-4" aria-label="Your battle">
-          {!v.outcome && v.canReportOutcome && (
-            <Link href={`/b/${v.slug}/report`} className="btn w-full bg-gradient-to-r from-a to-b py-3 text-base text-white">
-              Close the loop · which did you pick? <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs">+10 ⚡</span>
-            </Link>
-          )}
-          {!v.outcome && !v.canReportOutcome && v.isOpen && (
-            <p className="text-sm text-zinc-500">
-              Once you have {v.minVotesForLoop}+ votes or the deadline passes, you can report back which you picked and earn priority.
-            </p>
-          )}
-          {v.outcome && (
-            <Link href={`/b/${v.slug}/report`} className="text-sm font-semibold text-zinc-600 underline">
-              Edit your report-back
-            </Link>
-          )}
-          <ShareButtons url={shareUrl} title={v.title} />
-          <div className="flex flex-wrap gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+        <section className="space-y-3 border-t border-ink/10 pt-5" aria-label="Share and manage">
+          <h2 className="text-[15px] font-medium">Get more votes</h2>
+          <CopyLink url={shareUrl} />
+          <ShareGrid url={shareUrl} title={v.title} />
+          <div className="flex flex-wrap gap-1 pt-1">
+            {v.outcome && (
+              <Link href={`/b/${v.slug}/report`} className="btn-ghost !px-2.5 !py-1.5 text-sm">
+                <Pencil className="size-4" aria-hidden /> Edit outcome
+              </Link>
+            )}
             {v.isOpen && !v.boostActive && (
-              <button className="btn-pp !py-1.5" onClick={() => ownerAction("boost")} disabled={(v.viewerPP ?? 0) < v.boostCost}>
-                <Zap className="size-4" /> Boost ({v.boostCost} ⚡)
+              <button className="btn-pp !px-2.5 !py-1.5 text-sm" onClick={() => ownerAction("boost")} disabled={(v.viewerPP ?? 0) < v.boostCost}>
+                <Zap className="size-4 fill-pp text-pp" aria-hidden /> Boost ({v.boostCost} ⚡)
               </button>
             )}
             {v.canEdit && (
-              <button className="btn-ghost !py-1.5" onClick={() => setEditing(true)}>
-                <Pencil className="size-4" /> Edit
+              <button className="btn-ghost !px-2.5 !py-1.5 text-sm" onClick={() => setEditing(true)}>
+                <Pencil className="size-4" aria-hidden /> Edit
               </button>
             )}
             {v.isOpen && (
-              <button className="btn-ghost !py-1.5" onClick={() => ownerAction("close")}>
-                <StopCircle className="size-4" /> Close voting
+              <button className="btn-ghost !px-2.5 !py-1.5 text-sm text-ink" onClick={() => ownerAction("close")}>
+                <StopCircle className="size-4" aria-hidden /> Close voting
               </button>
             )}
-            <button className="btn-ghost !py-1.5 text-red-600" onClick={() => ownerAction("delete")}>
-              <Trash2 className="size-4" /> Delete
+            <button className="btn-ghost !px-2.5 !py-1.5 text-sm text-b hover:bg-b-soft" onClick={() => ownerAction("delete")}>
+              <Trash2 className="size-4" aria-hidden /> Delete
             </button>
           </div>
         </section>
       )}
 
-      {/* Reasons */}
-      {res && (v.reasons.A.length > 0 || v.reasons.B.length > 0) && (
-        <section aria-label="Reasons" className="grid gap-4 sm:grid-cols-2">
-          {(["A", "B"] as const).map((s) => (
-            <ReasonList
-              key={s}
-              side={s}
-              label={s === "A" ? A.label : B.label}
-              reasons={v.reasons[s]}
-              signedIn={signedIn}
-              isOwner={v.isOwner}
-              onChange={refresh}
-            />
-          ))}
-        </section>
+      {!v.isOwner && (
+        <div className="flex items-center justify-between border-t border-ink/10 pt-4">
+          <ShareIconButton url={shareUrl} title={v.title} className="btn-ghost !px-3 !py-1.5 text-sm">
+            Share
+          </ShareIconButton>
+          <ReportButton targetType="BATTLE" targetId={v.id} />
+        </div>
       )}
 
-      {!v.isOwner && (
-        <div className="flex items-center justify-between border-t border-zinc-200 pt-4 dark:border-zinc-800">
-          <ShareIcon url={shareUrl} title={v.title} />
-          <ReportButton targetType="BATTLE" targetId={v.id} />
+      {showStickyLoop && (
+        <div className="fixed inset-x-0 bottom-[calc(3.6rem+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t from-white via-white to-white/0 px-4 pb-3 pt-6 md:bottom-0 md:pl-60">
+          <Link href={`/b/${v.slug}/report`} className="btn-primary mx-auto w-full max-w-2xl py-3">
+            Decided? Close the loop · +{loopPoints} <Zap className="size-4 fill-white" aria-hidden />
+          </Link>
         </div>
       )}
     </article>
   );
 }
 
-function confirmAction(msg: string) {
-  return typeof window !== "undefined" ? window.confirm(msg) : false;
-}
+const score = (r: ReasonView) => r.helpful + (r.ownerHelpful ? 2 : 0);
 
-function OutcomeBanner({ v, crowdWinner }: { v: NonNullable<BattleView>; crowdWinner: string | null }) {
+function OutcomeBanner({ v, leader }: { v: V; leader: "A" | "B" | null }) {
   const o = v.outcome!;
   const chosenLabel = o.chosen === "A" ? v.options.A.label : o.chosen === "B" ? v.options.B.label : null;
-  const poster = v.author.name || `@${v.author.handle}`;
+  const poster = v.isOwner ? "You" : v.author.name || `@${v.author.handle}`;
   return (
-    <div className={cn("rounded-2xl p-4 text-white shadow", o.thumb === "DOWN" ? "bg-zinc-800" : "bg-gradient-to-r from-ok to-emerald-500")}>
-      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide opacity-90">Loop closed</div>
-      <p className="mt-1 text-lg font-bold">
+    <div className="rounded-[14px] bg-violet-soft p-4">
+      <div className="text-xs text-violet">Loop closed</div>
+      <p className="mt-1 text-[17px] leading-snug">
         {chosenLabel ? (
           <>
-            {poster} picked <span className="underline decoration-white/50 underline-offset-4">{chosenLabel}</span>{" "}
+            {poster} picked <b className="font-medium">{chosenLabel}</b>{" "}
             {o.thumb === "UP" ? (
-              <span className="inline-flex items-center gap-1">
-                · <ThumbsUp className="size-5" /> it worked out
+              <span className="inline-flex items-center gap-1 text-green">
+                · <ThumbsUp className="size-4" aria-hidden /> went well
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1">
-                · <ThumbsDown className="size-5" /> not great
+              <span className="inline-flex items-center gap-1 text-zinc-600">
+                · <ThumbsDown className="size-4" aria-hidden /> not great
               </span>
             )}
           </>
@@ -315,37 +386,23 @@ function OutcomeBanner({ v, crowdWinner }: { v: NonNullable<BattleView>; crowdWi
           <>{poster} went with neither option</>
         )}
       </p>
-      {o.note && <p className="mt-1 text-[15px] opacity-95">“{o.note}”</p>}
-      {chosenLabel && crowdWinner && v.results && (
-        <p className="mt-2 text-sm opacity-90">
-          {crowdWinner === o.chosen
-            ? `The crowd agreed (${crowdWinner === "A" ? v.results.a : v.results.b}%)`
-            : `The crowd picked the other one (${crowdWinner === "A" ? v.results.a : v.results.b}%)`}
+      {o.note && <p className="mt-1 text-[15px] text-zinc-700">“{o.note}”</p>}
+      {chosenLabel && leader && v.results && (
+        <p className="mt-2 text-[13px] text-zinc-600">
+          {leader === o.chosen
+            ? `The crowd agreed (${leader === "A" ? v.results.a : v.results.b}%)`
+            : `The crowd picked the other one (${leader === "A" ? v.results.a : v.results.b}%)`}
         </p>
       )}
     </div>
   );
 }
 
-function ReasonList({
-  side,
-  label,
-  reasons,
-  signedIn,
-  isOwner,
-  onChange,
-}: {
-  side: "A" | "B";
-  label: string;
-  reasons: ReasonView[];
-  signedIn: boolean;
-  isOwner: boolean;
-  onChange: () => void;
-}) {
+function ReasonList({ reasons, signedIn, isOwner, onChange }: { reasons: ReasonView[]; signedIn: boolean; isOwner: boolean; onChange: () => void }) {
   const [all, setAll] = useState(false);
-  const shown = all ? reasons : reasons.slice(0, 3);
+  const shown = all ? reasons : reasons.slice(0, 5);
   async function helpful(r: ReasonView) {
-    if (!signedIn) return toast("Sign in to mark reasons helpful");
+    if (!signedIn) return toast("Sign in to upvote reasons");
     try {
       await api(`/api/reasons/${r.voteId}/helpful`, { method: "POST" });
       onChange();
@@ -354,48 +411,54 @@ function ReasonList({
     }
   }
   return (
-    <div>
-      <h2 className={cn("mb-2 flex items-center gap-2 text-sm font-bold", side === "A" ? "text-a" : "text-b")}>
-        <span className={cn("flex size-5 items-center justify-center rounded-full text-[11px] text-white", side === "A" ? "bg-a" : "bg-b")}>{side}</span>
-        Why {label}
-      </h2>
-      {reasons.length === 0 && <p className="text-sm text-zinc-400">No reasons yet.</p>}
+    <>
       <ul className="space-y-2">
         {shown.map((r) => (
-          <li key={r.voteId} className="card p-3">
-            <p className="text-[15px]">{r.text}</p>
-            <div className="mt-1.5 flex items-center justify-between text-xs text-zinc-500">
-              <span>
-                {r.byHandle ? <Link href={`/u/${r.byHandle}`} className="hover:underline">{r.by}</Link> : r.by}
-                {r.ownerHelpful && <span className="ml-1.5 rounded-full bg-pp-soft px-1.5 py-0.5 font-semibold text-amber-700">Poster found this helpful</span>}
-              </span>
-              <span className="flex items-center gap-1">
-                {!r.mine && (
-                  <button
-                    onClick={() => helpful(r)}
-                    className={cn("inline-flex items-center gap-1 rounded-full px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800", r.markedByMe && "text-b")}
-                    aria-pressed={r.markedByMe}
-                    aria-label={isOwner ? "Mark helpful (+3 ⚡ to them)" : "Mark helpful"}
-                  >
-                    <Heart className={cn("size-3.5", r.markedByMe && "fill-b")} /> {r.helpful || ""}
-                  </button>
+          <li key={r.voteId} className="card flex gap-2.5 p-3">
+            <span
+              className={cn("mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border bg-white text-[11px]", r.side === "A" ? "border-a text-a" : "border-b text-b")}
+              aria-label={`Option ${r.side}`}
+            >
+              {r.side}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm">{r.text}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-zinc-500">
+                {r.byHandle ? (
+                  <Link href={`/u/${r.byHandle}`} className="hover:underline">
+                    {r.by}
+                  </Link>
+                ) : (
+                  r.by
                 )}
+                {r.ownerHelpful && <span className="text-amber-700">· poster found this helpful</span>}
                 {!r.mine && <ReportButton targetType="REASON" targetId={r.voteId} small />}
-              </span>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => !r.mine && helpful(r)}
+              disabled={r.mine}
+              className={cn("flex h-fit shrink-0 flex-col items-center rounded-md px-1.5 py-0.5 text-xs text-zinc-500 hover:bg-white", r.markedByMe && "text-accent")}
+              aria-pressed={r.markedByMe}
+              aria-label={isOwner ? "Mark helpful (+3 ⚡ to them)" : "Mark helpful"}
+            >
+              <ChevronUp className="size-4" aria-hidden />
+              {r.helpful}
+            </button>
           </li>
         ))}
       </ul>
-      {reasons.length > 3 && (
-        <button className="mt-2 text-sm font-semibold text-zinc-600 hover:underline" onClick={() => setAll(!all)}>
+      {reasons.length > 5 && (
+        <button className="text-[13px] text-accent hover:underline" onClick={() => setAll(!all)}>
           {all ? "Show less" : `See all ${reasons.length}`}
         </button>
       )}
-    </div>
+    </>
   );
 }
 
-function EditForm({ v, onDone }: { v: NonNullable<BattleView>; onDone: () => void }) {
+function EditForm({ v, onDone }: { v: V; onDone: () => void }) {
   const [title, setTitle] = useState(v.title);
   const [context, setContext] = useState(v.context ?? "");
   async function save() {
@@ -408,31 +471,16 @@ function EditForm({ v, onDone }: { v: NonNullable<BattleView>; onDone: () => voi
   }
   return (
     <div className="space-y-2">
-      <input className="input font-semibold" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
+      <input className="input" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
       <textarea className="input" rows={2} value={context} maxLength={280} onChange={(e) => setContext(e.target.value)} aria-label="Context" />
       <div className="flex gap-2">
-        <button className="btn-primary !py-1.5" onClick={save}>Save</button>
-        <button className="btn-ghost !py-1.5" onClick={onDone}>Cancel</button>
+        <button className="btn-primary !py-1.5" onClick={save}>
+          Save
+        </button>
+        <button className="btn-ghost !py-1.5" onClick={onDone}>
+          Cancel
+        </button>
       </div>
     </div>
   );
 }
-
-function ShareIcon({ url, title }: { url: string; title: string }) {
-  async function share() {
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, text: `Help me choose: ${title}`, url });
-        return;
-      } catch {}
-    }
-    await navigator.clipboard.writeText(url);
-    toast("Link copied");
-  }
-  return (
-    <button className="btn-ghost !px-3 !py-1.5" onClick={share}>
-      <Share2 className="size-4" /> Share
-    </button>
-  );
-}
-

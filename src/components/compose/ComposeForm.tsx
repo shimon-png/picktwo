@@ -1,30 +1,48 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Globe, Lock, Users, Zap } from "lucide-react";
+import { ArrowRight, X } from "lucide-react";
 import { api, setPP, toast } from "@/lib/client";
 import { cn } from "@/lib/utils";
-import { BUDGETS, CATEGORIES, DEADLINE_PRESETS, KID_AGES, OCCASIONS, RECIPIENTS } from "@/lib/constants";
+import { CATEGORIES, DEADLINE_PRESETS, KID_AGES, guessCategory } from "@/lib/constants";
+import { pointsTier } from "@/server/services/priority";
+import { Bar } from "@/components/ui/Bar";
 import { OptionEditor, type OptionDraft } from "./OptionEditor";
 
-type Tier = { tier: "High" | "Normal" | "Low"; reason: string };
+type Visibility = "PUBLIC" | "LINK_ONLY" | "FRIENDS";
 const DRAFT_KEY = "pt:draft";
 
-export function ComposeForm({ tier, dataConsentDefault, accountConsent }: { tier: Tier; dataConsentDefault: boolean; accountConsent: boolean }) {
+const AUDIENCE: { id: Visibility; label: string; desc: string }[] = [
+  { id: "PUBLIC", label: "Everyone", desc: "Shared by link and shown to relevant voters." },
+  { id: "LINK_ONLY", label: "Link only", desc: "Only people you send the link to." },
+  { id: "FRIENDS", label: "Friends", desc: "Mutual follows, signed in." },
+];
+
+export function ComposeForm({
+  pp,
+  tiers,
+  openLoops,
+  accountConsent,
+}: {
+  pp: number;
+  tiers: { highAt: number; topAt: number };
+  openLoops: number;
+  accountConsent: boolean;
+}) {
   const router = useRouter();
-  const [step, setStep] = useState(1);
   const [a, setA] = useState<OptionDraft>({ label: "" });
   const [b, setB] = useState<OptionDraft>({ label: "" });
-  const [title, setTitle] = useState("Which one?");
+  const [review, setReview] = useState(false);
+  const [title, setTitle] = useState("");
+  const [titleEdited, setTitleEdited] = useState(false);
   const [context, setContext] = useState("");
   const [categoryId, setCategoryId] = useState<string>("gifts");
+  const [categoryPicked, setCategoryPicked] = useState(false);
   const [kidAge, setKidAge] = useState<string[]>([]);
-  const [recipient, setRecipient] = useState<string>("");
-  const [budget, setBudget] = useState<string>("");
-  const [occasion, setOccasion] = useState<string>("");
   const [deadline, setDeadline] = useState<number>(24);
-  const [visibility, setVisibility] = useState<"PUBLIC" | "LINK_ONLY" | "FRIENDS">("PUBLIC");
-  const [dataConsent, setDataConsent] = useState(dataConsentDefault);
+  const [visibility, setVisibility] = useState<Visibility>("PUBLIC");
+  const [dataConsent, setDataConsent] = useState(true);
   const [busy, setBusy] = useState(false);
 
   // Draft autosave (PRD B-12) — text fields only (images can be large)
@@ -32,37 +50,39 @@ export function ComposeForm({ tier, dataConsentDefault, accountConsent }: { tier
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
       if (d) {
-        setTitle(d.title ?? "Which one?");
-        setContext(d.context ?? "");
-        setCategoryId(d.categoryId ?? "gifts");
         setA((x) => ({ ...x, label: d.a ?? "" }));
         setB((x) => ({ ...x, label: d.b ?? "" }));
+        setContext(d.context ?? "");
       }
     } catch {}
   }, []);
   useEffect(() => {
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, context, categoryId, a: a.label, b: b.label }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ context, a: a.label, b: b.label }));
     } catch {}
-  }, [title, context, categoryId, a.label, b.label]);
+  }, [context, a.label, b.label]);
 
-  const step1Ok = a.label.trim().length > 0 && b.label.trim().length > 0;
-  const step2Ok = title.trim().length >= 3;
+  const ready = a.label.trim().length > 0 && b.label.trim().length > 0;
+  const suggestedTitle = `${a.label.trim()} or ${b.label.trim()}?`.slice(0, 100);
+  const question = titleEdited ? title : suggestedTitle;
+  const tier = pointsTier(pp, tiers.highAt, tiers.topAt);
+
+  function openReview() {
+    if (!ready) return;
+    if (!categoryPicked) setCategoryId(guessCategory(`${a.label} ${b.label} ${a.urlTitle ?? ""} ${b.urlTitle ?? ""}`));
+    setReview(true);
+  }
 
   async function publish() {
+    if (question.trim().length < 3) return toast("Add a question (3+ characters)", "error");
     setBusy(true);
     try {
       const r = await api<{ slug: string; bonus: number }>("/api/battles", {
         body: {
-          title: title.trim(),
+          title: question.trim(),
           context: context.trim(),
           categoryId,
-          tags: {
-            ...(kidAge.length ? { kidAge } : {}),
-            ...(recipient ? { recipient } : {}),
-            ...(budget ? { budget } : {}),
-            ...(occasion ? { occasion } : {}),
-          },
+          tags: kidAge.length ? { kidAge } : {},
           visibility,
           deadlineHours: deadline,
           dataConsent: dataConsent && accountConsent,
@@ -73,11 +93,11 @@ export function ComposeForm({ tier, dataConsentDefault, accountConsent }: { tier
         localStorage.removeItem(DRAFT_KEY);
       } catch {}
       if (r.bonus) {
-        toast(`+${r.bonus} ⚡ for your first battle!`, "pp");
+        toast(`+${r.bonus} for your first battle`, "pp");
         const me = await api<{ ppBalance: number }>("/api/me/priority").catch(() => null);
         setPP(me?.ppBalance);
       }
-      router.push(`/b/${r.slug}?new=1`);
+      router.push(`/b/${r.slug}/published`);
       router.refresh();
     } catch (e) {
       toast((e as Error).message, "error");
@@ -86,137 +106,156 @@ export function ComposeForm({ tier, dataConsentDefault, accountConsent }: { tier
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-2xl font-extrabold">New battle</h1>
-        <span className="text-sm font-medium text-zinc-500">Step {step} of 3</span>
+    <div className="-mx-4 -mt-2 flex h-dvh flex-col px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:h-[calc(100dvh-1rem)]">
+      <div className="flex h-12 shrink-0 items-center">
+        <Link href="/vote" className="-ml-2 rounded-lg p-2 text-ink hover:bg-surface" aria-label="Close">
+          <X className="size-5" />
+        </Link>
       </div>
-      <div className="flex gap-1.5" aria-hidden>
-        {[1, 2, 3].map((s) => (
-          <div key={s} className={cn("h-1.5 flex-1 rounded-full", s <= step ? "bg-zinc-900 dark:bg-white" : "bg-zinc-200 dark:bg-zinc-800")} />
-        ))}
+      <h1 className="display text-[26px] leading-tight">What are you deciding between?</h1>
+
+      <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
+        <OptionEditor side="A" value={a} onChange={setA} />
+        <OptionEditor side="B" value={b} onChange={setB} />
       </div>
+      <p className="mt-2 text-xs text-zinc-500">No photos where a child’s face is visible.</p>
 
-      {step === 1 && (
-        <section className="space-y-4">
-          <p className="text-[15px] text-zinc-600 dark:text-zinc-400">Add your two options — a photo, a link, or just a name.</p>
-          <div className="flex gap-3">
-            <OptionEditor side="A" value={a} onChange={setA} />
-            <OptionEditor side="B" value={b} onChange={setB} />
-          </div>
-          <p className="text-xs text-zinc-400">Please don’t post photos where a child’s face is visible.</p>
-        </section>
-      )}
+      <button className="btn-primary mt-3 w-full shrink-0 py-3" disabled={!ready} onClick={openReview}>
+        Continue <ArrowRight className="size-4" aria-hidden />
+      </button>
 
-      {step === 2 && (
-        <section className="space-y-5">
-          <div>
-            <label className="label" htmlFor="title">Your question</label>
-            <input id="title" className="input font-semibold" maxLength={100} value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div>
-            <label className="label" htmlFor="context">
-              Context <span className="font-normal text-zinc-400">— helps people give better advice</span>
-            </label>
-            <textarea
-              id="context"
-              className="input"
-              rows={3}
-              maxLength={280}
-              value={context}
-              onChange={(e) => setContext(e.target.value)}
-              placeholder="Gift for my 6-year-old daughter, loves art, budget ~$50"
-            />
-            <div className="mt-1 text-right text-xs text-zinc-400">{context.length}/280</div>
-          </div>
-          <ChipGroup label="Category" options={CATEGORIES.map((c) => ({ id: c.id, label: `${c.emoji} ${c.name}` }))} value={[categoryId]} onChange={(v) => setCategoryId(v[0] ?? "other")} single />
-          <ChipGroup label="Kid’s age (optional)" options={KID_AGES.map((k) => ({ id: k.id, label: k.label }))} value={kidAge} onChange={setKidAge} />
-          <ChipGroup label="For whom? (optional)" options={RECIPIENTS.map((r) => ({ id: r, label: r }))} value={recipient ? [recipient] : []} onChange={(v) => setRecipient(v[0] ?? "")} single allowNone />
-          <ChipGroup label="Budget (optional)" options={BUDGETS.map((r) => ({ id: r, label: r }))} value={budget ? [budget] : []} onChange={(v) => setBudget(v[0] ?? "")} single allowNone />
-          <ChipGroup label="Occasion (optional)" options={OCCASIONS.map((r) => ({ id: r, label: r }))} value={occasion ? [occasion] : []} onChange={(v) => setOccasion(v[0] ?? "")} single allowNone />
-          <ChipGroup
-            label="Voting closes in"
-            options={DEADLINE_PRESETS.map((d) => ({ id: String(d.hours), label: d.label }))}
-            value={[String(deadline)]}
-            onChange={(v) => setDeadline(Number(v[0] ?? 24))}
-            single
-          />
-        </section>
-      )}
-
-      {step === 3 && (
-        <section className="space-y-5">
-          <div className="space-y-2">
-            <span className="label">Who can vote?</span>
-            {(
-              [
-                ["PUBLIC", Globe, "Friends + community", "Shared by link and shown to relevant voters"],
-                ["LINK_ONLY", Lock, "Link only", "Only people you send the link to"],
-                ["FRIENDS", Users, "Friends only", "Mutual follows, signed in"],
-              ] as const
-            ).map(([id, Icon, label, desc]) => (
-              <button
-                key={id}
-                onClick={() => setVisibility(id)}
-                aria-pressed={visibility === id}
-                className={cn("card flex w-full items-center gap-3 p-3 text-left", visibility === id && "border-zinc-900 ring-2 ring-zinc-900/10 dark:border-white")}
-              >
-                <Icon className="size-5 shrink-0 text-zinc-500" />
-                <span>
-                  <span className="block font-semibold">{label}</span>
-                  <span className="block text-sm text-zinc-500">{desc}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {visibility === "PUBLIC" && (
-            <div
-              className={cn(
-                "flex items-start gap-3 rounded-2xl p-4",
-                tier.tier === "Low" ? "bg-b-soft text-red-900 dark:bg-b/15 dark:text-red-200" : "bg-pp-soft text-amber-900 dark:bg-amber-500/10 dark:text-amber-200",
-              )}
-            >
-              <Zap className="mt-0.5 size-5 shrink-0 fill-pp text-pp" />
-              <div className="text-sm">
-                <div className="font-bold">Community priority: {tier.tier}</div>
-                <div>{tier.reason}</div>
-              </div>
+      {review && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-labelledby="review-title">
+          <button className="absolute inset-0 bg-ink/35" aria-label="Back to options" onClick={() => setReview(false)} />
+          <div className="animate-sheet relative flex max-h-[88dvh] w-full max-w-2xl flex-col rounded-t-[20px] bg-white shadow-lift">
+            <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-zinc-300" aria-hidden />
+            <div className="flex items-baseline justify-between px-4 pb-2 pt-3">
+              <h2 id="review-title" className="text-lg">
+                Review &amp; publish
+              </h2>
+              <span className="text-xs text-zinc-500">All optional</span>
             </div>
-          )}
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 pb-4">
+              <div>
+                <label className="label" htmlFor="title">
+                  Question
+                </label>
+                <input
+                  id="title"
+                  className="input"
+                  maxLength={100}
+                  value={question}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setTitleEdited(true);
+                  }}
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="context">
+                  Context — helps people give better advice
+                </label>
+                <textarea
+                  id="context"
+                  className="input"
+                  rows={2}
+                  maxLength={280}
+                  value={context}
+                  onChange={(e) => setContext(e.target.value)}
+                  placeholder="Gift for my 6-year-old, loves art, ~$50"
+                />
+              </div>
 
-          <label className="flex items-start gap-3 text-sm">
-            <input
-              type="checkbox"
-              className="mt-0.5 size-4 accent-zinc-900"
-              checked={dataConsent && accountConsent}
-              disabled={!accountConsent}
-              onChange={(e) => setDataConsent(e.target.checked)}
-            />
-            <span className="text-zinc-600 dark:text-zinc-400">
-              Allow this battle to be used, anonymised, to improve PickTwo’s recommendations.
-              {!accountConsent && <span className="block text-xs text-zinc-400">Turn on data sharing in Settings to enable this.</span>}
-            </span>
-          </label>
-        </section>
+              <ChipGroup
+                label={
+                  <>
+                    Category{!categoryPicked && <span className="text-accent"> · we guessed</span>}
+                  </>
+                }
+                options={CATEGORIES.map((c) => ({ id: c.id, label: c.name }))}
+                value={[categoryId]}
+                onChange={(v) => {
+                  setCategoryId(v[0] ?? "other");
+                  setCategoryPicked(true);
+                }}
+                single
+              />
+              <ChipGroup
+                label={<>Kid’s age · matches you with parents of same-age kids</>}
+                options={KID_AGES.map((k) => ({ id: k.id, label: k.label }))}
+                value={kidAge}
+                onChange={setKidAge}
+              />
+              <ChipGroup
+                label="Voting closes in"
+                options={DEADLINE_PRESETS.map((d) => ({ id: String(d.hours), label: d.label }))}
+                value={[String(deadline)]}
+                onChange={(v) => setDeadline(Number(v[0] ?? 24))}
+                single
+              />
+
+              <fieldset>
+                <legend className="label">Who can vote</legend>
+                <div className="grid grid-cols-3 gap-2">
+                  {AUDIENCE.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      aria-pressed={visibility === o.id}
+                      onClick={() => setVisibility(o.id)}
+                      className={cn("rounded-lg py-2 text-sm shadow-ring", visibility === o.id ? "bg-accent-900 text-accent ring-1 ring-accent" : "bg-white text-ink")}
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-zinc-500">{AUDIENCE.find((o) => o.id === visibility)!.desc}</p>
+              </fieldset>
+
+              <div className="flex items-center gap-3 rounded-lg bg-accent-900 px-3.5 py-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-accent-200">
+                    {openLoops > 0 ? `${tier.tier} priority · ${openLoops} open loop${openLoops > 1 ? "s" : ""} lowers your reach` : `${tier.tier} priority`}
+                  </div>
+                  <Bar value={tier.progress} className="mt-1.5" />
+                </div>
+                {tier.next && (
+                  <Link href="/vote" className="btn-ghost shrink-0 !px-2 !py-1 text-[13px]">
+                    Boost first
+                  </Link>
+                )}
+              </div>
+
+              <label className="flex items-start gap-2.5 text-[13px] text-zinc-600">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-accent"
+                  checked={dataConsent && accountConsent}
+                  disabled={!accountConsent}
+                  onChange={(e) => setDataConsent(e.target.checked)}
+                />
+                <span>
+                  Let crowdpick use this battle, anonymised, to improve recommendations.
+                  {!accountConsent && (
+                    <span className="block text-xs text-zinc-400">
+                      Turn on data sharing in{" "}
+                      <Link href="/settings" className="underline">
+                        Settings
+                      </Link>{" "}
+                      to enable this.
+                    </span>
+                  )}
+                </span>
+              </label>
+            </div>
+            <div className="border-t border-ink/10 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+              <button className="btn-primary w-full py-3" disabled={busy} onClick={publish}>
+                {busy ? "Publishing…" : "Publish & share"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-
-      <div className="flex gap-2 pt-2">
-        {step > 1 && (
-          <button className="btn-outline" onClick={() => setStep(step - 1)}>
-            <ArrowLeft className="size-4" /> Back
-          </button>
-        )}
-        {step < 3 ? (
-          <button className="btn-primary flex-1 py-3" disabled={step === 1 ? !step1Ok : !step2Ok} onClick={() => setStep(step + 1)}>
-            Next <ArrowRight className="size-4" />
-          </button>
-        ) : (
-          <button className="btn flex-1 bg-gradient-to-r from-a to-b py-3 text-base text-white" disabled={busy} onClick={publish}>
-            {busy ? "Publishing…" : "Publish & share"}
-          </button>
-        )}
-      </div>
     </div>
   );
 }
@@ -239,19 +278,17 @@ export function ChipGroup({
   value,
   onChange,
   single,
-  allowNone,
 }: {
-  label: string;
+  label: React.ReactNode;
   options: { id: string; label: string }[];
   value: string[];
   onChange: (v: string[]) => void;
   single?: boolean;
-  allowNone?: boolean;
 }) {
   return (
     <fieldset>
       <legend className="label">{label}</legend>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {options.map((o) => {
           const on = value.includes(o.id);
           return (
@@ -261,7 +298,7 @@ export function ChipGroup({
               aria-pressed={on}
               className={cn("chip", on && "chip-on")}
               onClick={() => {
-                if (single) onChange(on && allowNone ? [] : [o.id]);
+                if (single) onChange([o.id]);
                 else onChange(on ? value.filter((x) => x !== o.id) : [...value, o.id]);
               }}
             >

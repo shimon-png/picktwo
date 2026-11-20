@@ -60,11 +60,11 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   return (
     <div className="space-y-6">
       <header className="flex items-start gap-4">
-        <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-a to-b font-display text-2xl font-extrabold text-white">
+        <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-a to-b text-2xl font-medium text-white">
           {(u.name || u.handle || "?").slice(0, 1).toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-2xl font-extrabold">{u.name || `@${u.handle}`}</h1>
+          <h1 className=" text-2xl font-medium">{u.name || `@${u.handle}`}</h1>
           <p className="text-sm text-zinc-500">@{u.handle}</p>
           {u.bio && <p className="mt-1 text-[15px]">{u.bio}</p>}
           <div className="mt-2 flex gap-4 text-sm">
@@ -82,9 +82,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
       </header>
 
       {match !== null && (
-        <div className="rounded-2xl bg-gradient-to-r from-a/10 to-b/10 p-4 text-center">
-          <div className="font-display text-3xl font-extrabold">{match}%</div>
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">taste match with you{match >= 75 ? " — you two always agree!" : ""}</div>
+        <div className="rounded-[14px] bg-gradient-to-r from-a/10 to-b/10 p-4 text-center">
+          <div className=" text-3xl font-medium">{match}%</div>
+          <div className="text-sm text-zinc-600">taste match with you{match >= 75 ? " — you two always agree!" : ""}</div>
         </div>
       )}
 
@@ -97,13 +97,13 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
       {badges.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {badges.map((b) => (
-            <span key={b} className="rounded-full bg-pp-soft px-3 py-1 text-sm font-semibold text-amber-800">🏅 {b}</span>
+            <span key={b} className="rounded-full bg-pp-soft px-3 py-1 text-sm font-medium text-amber-800">🏅 {b}</span>
           ))}
         </div>
       )}
 
       <section className="space-y-2">
-        <h2 className="font-display text-lg font-extrabold">Battles</h2>
+        <h2 className=" text-lg font-medium">Battles</h2>
         {list.length === 0 ? <p className="text-sm text-zinc-500">No public battles yet.</p> : list.map((b) => <BattleCardRow key={b.id} b={b} showAuthor={false} src="profile" />)}
       </section>
       {!isMe && me && (
@@ -118,7 +118,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
 function Stat({ n, label }: { n: number | string; label: string }) {
   return (
     <div className="card p-3">
-      <div className="font-display text-2xl font-extrabold">{n}</div>
+      <div className=" text-2xl font-medium">{n}</div>
       <div className="text-xs text-zinc-500">{label}</div>
     </div>
   );

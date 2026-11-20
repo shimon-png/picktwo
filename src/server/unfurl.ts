@@ -62,7 +62,7 @@ export async function unfurl(raw: string) {
       const res = await fetch(url, {
         redirect: "manual",
         signal: ctrl.signal,
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; PickTwoBot/1.0; +https://picktwo.app)", Accept: "text/html" },
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; crowdpickBot/1.0; +https://crowdpick.ai)", Accept: "text/html" },
       });
       if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
         url = await assertPublicUrl(new URL(res.headers.get("location")!, url).toString());

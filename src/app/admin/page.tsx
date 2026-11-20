@@ -53,12 +53,12 @@ export default async function AdminHome() {
         {tiles.map(([k, v]) => (
           <div key={k} className="card p-3">
             <div className="text-xs text-zinc-500">{k}</div>
-            <div className="font-display text-2xl font-extrabold">{v}</div>
+            <div className=" text-2xl font-medium">{v}</div>
           </div>
         ))}
       </div>
       <section className="card p-4">
-        <h2 className="mb-3 font-semibold">Votes per day (14d)</h2>
+        <h2 className="mb-3 font-medium">Votes per day (14d)</h2>
         <div className="flex h-32 items-end gap-1">
           {daily.map((d) => (
             <div key={d.day} className="flex flex-1 flex-col items-center gap-1" title={`${d.day}: ${d.votes} votes, ${d.battles} battles`}>
