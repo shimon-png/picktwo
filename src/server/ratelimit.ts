@@ -15,6 +15,9 @@ export const RULES = {
   report: { limit: 10, windowSec: 3600 },
   contactHour: { limit: 5, windowSec: 3600 },
   contactDay: { limit: 20, windowSec: 86400 },
+  signinCodeIp: { limit: 10, windowSec: 3600 },
+  signinCodeEmail: { limit: 5, windowSec: 3600 },
+  quickProfile: { limit: 20, windowSec: 3600 },
   generic: { limit: 60, windowSec: 60 },
 } satisfies Record<string, Rule>;
 
