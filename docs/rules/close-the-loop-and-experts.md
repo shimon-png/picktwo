@@ -64,6 +64,13 @@ Like an audience score and a critics score:
 - If no expert voted yet, the tile says "No expert votes yet". Today almost nobody has 50 correct picks, so expect this to be empty at first.
 - Where: `expertScores()` in `services/battles.ts`; `getBattleView().expertResults` and `BattleCard.expert`.
 
+## Rule 5: repost a finished battle
+
+- Every closed battle in **You → Your battles** has a one-tap **Repost** button. It posts the same question, options and photos again as a new battle, with the same length (still max 5 days), and opens it.
+- A repost is a new post, so it follows the same rules: it's blocked while the poster has 3+ unreported battles, and the photos are screened again.
+- Reposting does **not** close the loop on the old battle. The old one keeps its votes and still needs its outcome reported.
+- Where: `repostBattle()` in `services/battles.ts`, `POST /api/battles/[slug]/repost`, `components/battle/RepostButton.tsx`.
+
 ## Changing the numbers
 
 All thresholds live in the economy config (`ECONOMY_DEFAULTS` in `src/lib/constants.ts`) and can be overridden from the admin panel without a deploy: `maxBattleHours`, `maxUnreportedBattles`, `proAt`, `expertAt`, `superExpertAt`.

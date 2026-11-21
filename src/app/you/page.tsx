@@ -15,6 +15,7 @@ import { countOpenLoops, countUnreported } from "@/server/services/points";
 import { TIER_LABEL, canPostBattle, expertTier, nextTier } from "@/server/services/expertise";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { Scores } from "@/components/battle/Scores";
+import { RepostButton } from "@/components/battle/RepostButton";
 import { unreadCount } from "@/server/services/notifications";
 import { pointsTier } from "@/server/services/priority";
 import { TONE_CLASSES, type Tone } from "@/lib/constants";
@@ -240,8 +241,8 @@ function BattleRow({ b, reasons, awaiting, loopPoints }: { b: BattleCard; reason
       ? "Voting closed · tell people what you picked"
       : `Live · ${votes} vote${votes === 1 ? "" : "s"} · ${reasons} reason${reasons === 1 ? "" : "s"} · ${timeLeft(b.deadline)}`;
   return (
-    <li>
-      <Link href={awaiting ? `/b/${b.slug}/report` : `/b/${b.slug}`} className="flex items-center gap-3 py-3">
+    <li className="flex items-center gap-2">
+      <Link href={awaiting ? `/b/${b.slug}/report` : `/b/${b.slug}`} className="flex min-w-0 flex-1 items-center gap-3 py-3">
         <span className="flex gap-1">
           <Thumb img={b.imageA} label={b.labelA} side="A" />
           <Thumb img={b.imageB} label={b.labelB} side="B" />
@@ -257,6 +258,7 @@ function BattleRow({ b, reasons, awaiting, loopPoints }: { b: BattleCard; reason
         </span>
         {awaiting && <span className="tag shrink-0 bg-accent-900 text-accent">+{loopPoints} ⚡</span>}
       </Link>
+      {b.status === "CLOSED" && <RepostButton slug={b.slug} />}
     </li>
   );
 }
