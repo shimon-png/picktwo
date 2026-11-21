@@ -15,12 +15,16 @@ import { AppError } from "../errors";
 import { createSlug } from "@/lib/id";
 import { DEFAULT_CATEGORY_ID, REASON_CHIPS, kidAgeLabel } from "@/lib/constants";
 import type { CreateBattleInput } from "@/lib/validators";
-import { assertCleanText, moderateImage } from "../moderation";
+import { assertCleanText, hashMatchImage, screenImage } from "../moderation";
+import { strictest } from "./safety";
+import { recordAutoHold, recordHashMatch } from "./reports";
+import { del } from "@vercel/blob";
 import { awardPoints, countOpenLoops } from "./points";
-import { getEconomy } from "./config";
+import { getConfig, getEconomy } from "./config";
 import { notify } from "./notifications";
 import { track } from "../analytics";
 import { pct } from "@/lib/utils";
+import { isAdmin } from "../viewer";
 
 // ---------------- Create ----------------
 /**
@@ -48,12 +52,7 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
   if (input.postAs && !opts.asAdmin) throw new AppError("FORBIDDEN", "Only admins can post as another user");
   assertCleanText(input.title, input.context, input.options[0].label, input.options[1].label, input.postAs);
   const user = input.postAs && input.postAs !== actor.handle ? await resolvePostAs(input.postAs) : actor;
-  for (const o of input.options) {
-    if (o.imageUrl && o.imageUrl.startsWith("https://")) {
-      const m = await moderateImage(o.imageUrl);
-      if (!m.allowed) throw new AppError("VALIDATION", "One of your images can't be posted. Please choose another.");
-    }
-  }
+  const screen = await screenPhotos(user, input.options);
   const economy = await getEconomy();
   const deadline = new Date(Date.now() + input.deadlineHours * 3600_000);
 
@@ -74,6 +73,7 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
         categoryId: DEFAULT_CATEGORY_ID,
         tags: input.tags,
         visibility: input.visibility,
+        status: screen.verdict === "review" ? "HIDDEN" : "OPEN",
         deadline,
         dataConsent: input.dataConsent && user.dataConsent,
       })
@@ -106,8 +106,37 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
     { visibility: input.visibility, hours: input.deadlineHours, ...(user.id !== actor.id ? { postedBy: actor.id } : {}) },
     { userId: user.id },
   );
+  if (screen.verdict === "review") await recordAutoHold(result.battle.id, result.battle.title, result.battle.slug, screen.reasons);
   const openLoops = await countOpenLoops(user.id, economy);
-  return { slug: result.battle.slug, bonus: user.id === actor.id ? result.bonus : 0, openLoops, postedAs: user.id === actor.id ? null : user.handle };
+  return { inReview: screen.verdict === "review", slug: result.battle.slug, bonus: user.id === actor.id ? result.bonus : 0, openLoops, postedAs: user.id === actor.id ? null : user.handle };
+}
+
+/**
+ * Screen every photo before a battle goes public: known-CSAM hash match first (bans + records for
+ * NCMEC reporting), then the explicit-content classifier. Blocked uploads are refused (and removed
+ * from Blob); uncertain ones return "review" so the battle is created hidden for an admin.
+ */
+async function screenPhotos(user: User, opts: CreateBattleInput["options"]) {
+  const urls = opts.flatMap((o) => [o.imageUrl, o.urlImage]).filter((u): u is string => !!u && (u.startsWith("https://") || u.startsWith("data:image/")));
+  if (!urls.length) return { verdict: "allow" as const, reasons: [] as string[] };
+  const hashes = await Promise.all(urls.map((u) => hashMatchImage(u)));
+  const matched = urls.filter((_, i) => hashes[i].match);
+  if (matched.length) {
+    await recordHashMatch(user.id, matched);
+    track("upload_hash_match", {}, { userId: user.id });
+    throw new AppError("FORBIDDEN", "This upload violates our policies and can't be posted.");
+  }
+  const { features } = await getConfig();
+  const decision = strictest(await Promise.all(urls.map((u) => screenImage(u, { requireModeration: features.requireImageModeration }))));
+  const hashError = hashes.find((h) => h.error)?.error;
+  if (hashError && decision.verdict === "allow") return { verdict: "review" as const, reasons: [`hash check unavailable: ${hashError}`] };
+  if (decision.verdict === "block") {
+    track("upload_blocked", { reasons: decision.reasons }, { userId: user.id });
+    const own = opts.map((o) => o.imageUrl).filter((u): u is string => !!u && u.includes(".blob.vercel-storage.com/"));
+    if (own.length && process.env.BLOB_READ_WRITE_TOKEN) await del(own).catch(() => {});
+    throw new AppError("VALIDATION", "One of your photos looks explicit or graphic, so it can't be posted. Please choose another.");
+  }
+  return decision;
 }
 
 // ---------------- Close (lazy + cron) ----------------
@@ -175,7 +204,7 @@ export async function friendIds(userId: string): Promise<Set<string>> {
 }
 
 export async function assertCanView(b: Battle, viewer: User | null) {
-  if (b.status === "HIDDEN" && viewer?.id !== b.authorId) throw new AppError("NOT_FOUND", "This battle isn't available");
+  if (b.status === "HIDDEN" && viewer?.id !== b.authorId && !isAdmin(viewer)) throw new AppError("NOT_FOUND", "This battle isn't available");
   if (b.visibility === "FRIENDS") {
     if (!viewer) throw new AppError("UNAUTHORIZED", "Sign in to see this battle — it's shared with friends only");
     if (!(await areFriends(viewer.id, b.authorId))) throw new AppError("FORBIDDEN", "This battle is shared with friends only");

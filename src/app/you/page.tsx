@@ -3,9 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { Bell, ChevronRight, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
+import { Bell, ChevronRight, Flag, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { unreadContactCount } from "@/server/services/contact";
+import { openReportCount } from "@/server/services/reports";
 import { db } from "@/server/db";
 import { battles, pointLedger, votes } from "@/server/db/schema";
 import { getEconomy } from "@/server/services/config";
@@ -49,6 +50,7 @@ export default async function YouPage() {
     db.select().from(pointLedger).where(eq(pointLedger.userId, user.id)).orderBy(desc(pointLedger.createdAt)).limit(15),
   ]);
   const newMessages = admin ? await unreadContactCount() : 0;
+  const flagged = admin ? await openReportCount() : 0;
   const reasonCounts = new Map<string, number>();
   if (mine.length) {
     const rows = await db
@@ -160,6 +162,7 @@ export default async function YouPage() {
             [TOUR_URL, GraduationCap, "Tutorial", 0],
             ["/contact", LifeBuoy, "Contact us & feedback", 0],
             ...(admin ? ([["/admin/messages", Mail, "Admin · contact messages", newMessages]] as const) : []),
+            ...(admin ? ([["/admin/reports", Flag, "Admin · flagged photos", flagged]] as const) : []),
           ] as const
         ).map(([href, Icon, label, badge]) => (
           <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface">

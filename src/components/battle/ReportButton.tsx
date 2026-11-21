@@ -2,21 +2,16 @@
 import { useState } from "react";
 import { Flag } from "lucide-react";
 import { api, toast } from "@/lib/client";
+import { REPORT_REASONS } from "@/server/services/safety";
 
-const REASONS = [
-  { id: "minor_safety", label: "Child safety concern" },
-  { id: "inappropriate", label: "Inappropriate content" },
-  { id: "harassment", label: "Harassment or hate" },
-  { id: "spam", label: "Spam" },
-  { id: "other", label: "Something else" },
-] as const;
+const REASONS = REPORT_REASONS;
 
 export function ReportButton({ targetType, targetId, small }: { targetType: "BATTLE" | "REASON" | "USER"; targetId: string; small?: boolean }) {
   const [open, setOpen] = useState(false);
   async function send(reason: string) {
     try {
-      await api("/api/reports", { body: { targetType, targetId, reason } });
-      toast("Thanks — our team will review it");
+      const r = await api<{ hidden?: boolean }>("/api/reports", { body: { targetType, targetId, reason } });
+      toast(r.hidden ? "Thanks. It's hidden while our team reviews it." : "Thanks. Our team will review it.");
     } catch (e) {
       toast((e as Error).message, "error");
     }

@@ -15,9 +15,15 @@ export function ReportActions({ id }: { id: string }) {
   }
   return (
     <div className="flex flex-wrap gap-1.5">
-      {["hide", "delete", "ban", "restore", "dismiss"].map((a) => (
+      {[
+        ["approve", "Approve (show)"],
+        ["hide", "Keep hidden"],
+        ["delete", "Delete"],
+        ["ban", "Ban author"],
+        ["dismiss", "Dismiss"],
+      ].map(([a, label]) => (
         <button key={a} className={`chip !py-1 text-xs ${a === "ban" || a === "delete" ? "text-red-600" : ""}`} onClick={() => act(a)}>
-          {a}
+          {label}
         </button>
       ))}
     </div>
