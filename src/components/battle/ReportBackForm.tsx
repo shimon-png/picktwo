@@ -157,7 +157,7 @@ export function ReportBackForm(props: {
           {photo ? (
             <div className="relative">
               <img src={photo} alt="Your after photo" className="size-14 rounded-lg object-cover" />
-              <button className="absolute -right-2 -top-2 rounded-full bg-ink p-0.5 text-white" onClick={() => setPhoto(null)} aria-label="Remove photo">
+              <button className="absolute -right-2 -top-2 rounded-full bg-ink p-0.5 text-page" onClick={() => setPhoto(null)} aria-label="Remove photo">
                 <X className="size-3.5" />
               </button>
             </div>

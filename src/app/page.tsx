@@ -82,9 +82,10 @@ export default async function HomePage() {
 
         {live && (
           <div className="relative mx-auto mt-10 max-w-sm text-left">
-            {/* stacked cards behind the live one: straight, centred, symmetric inset so the edges line up */}
-            <div aria-hidden className="absolute inset-x-6 -top-5 bottom-8 rounded-[22px] bg-pink-soft shadow-ring" />
-            <div aria-hidden className="absolute inset-x-3 -top-2.5 bottom-8 rounded-[22px] bg-accent-900 shadow-ring" />
+            {/* fanned cards behind the live one, then a straight full-width card just above it */}
+            <div aria-hidden className="absolute inset-x-6 -top-5 h-24 -rotate-6 rounded-[22px] bg-pink-soft shadow-ring" />
+            <div aria-hidden className="absolute inset-x-6 -top-5 h-24 rotate-6 rounded-[22px] bg-accent-900 shadow-ring" />
+            <div aria-hidden className="absolute inset-x-0 -top-2.5 h-24 rounded-[22px] bg-surface shadow-ring" />
             <div className="relative">
               <HeroRotator battles={heroBattles} />
             </div>
@@ -163,11 +164,11 @@ export default async function HomePage() {
       </section>
 
       {/* ---------- Final CTA ---------- */}
-      <section className="mx-4 mb-8 rounded-[24px] bg-ink px-6 py-9 text-center text-white">
+      <section className="mx-4 mb-8 rounded-[24px] bg-ink px-6 py-9 text-center text-page">
         <Mark size={40} className="mx-auto" />
         <h2 className="mt-4 text-[26px] leading-tight">Stuck between two?</h2>
-        <p className="mx-auto mt-2 max-w-xs text-[15px] text-white/70">Post it in 30 seconds. Most battles get their first votes within minutes.</p>
-        <Link href="/signin?callbackUrl=/post" className="btn mt-6 rounded-full bg-white px-7 py-3.5 text-base text-ink hover:bg-white/90">
+        <p className="mx-auto mt-2 max-w-xs text-[15px] text-page/70">Post it in 30 seconds. Most battles get their first votes within minutes.</p>
+        <Link href="/signin?callbackUrl=/post" className="btn mt-6 rounded-full bg-page px-7 py-3.5 text-base text-ink hover:opacity-90">
           Ask the crowd — it’s free
         </Link>
       </section>

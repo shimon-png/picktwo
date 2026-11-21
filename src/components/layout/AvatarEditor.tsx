@@ -56,7 +56,7 @@ export function AvatarEditor({ image, name }: { image: string | null; name: stri
         aria-label="Change profile photo"
       >
         {url ? <img src={url} alt="" className="size-full object-cover" /> : <span className="flex size-full items-center justify-center">{initial}</span>}
-        <span className="absolute bottom-0 right-0 flex size-7 items-center justify-center rounded-full border-2 border-white bg-ink text-white">
+        <span className="absolute bottom-0 right-0 flex size-7 items-center justify-center rounded-full border-2 border-white bg-ink text-page">
           <Camera className="size-3.5" aria-hidden />
         </span>
       </button>
