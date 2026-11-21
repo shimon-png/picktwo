@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type { BattleCard } from "@/server/services/battles";
 import { cn, pct, timeLeft } from "@/lib/utils";
+import { ExpertBadge } from "@/components/ui/ExpertBadge";
+import { Scores } from "./Scores";
 
 function Thumb({ img, label, side }: { img: string | null; label: string; side: "A" | "B" }) {
   return (
@@ -33,6 +35,7 @@ export function BattleCardRow({ b, showAuthor = true, src = "home" }: { b: Battl
         <div className="truncate text-xs text-zinc-500">
           {b.labelA} vs {b.labelB}
           {showAuthor && b.authorHandle ? ` · @${b.authorHandle}` : ""}
+          {showAuthor && b.authorHandle && <ExpertBadge tier={b.authorTier} className="ml-1" />}
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs">
           {b.outcome ? (
@@ -45,6 +48,11 @@ export function BattleCardRow({ b, showAuthor = true, src = "home" }: { b: Battl
           )}
           <span className="text-zinc-400">· {p.total} votes</span>
         </div>
+        {p.total > 0 && (
+          <div className="mt-1 text-xs text-zinc-500">
+            <Scores compact everyone={p} experts={b.expert} labelA={b.labelA} labelB={b.labelB} />
+          </div>
+        )}
       </div>
       {p.total > 0 && (
         <div className="w-12 shrink-0 text-right text-xs font-medium tabular-nums">

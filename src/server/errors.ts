@@ -7,7 +7,8 @@ export type ErrorCode =
   | "VALIDATION"
   | "INSUFFICIENT_POINTS"
   | "CONFLICT"
-  | "SIGNUP_REQUIRED";
+  | "SIGNUP_REQUIRED"
+  | "LOOPS_OPEN";
 
 const STATUS: Record<ErrorCode, number> = {
   VOTING_CLOSED: 409,
@@ -19,6 +20,7 @@ const STATUS: Record<ErrorCode, number> = {
   INSUFFICIENT_POINTS: 402,
   CONFLICT: 409,
   SIGNUP_REQUIRED: 401,
+  LOOPS_OPEN: 409,
 };
 
 export class AppError extends Error {

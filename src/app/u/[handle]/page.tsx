@@ -9,6 +9,9 @@ import { battleCards, friendIds, visibleStatuses } from "@/server/services/battl
 import { BattleCardRow } from "@/components/battle/BattleCardRow";
 import { FollowButton } from "@/components/layout/FollowButton";
 import { ReportButton } from "@/components/battle/ReportButton";
+import { ExpertBadge } from "@/components/ui/ExpertBadge";
+import { getEconomy } from "@/server/services/config";
+import { TIER_LABEL, expertTier } from "@/server/services/expertise";
 
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
@@ -51,6 +54,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
     me && !isMe ? db.select().from(follows).where(and(eq(follows.followerId, me.id), eq(follows.followingId, u.id))) : Promise.resolve([]),
     me && !isMe ? tasteMatch(me.id, u.id) : Promise.resolve(null),
   ]);
+  const tier = expertTier(u.correctPicks, await getEconomy());
   const loopRate = stats.past ? Math.round((100 * stats.closed) / stats.past) : null;
   const badges: string[] = [];
   // Reputation is still stored per (legacy) category; the badge uses the overall record.
@@ -71,8 +75,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className=" text-2xl font-medium">{u.name || `@${u.handle}`}</h1>
-          <p className="text-sm text-zinc-500">@{u.handle}</p>
+          <h1 className="flex items-center gap-1.5 text-2xl font-medium">
+            {u.name || `@${u.handle}`}
+            <ExpertBadge tier={tier} />
+          </h1>
+          <p className="text-sm text-zinc-500">
+            @{u.handle}
+            {tier !== "NONE" && ` · ${TIER_LABEL[tier]} · ${u.correctPicks} correct picks`}
+          </p>
           {u.bio && <p className="mt-1 text-[15px]">{u.bio}</p>}
           <div className="mt-2 flex gap-4 text-sm">
             <span><b>{followers}</b> followers</span>

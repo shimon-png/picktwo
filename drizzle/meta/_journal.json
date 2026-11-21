@@ -64,6 +64,13 @@
       "when": 1795219757470,
       "tag": "0008_profile_city",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795289197395,
+      "tag": "0009_expert_tiers",
+      "breakpoints": true
     }
   ]
 }

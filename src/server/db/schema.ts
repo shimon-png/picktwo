@@ -71,6 +71,8 @@ export const users = pgTable("user", {
   kidAges: text("kid_ages").array().$type<KidAge[]>().notNull().default([]),
   interests: text("interests").array().notNull().default([]),
   ppBalance: integer("pp_balance").notNull().default(10),
+  /** Lifetime correct picks (votes that matched the poster's reported choice); drives Pro / Expert / Super expert. */
+  correctPicks: integer("correct_picks").notNull().default(0),
   lastActiveAt: now("last_active_at"),
   dataConsent: boolean("data_consent").notNull().default(false),
   marketingEmail: boolean("marketing_email").notNull().default(false),
@@ -194,6 +196,8 @@ export const votes = pgTable(
     dwellMs: integer("dwell_ms"),
     source: text("source"),
     pointsAwarded: integer("points_awarded").notNull().default(0),
+    /** Voter's correct picks when they voted (snapshot), so the Expert score uses their status at vote time. */
+    voterCorrect: integer("voter_correct").notNull().default(0),
     flagged: boolean("flagged").notNull().default(false),
     changedAt: ts("changed_at"),
     createdAt: now("created_at"),

@@ -20,7 +20,8 @@ import { assertCleanText, hashMatchImage, screenImage } from "../moderation";
 import { strictest } from "./safety";
 import { recordAutoHold, recordHashMatch } from "./reports";
 import { del } from "@vercel/blob";
-import { awardPoints, countOpenLoops } from "./points";
+import { awardPoints, countOpenLoops, countUnreported } from "./points";
+import { canPostBattle, clampBattleHours, expertTier, latestDeadline, sideScore, type ExpertTier } from "./expertise";
 import { getConfig, getEconomy } from "./config";
 import { notify } from "./notifications";
 import { track } from "../analytics";
@@ -63,9 +64,16 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
   const badZips = (input.tags.target?.zips ?? []).filter((z) => z.trim() && !checkZipTarget(z));
   if (badZips.length) throw new AppError("VALIDATION", `Not a real ZIP code or prefix: ${badZips.join(", ")}`);
   const user = input.postAs && input.postAs !== actor.handle ? await resolvePostAs(input.postAs) : actor;
-  const screen = await screenPhotos(user, input.options);
   const economy = await getEconomy();
-  const deadline = new Date(Date.now() + input.deadlineHours * 3600_000);
+  // Close-the-loop gate. Admin "post as" profiles can't sign in to report back, so they're exempt.
+  if (user.id === actor.id) {
+    const unreported = await countUnreported(user.id);
+    if (!canPostBattle(unreported, economy.maxUnreportedBattles))
+      throw new AppError("LOOPS_OPEN", `Tell the crowd what you picked on your ${unreported} finished battles first. Each one you close frees up a post.`);
+  }
+  const screen = await screenPhotos(user, input.options);
+  const hours = clampBattleHours(input.deadlineHours, economy.maxBattleHours);
+  const deadline = new Date(Date.now() + hours * 3600_000);
 
   const result = await db.transaction(async (tx) => {
     let slug = createSlug();
@@ -114,7 +122,7 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
   });
   track(
     "battle_published",
-    { visibility: input.visibility, hours: input.deadlineHours, ...(user.id !== actor.id ? { postedBy: actor.id } : {}) },
+    { visibility: input.visibility, hours, ...(user.id !== actor.id ? { postedBy: actor.id } : {}) },
     { userId: user.id },
   );
   if (screen.verdict === "review") await recordAutoHold(result.battle.id, result.battle.title, result.battle.slug, screen.reasons);
@@ -243,7 +251,10 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
 
   const [opts, [author], [outcome]] = await Promise.all([
     db.select().from(options).where(eq(options.battleId, b.id)),
-    db.select({ id: users.id, name: users.name, handle: users.handle, image: users.image }).from(users).where(eq(users.id, b.authorId)),
+    db
+      .select({ id: users.id, name: users.name, handle: users.handle, image: users.image, correctPicks: users.correctPicks })
+      .from(users)
+      .where(eq(users.id, b.authorId)),
     db.select().from(outcomes).where(eq(outcomes.battleId, b.id)),
   ]);
   const A = opts.find((o) => o.side === "A")!;
@@ -272,6 +283,7 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
   const economy = await getEconomy();
   const totalVotes = b.votesA + b.votesB;
   const now = new Date();
+  const expertResults = showResults ? ((await expertScores([b.id], economy.expertAt)).get(b.id) ?? null) : null;
 
   // Voter relevance (owner view): how many votes came from parents of same-age kids.
   let relevantVotes: { count: number; ageLabel: string } | null = null;
@@ -296,9 +308,11 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     isOpen,
     deadline: b.deadline.toISOString(),
     createdAt: b.createdAt.toISOString(),
-    author,
+    author: { id: author.id, name: author.name, handle: author.handle, image: author.image, tier: expertTier(author.correctPicks, economy) },
     options: { A, B },
     results,
+    /** "Expert score": votes from Expert and Super expert voters only (status when they voted). */
+    expertResults,
     totalVotes: showResults ? totalVotes : null,
     myVote,
     isOwner,
@@ -414,11 +428,12 @@ export async function closeEarly(slug: string, user: User) {
 export async function extendDeadline(slug: string, user: User, hours: number) {
   const b = await getOwnedBattle(slug, user);
   if (b.status !== "OPEN") throw new AppError("VOTING_CLOSED", "Voting has already closed");
+  const { maxBattleHours } = await getEconomy();
+  const latest = latestDeadline(b.createdAt, maxBattleHours);
+  if (b.deadline >= latest) throw new AppError("CONFLICT", `Battles can run for ${Math.round(maxBattleHours / 24)} days at most`);
   const h = Math.min(Math.max(1, hours), 168);
-  await db
-    .update(battles)
-    .set({ deadline: new Date(b.deadline.getTime() + h * 3600_000), updatedAt: new Date() })
-    .where(eq(battles.id, b.id));
+  const next = new Date(Math.min(b.deadline.getTime() + h * 3600_000, latest.getTime()));
+  await db.update(battles).set({ deadline: next, updatedAt: new Date() }).where(eq(battles.id, b.id));
 }
 
 export async function deleteBattle(slug: string, user: User, asAdmin = false) {
@@ -468,6 +483,9 @@ export type BattleCard = {
   authorName: string | null;
   authorImage: string | null;
   authorKidAges: string[];
+  authorTier: ExpertTier;
+  /** Expert score (Expert+ voters only); null when no expert voted. */
+  expert: { a: number; b: number; total: number } | null;
   kidAgeTags: string[];
   outcome: { chosen: string; thumb: string | null; note: string | null } | null;
 };
@@ -506,7 +524,14 @@ export async function hydrateCards(
   }[],
 ): Promise<BattleCard[]> {
   const ids = rows.map((r) => r.b.id);
-  const opts = ids.length ? await db.select().from(options).where(inArray(options.battleId, ids)) : [];
+  const authorIds = [...new Set(rows.map((r) => r.b.authorId))];
+  const [opts, authors, economy] = await Promise.all([
+    ids.length ? db.select().from(options).where(inArray(options.battleId, ids)) : Promise.resolve([]),
+    authorIds.length ? db.select({ id: users.id, correctPicks: users.correctPicks }).from(users).where(inArray(users.id, authorIds)) : Promise.resolve([]),
+    getEconomy(),
+  ]);
+  const experts = await expertScores(ids, economy.expertAt);
+  const picks = new Map(authors.map((a) => [a.id, a.correctPicks]));
   return rows.map(({ b, authorHandle, authorName, authorImage, authorKidAges, oChosen, oThumb, oNote }) => {
     const A = opts.find((o) => o.battleId === b.id && o.side === "A");
     const B = opts.find((o) => o.battleId === b.id && o.side === "B");
@@ -531,10 +556,32 @@ export async function hydrateCards(
       authorName,
       authorImage: authorImage ?? null,
       authorKidAges: authorKidAges ?? [],
+      authorTier: expertTier(picks.get(b.authorId) ?? 0, economy),
+      expert: experts.get(b.id) ?? null,
       kidAgeTags: b.tags?.target?.kidAges ?? b.tags?.kidAge ?? [],
       outcome: oChosen ? { chosen: oChosen, thumb: oThumb, note: oNote } : null,
     };
   });
+}
+
+/** Per-battle Expert score: share of each side among votes cast by Expert+ voters (snapshot at vote time). */
+export async function expertScores(battleIds: string[], expertAt: number) {
+  const m = new Map<string, { a: number; b: number; total: number }>();
+  if (!battleIds.length) return m;
+  const rows = await db
+    .select({
+      battleId: votes.battleId,
+      a: sql<number>`count(*) FILTER (WHERE ${votes.side} = 'A')::int`,
+      b: sql<number>`count(*) FILTER (WHERE ${votes.side} = 'B')::int`,
+    })
+    .from(votes)
+    .where(and(inArray(votes.battleId, battleIds), sql`${votes.voterCorrect} >= ${expertAt}`))
+    .groupBy(votes.battleId);
+  for (const r of rows) {
+    const s = sideScore(r.a, r.b);
+    if (s) m.set(r.battleId, s);
+  }
+  return m;
 }
 
 export const visibleStatuses = notInArray(battles.status, ["DELETED", "HIDDEN"]);

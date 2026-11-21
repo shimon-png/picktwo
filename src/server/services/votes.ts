@@ -145,6 +145,7 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
           reason: input.reason || null,
           dwellMs: input.dwellMs ?? null,
           source: input.source ?? null,
+          voterCorrect: user?.correctPicks ?? 0,
           flagged: issue === "burst" || issue === "degenerate",
         })
         .returning();
