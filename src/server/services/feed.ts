@@ -6,6 +6,7 @@ import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
 import { feedScore, diversify, type ViewerProfile } from "./ranking";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
+import { matchesTarget } from "./targeting";
 
 export type FeedItem = BattleCard & { score: number; debug?: Record<string, number> };
 
@@ -37,7 +38,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       ? or(eq(battles.visibility, "PUBLIC"), and(eq(battles.visibility, "FRIENDS"), inArray(battles.authorId, [...friends])))
       : eq(battles.visibility, "PUBLIC");
 
-  const rows = await db
+  const allRows = await db
     .select({
       b: battles,
       authorHandle: users.handle,
@@ -67,6 +68,8 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     )
     .orderBy(desc(battles.createdAt))
     .limit(500);
+  // "Target a specific group": only viewers whose profile matches see a targeted battle in the deck.
+  const rows = allRows.filter((r) => matchesTarget(r.b.tags?.target, user));
 
   // Viewer profile
   const profile: ViewerProfile = { categoryShare: {}, kidAges: user?.kidAges ?? [], country: user?.country ?? null };
@@ -87,7 +90,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     const pf = priorityFactor({ ppBalance: r.authorPP, openLoops: loops.get(r.b.authorId) ?? 0, boostActive, cap: economy.priorityCap });
     const score = feedScore(profile, {
       categoryId: r.b.categoryId,
-      kidAgeTags: r.b.tags?.kidAge ?? [],
+      kidAgeTags: r.b.tags?.target?.kidAges ?? r.b.tags?.kidAge ?? [],
       authorCountry: r.authorCountry,
       isFriend: friends.has(r.b.authorId),
       isFollowed: followed.has(r.b.authorId),

@@ -55,6 +55,10 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await expect(sheet.getByLabel(/Post as/)).toHaveCount(0); // admin-only
   await sheet.getByLabel("Question").fill(`Gift for my 6 y/o ${stamp}`);
   await sheet.getByLabel(/Context/).fill("Loves art, budget ~$50");
+  await expect(sheet.getByText(/Kid’s age/)).toHaveCount(0);
+  await expect(sheet.getByRole("checkbox")).toHaveCount(0); // data use lives in Settings now
+  await sheet.getByRole("button", { name: /Target a specific group/ }).click();
+  await sheet.getByRole("button", { name: "Parents", exact: true }).click();
   await sheet.getByRole("button", { name: "5–8" }).click();
   await sheet.getByRole("button", { name: "1 hour" }).click();
   await snap(poster, "02-review");

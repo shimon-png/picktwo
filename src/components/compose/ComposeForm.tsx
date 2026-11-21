@@ -2,13 +2,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, X } from "lucide-react";
+import { ArrowRight, ChevronDown, X } from "lucide-react";
 import { api, setPP, toast } from "@/lib/client";
 import { cn } from "@/lib/utils";
-import { DEADLINE_PRESETS, KID_AGES } from "@/lib/constants";
+import { AGE_RANGES, DEADLINE_PRESETS, KID_AGES } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
 import { Bar } from "@/components/ui/Bar";
 import { OptionEditor, type OptionDraft } from "./OptionEditor";
+import { cleanTarget, type BattleTarget } from "@/server/services/targeting";
 
 type Visibility = "PUBLIC" | "LINK_ONLY" | "FRIENDS";
 const DRAFT_KEY = "pt:draft";
@@ -23,13 +24,11 @@ export function ComposeForm({
   pp,
   tiers,
   openLoops,
-  accountConsent,
   isAdmin = false,
 }: {
   pp: number;
   tiers: { highAt: number; topAt: number };
   openLoops: number;
-  accountConsent: boolean;
   isAdmin?: boolean;
 }) {
   const router = useRouter();
@@ -40,28 +39,49 @@ export function ComposeForm({
   const [titleEdited, setTitleEdited] = useState(false);
   const [context, setContext] = useState("");
   const [postAs, setPostAs] = useState("");
-  const [kidAge, setKidAge] = useState<string[]>([]);
+  const [target, setTarget] = useState<BattleTarget>({});
+  const [targetOpen, setTargetOpen] = useState(false);
+  const [zipText, setZipText] = useState("");
   const [deadline, setDeadline] = useState<number>(24);
   const [visibility, setVisibility] = useState<Visibility>("PUBLIC");
-  const [dataConsent, setDataConsent] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  // Draft autosave (PRD B-12) — text fields only (images can be large)
+  // Draft autosave (PRD B-12). Photos are uploaded to Blob the moment they're picked, so the draft
+  // keeps their URLs (not the files): leaving the page and coming back restores everything.
   useEffect(() => {
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null");
       if (d) {
-        setA((x) => ({ ...x, label: d.a ?? "" }));
-        setB((x) => ({ ...x, label: d.b ?? "" }));
+        // Old drafts stored just the option names as strings.
+        setA(typeof d.a === "string" ? { label: d.a } : (d.a ?? { label: "" }));
+        setB(typeof d.b === "string" ? { label: d.b } : (d.b ?? { label: "" }));
         setContext(d.context ?? "");
+        if (d.titleEdited) {
+          setTitle(d.title ?? "");
+          setTitleEdited(true);
+        }
+        if (d.target) setTarget(d.target);
+        if (d.zipText) setZipText(d.zipText);
+        if (d.deadline) setDeadline(d.deadline);
+        if (d.visibility) setVisibility(d.visibility);
       }
     } catch {}
+    setLoaded(true);
   }, []);
   useEffect(() => {
+    if (!loaded) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ context, a: a.label, b: b.label }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ a, b, context, title, titleEdited, target, zipText, deadline, visibility }));
     } catch {}
-  }, [context, a.label, b.label]);
+  }, [loaded, a, b, context, title, titleEdited, target, zipText, deadline, visibility]);
+
+  const zips = zipText
+    .split(/[,\s]+/)
+    .map((z) => z.trim())
+    .filter(Boolean);
+  const cleanedTarget = cleanTarget({ ...target, zips });
+  const targetCount = cleanedTarget ? Object.keys(cleanedTarget).filter((k) => k !== "kidAges").length : 0;
 
   const ready = a.label.trim().length > 0 && b.label.trim().length > 0;
   const suggestedTitle = `${a.label.trim()} or ${b.label.trim()}?`.slice(0, 100);
@@ -82,10 +102,9 @@ export function ComposeForm({
           title: question.trim(),
           context: context.trim(),
           ...(isAdmin && postAs.trim() ? { postAs: postAs.trim() } : {}),
-          tags: kidAge.length ? { kidAge } : {},
+          tags: cleanedTarget ? { target: cleanedTarget } : {},
           visibility,
           deadlineHours: deadline,
-          dataConsent: dataConsent && accountConsent,
           options: [clean(a), clean(b)],
         },
       });
@@ -115,8 +134,9 @@ export function ComposeForm({
       <h1 className="display text-[26px] leading-tight">What are you deciding between?</h1>
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col gap-3">
-        <OptionEditor side="A" value={a} onChange={setA} />
-        <OptionEditor side="B" value={b} onChange={setB} />
+        {/* Keyed on `loaded` so each editor re-derives its mode (photo / link / name) from the restored draft. */}
+        <OptionEditor key={`a${loaded}`} side="A" value={a} onChange={setA} />
+        <OptionEditor key={`b${loaded}`} side="B" value={b} onChange={setB} />
       </div>
       <p className="mt-2 text-xs text-zinc-500">No photos where a child’s face is visible.</p>
 
@@ -188,12 +208,91 @@ export function ComposeForm({
                 />
               </div>
 
-              <ChipGroup
-                label={<>Kid’s age · matches you with parents of same-age kids</>}
-                options={KID_AGES.map((k) => ({ id: k.id, label: k.label }))}
-                value={kidAge}
-                onChange={setKidAge}
-              />
+              <div className="rounded-lg shadow-ring">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between gap-3 px-3.5 py-3 text-left"
+                  aria-expanded={targetOpen}
+                  aria-controls="target-panel"
+                  onClick={() => setTargetOpen((o) => !o)}
+                >
+                  <span>
+                    <span className="block text-[15px] text-ink">Target a specific group?</span>
+                    <span className="block text-xs text-zinc-500">
+                      {targetCount ? `${targetCount} filter${targetCount > 1 ? "s" : ""} · only matching people see it in Vote` : "Everyone can see it"}
+                    </span>
+                  </span>
+                  <ChevronDown className={cn("size-4 shrink-0 text-zinc-500 transition-transform", targetOpen && "rotate-180")} aria-hidden />
+                </button>
+                {targetOpen && (
+                  <div id="target-panel" className="space-y-4 border-t border-ink/10 px-3.5 pb-3.5 pt-3">
+                    <ChipGroup
+                      label="Parents"
+                      options={[
+                        { id: "YES", label: "Parents" },
+                        { id: "NO", label: "Not parents" },
+                      ]}
+                      value={target.parents ? [target.parents] : []}
+                      onChange={(v) => {
+                        const next = v.find((x) => x !== target.parents) as "YES" | "NO" | undefined;
+                        setTarget((t) => ({ ...t, parents: next, kidAges: next === "YES" ? t.kidAges : undefined }));
+                      }}
+                    />
+                    {target.parents === "YES" && (
+                      <ChipGroup
+                        label="With kids aged (optional)"
+                        options={KID_AGES.map((k) => ({ id: k.id, label: k.label }))}
+                        value={target.kidAges ?? []}
+                        onChange={(v) => setTarget((t) => ({ ...t, kidAges: v }))}
+                      />
+                    )}
+                    <ChipGroup
+                      label="Age"
+                      options={AGE_RANGES.map((r) => ({ id: r.id, label: r.label }))}
+                      value={target.ageRanges ?? []}
+                      onChange={(v) => setTarget((t) => ({ ...t, ageRanges: v }))}
+                    />
+                    <ChipGroup
+                      label="Men or women"
+                      options={[
+                        { id: "FEMALE", label: "Women" },
+                        { id: "MALE", label: "Men" },
+                      ]}
+                      value={target.sexes ?? []}
+                      onChange={(v) => setTarget((t) => ({ ...t, sexes: v as BattleTarget["sexes"] }))}
+                    />
+                    <div>
+                      <label className="label" htmlFor="target-zips">
+                        ZIP codes
+                      </label>
+                      <input
+                        id="target-zips"
+                        className="input"
+                        inputMode="text"
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        placeholder="e.g. 10001, 11211"
+                        maxLength={200}
+                        value={zipText}
+                        onChange={(e) => setZipText(e.target.value)}
+                      />
+                      <p className="mt-1.5 text-xs text-zinc-500">Separate with commas. A shorter code like 941 matches every ZIP that starts with it.</p>
+                    </div>
+                    {targetCount > 0 && (
+                      <button
+                        type="button"
+                        className="text-[13px] text-zinc-600 underline"
+                        onClick={() => {
+                          setTarget({});
+                          setZipText("");
+                        }}
+                      >
+                        Clear filters
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
               <ChipGroup
                 label="Voting closes in"
                 options={DEADLINE_PRESETS.map((d) => ({ id: String(d.hours), label: d.label }))}
@@ -234,27 +333,6 @@ export function ComposeForm({
                 )}
               </div>
 
-              <label className="flex items-start gap-2.5 text-[13px] text-zinc-600">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 size-4 accent-accent"
-                  checked={dataConsent && accountConsent}
-                  disabled={!accountConsent}
-                  onChange={(e) => setDataConsent(e.target.checked)}
-                />
-                <span>
-                  Let crowdpick use this battle, anonymised, to improve recommendations.
-                  {!accountConsent && (
-                    <span className="block text-xs text-zinc-400">
-                      Turn on data sharing in{" "}
-                      <Link href="/settings" className="underline">
-                        Settings
-                      </Link>{" "}
-                      to enable this.
-                    </span>
-                  )}
-                </span>
-              </label>
             </div>
             <div className="border-t border-ink/10 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
               <button className="btn-primary w-full py-3" disabled={busy} onClick={publish}>

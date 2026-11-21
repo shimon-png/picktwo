@@ -99,7 +99,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
   const { A, B } = v.options;
   const res = v.results;
   const leader = res && res.total > 0 ? (res.a === res.b ? null : res.a > res.b ? "A" : "B") : null;
-  const kidAges: string[] = v.tags?.kidAge ?? [];
+  const kidAges: string[] = v.tags?.target?.kidAges ?? v.tags?.kidAge ?? [];
   const loopPoints = v.loopRewards.loop;
   const allReasons = [...v.reasons.A, ...v.reasons.B].sort((x, y) => score(y) - score(x));
   const chosenLabel = v.outcome ? (v.outcome.chosen === "A" ? A.label : v.outcome.chosen === "B" ? B.label : "neither") : null;

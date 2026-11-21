@@ -10,6 +10,7 @@ import {
   follows,
   type Battle,
   type User,
+  type BattleTags,
 } from "../db/schema";
 import { AppError } from "../errors";
 import { createSlug } from "@/lib/id";
@@ -25,6 +26,7 @@ import { notify } from "./notifications";
 import { track } from "../analytics";
 import { pct } from "@/lib/utils";
 import { isAdmin } from "../viewer";
+import { cleanTarget } from "./targeting";
 
 // ---------------- Create ----------------
 /**
@@ -45,6 +47,12 @@ async function resolvePostAs(handle: string): Promise<User> {
   if (created) return created;
   const [raced] = await db.select().from(users).where(eq(users.handle, handle));
   return raced;
+}
+
+function cleanTags(tags: CreateBattleInput["tags"]): BattleTags {
+  const { target, ...rest } = tags;
+  const t = cleanTarget(target);
+  return t ? { ...rest, target: t } : rest;
 }
 
 export async function createBattle(actor: User, input: CreateBattleInput, opts: { asAdmin?: boolean } = {}) {
@@ -71,11 +79,11 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
         title: input.title,
         context: input.context || null,
         categoryId: DEFAULT_CATEGORY_ID,
-        tags: input.tags,
+        tags: cleanTags(input.tags),
         visibility: input.visibility,
         status: screen.verdict === "review" ? "HIDDEN" : "OPEN",
         deadline,
-        dataConsent: input.dataConsent && user.dataConsent,
+        dataConsent: user.dataConsent,
       })
       .returning();
     await tx.insert(options).values(
@@ -264,7 +272,7 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
 
   // Voter relevance (owner view): how many votes came from parents of same-age kids.
   let relevantVotes: { count: number; ageLabel: string } | null = null;
-  const ageTags = b.tags?.kidAge ?? [];
+  const ageTags = b.tags?.target?.kidAges ?? b.tags?.kidAge ?? [];
   if (isOwner && ageTags.length && totalVotes > 0) {
     const [r] = await db
       .select({ n: sql<number>`count(*)::int` })
@@ -520,7 +528,7 @@ export async function hydrateCards(
       authorName,
       authorImage: authorImage ?? null,
       authorKidAges: authorKidAges ?? [],
-      kidAgeTags: b.tags?.kidAge ?? [],
+      kidAgeTags: b.tags?.target?.kidAges ?? b.tags?.kidAge ?? [],
       outcome: oChosen ? { chosen: oChosen, thumb: oThumb, note: oNote } : null,
     };
   });

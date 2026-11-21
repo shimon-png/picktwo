@@ -47,7 +47,7 @@ export function SettingsPanel({ initial }: { initial: S }) {
       <section>
         <h2 className="text-lg font-medium">Data & privacy</h2>
         <div className="divide-y divide-zinc-200">
-          <Row k="dataConsent" label="Help improve recommendations" desc="Allow anonymised use of your battles, votes and outcomes. We never sell your identity." />
+          <Row k="dataConsent" label="Help improve recommendations" desc="Let crowdpick use your battles, votes and outcomes, anonymised, to improve recommendations. Applies to all your battles. We never sell your identity." />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <a href="/api/me/export" className="btn-outline">

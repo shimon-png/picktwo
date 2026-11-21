@@ -38,11 +38,21 @@ export const createBattleInput = z.object({
       recipient: z.string().max(30).optional(),
       budget: z.string().max(30).optional(),
       occasion: z.string().max(30).optional(),
+      target: z
+        .object({
+          zips: z.array(z.string().trim().max(10)).max(20).optional(),
+          parents: z.enum(["YES", "NO"]).optional(),
+          kidAges: z.array(z.enum(KID_AGE_IDS)).max(5).optional(),
+          ageRanges: z.array(z.enum(AGE_RANGE_IDS)).max(6).optional(),
+          sexes: z.array(z.enum(["MALE", "FEMALE"])).max(2).optional(),
+        })
+        .optional(),
     })
     .default({}),
   visibility: z.enum(["PUBLIC", "LINK_ONLY", "FRIENDS"]).default("PUBLIC"),
   deadlineHours: z.number().min(1).max(24 * 30),
-  dataConsent: z.boolean().default(false),
+  /** Ignored: data use follows the author's account setting (Settings → Data & privacy). */
+  dataConsent: z.boolean().optional(),
   options: z.tuple([optionInput, optionInput]),
   /** Admin only: publish under this username (created if it doesn't exist). */
   postAs: z
