@@ -66,8 +66,8 @@ export function OptionFace({
         {typeof percent === "number" && (
           <span
             className={cn(
-              "block font-medium leading-none tabular-nums tracking-tight",
-              big ? "text-[26px]" : "text-2xl",
+              "block font-display leading-none tabular-nums",
+              big ? "text-[34px]" : "text-[30px]",
               image ? "text-white" : isA ? "text-ink" : "text-b",
             )}
           >
@@ -82,7 +82,7 @@ export function OptionFace({
       {(ring || hot) && (
         <span
           aria-hidden
-          className={cn("pointer-events-none absolute inset-0 z-20 rounded-lg ring-inset", ring ? "ring-2 ring-accent" : isA ? "ring-2 ring-a/60" : "ring-2 ring-b/60")}
+          className={cn("pointer-events-none absolute inset-0 z-20 rounded-lg ring-inset", ring ? "ring-2 ring-ink" : isA ? "ring-2 ring-a/60" : "ring-2 ring-b/60")}
         />
       )}
     </span>

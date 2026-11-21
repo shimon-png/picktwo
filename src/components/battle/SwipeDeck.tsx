@@ -14,13 +14,23 @@ import { OptionFace } from "./OptionFace";
 type Side = "A" | "B";
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
 
-/** Drag-to-grow: the photo you drag towards widens. `share` is B's width share, 0..1 (0.5 = 50/50). */
-const PICK_AT = 0.8; // let go past 80/20 to pick
-const SWITCH_AT = 0.6; // once picked, dragging past 60/40 the other way switches
-const PICKED_SHARE = 0.72; // resting split after a pick, so the other photo stays tappable
-const HOT_AT = 0.62;
-const FILL_MS = 200;
+/**
+ * Tinder-style photo throw: grab a photo, it lifts off the card and follows your finger;
+ * fling it off either side to pick it, and the deck moves on by itself. Tapping a photo
+ * picks it too but stays (results, reason chips, Next) so the pick can still change.
+ */
+const THROW_FRAC = 0.32; // drag past this share of the card width to throw…
+const FLING_PX_MS = 0.55; // …or flick faster than this
+const THROW_MS = 340;
+const RESULT_MS = 1150; // how long the result shows after a throw before the next battle
 const FLY_MS = 280;
+
+/** Short buzz where the browser supports it (Android Chrome; iOS Safari has no web vibration). */
+function buzz(ms: number) {
+  try {
+    navigator.vibrate?.(ms);
+  } catch {}
+}
 
 export function SwipeDeck({
   initial,
@@ -46,14 +56,15 @@ export function SwipeDeck({
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState("");
   const [fly, setFly] = useState<-1 | 1 | 0>(0);
-  const [dx, setDx] = useState(0);
-  const [fill, setFill] = useState(false);
+  // The grabbed photo and its offset, and a photo that has been thrown off the card.
+  const [grab, setGrab] = useState<{ side: Side; dx: number; dy: number } | null>(null);
+  const [thrown, setThrown] = useState<{ side: Side; dir: -1 | 1 } | null>(null);
   const [pp, setPp] = useState(initialPP);
   const [session, setSession] = useState({ votes: 0, points: 0 });
   const shownAt = useRef(Date.now());
-  const drag = useRef<{ x: number; moved: boolean } | null>(null);
-  const [dragW, setDragW] = useState(320);
-  const splitRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ side: Side; x: number; y: number; moved: boolean; w: number; lx: number; lt: number; v: number; armed: boolean } | null>(null);
+  const justDragged = useRef(false);
+  const cardRef = useRef<HTMLElement>(null);
   const seen = useRef(new Set(initial.map((i) => i.id)));
   const card = queue[0];
   const peek = queue[1];
@@ -94,8 +105,8 @@ export function SwipeDeck({
     setTimeout(() => {
       setQueue((q) => q.slice(1));
       setFly(0);
-      setDx(0);
-      setFill(false);
+      setGrab(null);
+      setThrown(null);
       setVoted(null);
       setResult(null);
       setReason(null);
@@ -107,11 +118,11 @@ export function SwipeDeck({
   const gated = !signedIn && guestLeft !== null && guestLeft <= 0;
 
   // The pick stays changeable (tap the other photo, drag the other way, ← / →) until Next.
-  async function vote(side: Side) {
-    if (!card || fly || gated || voted === side) return;
+  async function vote(side: Side): Promise<boolean> {
+    if (!card || fly || gated) return false;
+    if (voted === side) return true;
     const prev = voted;
     setVoted(side);
-    setDx(0);
     const dwellMs = Date.now() - shownAt.current;
     setResult(pct(card.votesA + (side === "A" ? 1 : 0), card.votesB + (side === "B" ? 1 : 0)));
     // A reason was for the old pick; clear it on the server too.
@@ -133,21 +144,40 @@ export function SwipeDeck({
       if (r.ppBalance != null) setPp(r.ppBalance);
       setSession((s) => ({ votes: s.votes + (prev ? 0 : 1), points: s.points + r.points }));
       if (r.points > 0) toast(`+${r.points} for voting`, "pp");
+      return true;
     } catch (e) {
       if (prev) {
         setVoted(prev);
         toast((e as Error).message, "error");
-        return;
+        return false;
       }
       unmarkDone(card.id);
       if (e instanceof ApiError && e.code === "SIGNUP_REQUIRED") {
         setVoted(null);
         setResult(null);
         setGuestLeft(0);
-        return;
+        return false;
       }
+      setVoted(null);
+      setResult(null);
       toast((e as Error).message, "error");
+      return false;
     }
+  }
+
+  // Fling: the photo flies off, the vote counts, the result flashes, then the next battle.
+  async function throwPhoto(side: Side, dir: -1 | 1) {
+    if (!card || thrown || fly) return;
+    buzz(18);
+    setThrown({ side, dir });
+    setGrab(null);
+    const started = Date.now();
+    const ok = await vote(side);
+    if (!ok) {
+      setThrown(null);
+      return;
+    }
+    setTimeout(() => advance(dir), Math.max(0, RESULT_MS - (Date.now() - started)));
   }
 
   async function giveReason(text: string) {
@@ -171,18 +201,15 @@ export function SwipeDeck({
   }
 
   function skip() {
-    if (!card || voted || fly) return;
+    if (!card || voted || fly || thrown) return;
     markDone(card.id);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
     advance(-1);
   }
 
   function next() {
-    if (!voted || fly || fill) return;
-    // The picked photo fills the card, then the card flies off towards it.
-    setFill(true);
-    setDx(0);
-    setTimeout(() => advance(voted === "A" ? -1 : 1), FILL_MS);
+    if (!voted || fly || thrown) return;
+    advance(voted === "A" ? -1 : 1);
   }
 
   // Keyboard: ← A, → B, ↓ skip, Enter next
@@ -203,7 +230,7 @@ export function SwipeDeck({
   const tierLine = tier ? (tier.next ? `${tier.toNext} ⚡ to ${tier.next} priority.` : "Top priority — your battles go first.") : null;
 
   const header = (
-    <div className="sticky top-14 z-20 -mx-4 bg-white/95 px-4 pb-3 backdrop-blur">
+    <div className="sticky top-14 z-20 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
       <p className="text-xs text-zinc-500" data-tour="status">
         {tierLine ?? (
           <>
@@ -251,10 +278,30 @@ export function SwipeDeck({
   const style: React.CSSProperties = fly
     ? { transform: `translateX(${fly * 460}px) rotate(${fly * 16}deg)`, opacity: 0, transition: `transform ${FLY_MS}ms ease, opacity ${FLY_MS}ms ease` }
     : { transition: "transform 200ms ease" };
-  // B's width share: resting point (50/50, or the picked side's split) plus the drag.
-  const restShare = fill ? (voted === "B" ? 1 : 0) : voted === "B" ? PICKED_SHARE : voted === "A" ? 1 - PICKED_SHARE : 0.5;
-  const share = Math.min(1, Math.max(0, restShare + dx / dragW));
-  const dragging = !!dx && !fill;
+
+  function photoStyle(s: Side): React.CSSProperties {
+    if (thrown?.side === s) {
+      const w = cardRef.current?.offsetWidth ?? 360;
+      return {
+        transform: `translate(${thrown.dir * (w + 160)}px, ${grab?.dy ?? -20}px) rotate(${thrown.dir * 28}deg) scale(1.05)`,
+        transition: `transform ${THROW_MS}ms cubic-bezier(.4,.1,.8,.6)`,
+        zIndex: 30,
+        boxShadow: "0 30px 60px rgba(0,0,0,.28)",
+      };
+    }
+    if (grab?.side === s)
+      return {
+        transform: `translate(${grab.dx}px, ${grab.dy}px) rotate(${grab.dx / 14}deg) scale(1.06)`,
+        zIndex: 30,
+        boxShadow: "0 26px 50px rgba(0,0,0,.26)",
+        cursor: "grabbing",
+      };
+    if (grab || thrown) return { transform: "scale(0.96)", opacity: thrown ? 1 : 0.6, transition: "transform 180ms ease, opacity 180ms ease" };
+    // Not touched: spring back with a little overshoot.
+    return { transition: "transform 320ms cubic-bezier(.2,1.4,.4,1), opacity 180ms ease, box-shadow 200ms ease" };
+  }
+
+  const armed = !!grab && Math.abs(grab.dx) > (cardRef.current?.offsetWidth ?? 360) * THROW_FRAC;
 
   return (
     <div>
@@ -262,37 +309,11 @@ export function SwipeDeck({
       <div className="relative h-[calc(100dvh-14.5rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
         {peek && <div aria-hidden className="absolute inset-0 translate-y-2.5 scale-95 rounded-2xl bg-surface opacity-60 shadow-ring" />}
         <article
+          ref={cardRef}
           key={card.id}
           aria-label={card.title}
-          className="animate-pop absolute inset-0 flex touch-pan-y select-none flex-col rounded-2xl bg-surface p-3.5 shadow-ring"
+          className="animate-pop absolute inset-0 flex select-none flex-col rounded-2xl bg-surface p-3.5 shadow-ring"
           style={style}
-          onPointerDown={(e) => {
-            if (fly || fill || (e.target as HTMLElement).closest("[data-nodrag]")) return;
-            drag.current = { x: e.clientX, moved: false };
-            setDragW(splitRef.current?.offsetWidth || 320);
-          }}
-          onPointerMove={(e) => {
-            if (!drag.current) return;
-            const d = e.clientX - drag.current.x;
-            if (!drag.current.moved && Math.abs(d) > 6) {
-              drag.current.moved = true;
-              e.currentTarget.setPointerCapture(e.pointerId);
-            }
-            if (drag.current.moved) setDx(d);
-          }}
-          onPointerUp={() => {
-            const d = drag.current;
-            drag.current = null;
-            if (!d?.moved) return;
-            const at = voted ? SWITCH_AT : PICK_AT;
-            if (share >= at) vote("B");
-            else if (share <= 1 - at) vote("A");
-            setDx(0);
-          }}
-          onPointerCancel={() => {
-            drag.current = null;
-            setDx(0);
-          }}
         >
           <div className="flex items-center gap-2 text-xs text-zinc-500">
             <span className={cn("inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]", TONE_CLASSES[avatarTone].solid)} aria-hidden>
@@ -311,22 +332,59 @@ export function SwipeDeck({
           </h1>
           {card.context && <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500">{card.context}</p>}
 
-          <div ref={splitRef} className={cn("mt-3 flex min-h-0 flex-1", fill ? "gap-0" : "gap-2")}>
+          <div className="relative mt-3 grid min-h-0 flex-1 grid-cols-2 gap-2">
             {(["A", "B"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
-                className="h-full min-h-0 min-w-0 overflow-hidden active:scale-[0.98]"
-                style={{
-                  flex: `0 1 ${(s === "B" ? share : 1 - share) * 100}%`,
-                  transition: dragging ? "none" : `flex-basis ${FILL_MS}ms ease`,
-                }}
+                className="relative h-full min-h-0 touch-none rounded-lg will-change-transform"
+                style={photoStyle(s)}
                 data-tour={s === "A" ? "option-a" : "option-b"}
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
                 aria-pressed={voted === s}
+                onPointerDown={(e) => {
+                  if (fly || thrown || gated) return;
+                  drag.current = { side: s, x: e.clientX, y: e.clientY, moved: false, w: cardRef.current?.offsetWidth ?? 360, lx: e.clientX, lt: e.timeStamp, v: 0, armed: false };
+                }}
+                onPointerMove={(e) => {
+                  const d = drag.current;
+                  if (!d || d.side !== s) return;
+                  const dx = e.clientX - d.x;
+                  const dy = e.clientY - d.y;
+                  if (!d.moved && Math.hypot(dx, dy) > 6) {
+                    d.moved = true;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  }
+                  if (!d.moved) return;
+                  const dt = e.timeStamp - d.lt;
+                  if (dt > 0) d.v = 0.7 * ((e.clientX - d.lx) / dt) + 0.3 * d.v;
+                  d.lx = e.clientX;
+                  d.lt = e.timeStamp;
+                  const isArmed = Math.abs(dx) > d.w * THROW_FRAC;
+                  if (isArmed && !d.armed) buzz(8);
+                  d.armed = isArmed;
+                  setGrab({ side: s, dx, dy: dy * 0.6 });
+                }}
+                onPointerUp={(e) => {
+                  const d = drag.current;
+                  drag.current = null;
+                  if (!d?.moved) return;
+                  justDragged.current = true;
+                  const dx = e.clientX - d.x;
+                  const flung = Math.abs(d.v) > FLING_PX_MS && Math.abs(dx) > 24 && Math.sign(d.v) === Math.sign(dx);
+                  if (Math.abs(dx) > d.w * THROW_FRAC || flung) throwPhoto(s, dx < 0 ? -1 : 1);
+                  else setGrab(null);
+                }}
+                onPointerCancel={() => {
+                  drag.current = null;
+                  setGrab(null);
+                }}
                 onClick={() => {
-                  if (drag.current?.moved || dx) return;
-                  vote(s);
+                  if (justDragged.current) {
+                    justDragged.current = false;
+                    return;
+                  }
+                  if (!thrown) vote(s);
                 }}
               >
                 <OptionFace
@@ -336,15 +394,18 @@ export function SwipeDeck({
                   image={s === "A" ? card.imageA : card.imageB}
                   percent={result ? (s === "A" ? result.a : result.b) : null}
                   ring={voted === s}
-                  hot={voted !== s && (s === "B" ? share >= HOT_AT : share <= 1 - HOT_AT)}
+                  hot={grab?.side === s && armed}
                   big
-                  compact={(s === "B" ? share : 1 - share) < 0.3}
                 />
               </button>
             ))}
           </div>
 
-          {voted ? (
+          {thrown ? (
+            <p className="mt-3 text-center font-display text-[26px] leading-tight" aria-live="polite">
+              {result ? `${thrown.side === "A" ? result.a : result.b}% picked ${thrown.side === "A" ? card.labelA : card.labelB}` : "Counted"}
+            </p>
+          ) : voted ? (
             <div className="mt-3 space-y-2.5" data-nodrag>
               {signedIn ? (
                 <>
@@ -410,7 +471,7 @@ export function SwipeDeck({
             </div>
           ) : (
             <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
-              <span>← A · swipe or tap · B →</span>
+              <span>Throw a photo off the card to pick it</span>
               <button type="button" data-nodrag data-tour="skip" className="btn-ghost !px-2 !py-1 text-[13px] text-ink" onClick={skip}>
                 Skip
               </button>

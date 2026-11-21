@@ -6,11 +6,11 @@ export function Mark({ size = 22, className }: { size?: number; className?: stri
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden className={className}>
       <circle cx="7" cy="14.5" r="4.8" stroke="#8A90A2" strokeWidth="1.6" />
-      <circle cx="17" cy="14.5" r="4.8" stroke="#3170E8" strokeWidth="1.6" />
-      <circle cx="17" cy="14.5" r="1.9" fill="#3170E8" />
-      <circle cx="13.6" cy="5.2" r="1.25" fill="#E5484D" />
-      <circle cx="17" cy="4" r="1.25" fill="#E5484D" />
-      <circle cx="20.4" cy="5.2" r="1.25" fill="#E5484D" />
+      <circle cx="17" cy="14.5" r="4.8" stroke="#2F5FF0" strokeWidth="1.6" />
+      <circle cx="17" cy="14.5" r="1.9" fill="#2F5FF0" />
+      <circle cx="13.6" cy="5.2" r="1.25" fill="#E8384F" />
+      <circle cx="17" cy="4" r="1.25" fill="#E8384F" />
+      <circle cx="20.4" cy="5.2" r="1.25" fill="#E8384F" />
     </svg>
   );
 }

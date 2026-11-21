@@ -96,7 +96,7 @@ export default async function YouPage() {
       </section>
 
       <section>
-        <h2 className="mb-2.5 text-[15px] font-medium">Earn ⚡</h2>
+        <h2 className="mb-2.5 font-sans text-[15px] font-medium">Earn ⚡</h2>
         <ul className="space-y-1.5">
           {earn.map(([tone, Icon, label, n]) => (
             <li key={label} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5", TONE_CLASSES[tone].soft)}>
@@ -116,7 +116,7 @@ export default async function YouPage() {
 
       <section>
         <div className="mb-2.5 flex items-center justify-between">
-          <h2 className="text-[15px] font-medium">Your battles</h2>
+          <h2 className="font-sans text-[15px] font-medium">Your battles</h2>
           <Link href="/post" className="text-[13px] text-accent">
             + New
           </Link>
@@ -158,7 +158,7 @@ export default async function YouPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 text-[15px] font-medium">Recent ⚡</h2>
+        <h2 className="mb-2 font-sans text-[15px] font-medium">Recent ⚡</h2>
         {ledger.length === 0 ? (
           <p className="text-sm text-zinc-500">No points yet — start voting!</p>
         ) : (

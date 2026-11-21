@@ -47,7 +47,7 @@ export function ReportBackForm(props: {
         body: { chosen, thumb: chosen === "NEITHER" ? null : thumb, note, photoUrl: photo ?? undefined },
       });
       if (r.points > 0) {
-        confetti({ particleCount: 110, spread: 80, origin: { y: 0.7 }, colors: ["#3170E8", "#E5484D", "#E8890C", "#7B4FE0"] });
+        confetti({ particleCount: 110, spread: 80, origin: { y: 0.7 }, colors: ["#2F5FF0", "#E8384F", "#E8890C", "#7B4FE0"] });
         toast(`+${r.points} Loop closed — thank you!`, "pp");
         const me = await api<{ ppBalance: number }>("/api/me/priority").catch(() => null);
         setPP(me?.ppBalance);
@@ -108,7 +108,7 @@ export function ReportBackForm(props: {
       )}
 
       <section className="mt-6">
-        <h2 className="mb-2.5 text-[15px] font-medium">Which did you pick?</h2>
+        <h2 className="mb-2.5 font-sans text-[15px] font-medium">Which did you pick?</h2>
         <div className="flex gap-2">
           {tile("A", props.A.label, <OptionFace side="A" label={props.A.label} image={props.A.imageUrl || props.A.urlImage} ring={chosen === "A"} />)}
           {tile("B", props.B.label, <OptionFace side="B" label={props.B.label} image={props.B.imageUrl || props.B.urlImage} ring={chosen === "B"} />)}
@@ -123,7 +123,7 @@ export function ReportBackForm(props: {
 
       {needsThumb && (
         <section className="mt-6">
-          <h2 className="mb-2.5 text-[15px] font-medium">How did it go?</h2>
+          <h2 className="mb-2.5 font-sans text-[15px] font-medium">How did it go?</h2>
           <div className="grid grid-cols-2 gap-2">
             {(
               [

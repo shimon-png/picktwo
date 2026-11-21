@@ -12,8 +12,8 @@ function steps(signedIn: boolean): Step[] {
   return [
     { title: "Welcome to crowdpick", body: "Real people stuck between two options. Here’s a 30-second tour. Tap anywhere to go to the next tip." },
     { target: "question", title: "The question", body: "Each card is someone’s real decision. Tap the question to see the full battle, reasons and comments." },
-    { target: "option-a", title: "Vote for A", body: "Tap the left option, or swipe the card left, to vote A." },
-    { target: "option-b", title: "Vote for B", body: "Tap the right option, or swipe right, to vote B. You’ll see how everyone else voted right away." },
+    { target: "option-a", title: "Throw to pick", body: "Grab the photo you like and throw it off the card to pick it. You’ll go straight to the next battle." },
+    { target: "option-b", title: "Or tap", body: "Or just tap a photo to pick it and see how everyone else voted. You can change your mind until you hit Next." },
     { target: "skip", title: "Not sure? Skip", body: "Skip moves on to the next battle without voting." },
     signedIn
       ? { target: "account", title: "Your ⚡ priority", body: "Voting and adding reasons earns ⚡. More ⚡ means your own questions reach more voters, faster." }
