@@ -4,7 +4,7 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, diversify, type ViewerProfile } from "./ranking";
+import { feedScore, diversify, shuffleFactor, shuffleSeed, type ViewerProfile } from "./ranking";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 
 export type FeedItem = BattleCard & { score: number; debug?: Record<string, number> };
@@ -81,11 +81,13 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     for (const r of recent) profile.categoryShare[r.categoryId] = (profile.categoryShare[r.categoryId] ?? 0) + 1 / recent.length;
   }
 
+  // Random order per viewer (stable for the day) so everyone doesn't see the same sequence.
+  const seed = shuffleSeed(user?.id ?? viewer.deviceId ?? crypto.randomUUID(), now);
   const loops = await openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy);
   const scored = rows.map((r) => {
     const boostActive = !!r.b.boostUntil && r.b.boostUntil > now && r.b.boostVotesLeft > 0;
     const pf = priorityFactor({ ppBalance: r.authorPP, openLoops: loops.get(r.b.authorId) ?? 0, boostActive, cap: economy.priorityCap });
-    const score = feedScore(profile, {
+    const base = feedScore(profile, {
       categoryId: r.b.categoryId,
       kidAgeTags: r.b.tags?.kidAge ?? [],
       authorCountry: r.authorCountry,
@@ -96,6 +98,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       hoursSincePublish: (now.getTime() - r.b.createdAt.getTime()) / 3600_000,
       priorityFactor: pf,
     });
+    const score = base * shuffleFactor(seed, r.b.id);
     return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
   scored.sort((a, b) => b.score - a.score);
