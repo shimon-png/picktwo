@@ -353,7 +353,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       )}
 
       {showStickyLoop && (
-        <div className="fixed inset-x-0 bottom-[calc(3.6rem+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t from-page via-page to-page/0 px-4 pb-3 pt-6 md:bottom-0 md:pl-60">
+        <div className="fixed inset-x-0 bottom-[calc(3.9rem+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t from-page via-page to-page/0 px-4 pb-3 pt-6 md:bottom-0 md:pl-60">
           <Link href={`/b/${v.slug}/report`} className="btn-primary mx-auto w-full max-w-2xl py-3">
             Decided? Close the loop · +{loopPoints} <Zap className="size-4 fill-white" aria-hidden />
           </Link>

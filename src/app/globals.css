@@ -285,6 +285,7 @@ html[data-theme="arcade"] .text-white\/80 { color: rgb(255 255 255 / 0.8); }
 html[data-theme="arcade"] .text-white\/70 { color: rgb(255 255 255 / 0.7); }
 html[data-theme="arcade"] .fill-white { fill: #fff; }
 html[data-theme="arcade"] .btn-primary { background: #c6ff3d; color: #120e26; font-weight: 600; }
+html[data-theme="arcade"] nav a[aria-current="page"] { color: #c6ff3d; }
 html[data-theme="arcade"] .chip-on { background: #c6ff3d; color: #120e26; }
 html[data-theme="arcade"] .vs-badge { background: #120e26; color: #c6ff3d; box-shadow: 0 0 0 2px #c6ff3d, 0 0 14px rgba(198, 255, 61, 0.6); font: 700 13px "Chakra Petch", sans-serif; }
 html[data-theme="arcade"] .border-ink\/12, html[data-theme="arcade"] .input { border-color: #3a3170; }

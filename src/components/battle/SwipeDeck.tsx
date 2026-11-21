@@ -390,7 +390,7 @@ export function SwipeDeck({
   return (
     <div>
       {header}
-      <div className="relative h-[calc(100dvh-14.5rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
+      <div className="relative h-[calc(100dvh-14.85rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}
