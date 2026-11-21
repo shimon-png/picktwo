@@ -44,13 +44,19 @@ export function Scores({
     );
   return (
     <div className="grid grid-cols-2 gap-2">
-      <Tile title="Everyone" icon={<Users className="size-4" aria-hidden />} s={e} n={everyone?.total ?? 0} empty="No votes yet" />
-      <Tile title="Experts" icon={<ExpertBadge tier="EXPERT" />} s={x} n={experts?.total ?? 0} empty="No expert votes yet" />
+      <Tile title="Everyone" icon={<Users className="size-4" aria-hidden />} s={e} note="of all voters" empty="No votes yet" />
+      <Tile
+        title="Experts"
+        icon={<ExpertBadge tier="EXPERT" />}
+        s={x}
+        note={`${experts?.total ?? 0} expert vote${experts?.total === 1 ? "" : "s"}`}
+        empty="No expert votes yet"
+      />
     </div>
   );
 }
 
-function Tile({ title, icon, s, n, empty }: { title: string; icon: React.ReactNode; s: ReturnType<typeof lead>; n: number; empty: string }) {
+function Tile({ title, icon, s, note, empty }: { title: string; icon: React.ReactNode; s: ReturnType<typeof lead>; note: string; empty: string }) {
   return (
     <div className="card p-3">
       <div className="flex items-center gap-1.5 text-xs font-medium text-zinc-500">
@@ -61,9 +67,7 @@ function Tile({ title, icon, s, n, empty }: { title: string; icon: React.ReactNo
         <>
           <div className={cn("mt-1 text-2xl font-semibold tabular-nums", s.side === "A" ? "text-a" : s.side === "B" ? "text-b" : "")}>{s.pct}%</div>
           <div className="truncate text-[13px]">{s.label}</div>
-          <div className="text-xs text-zinc-500">
-            {n} vote{n === 1 ? "" : "s"}
-          </div>
+          <div className="text-xs text-zinc-500">{note}</div>
         </>
       ) : (
         <div className="mt-1 text-[13px] text-zinc-500">{empty}</div>
