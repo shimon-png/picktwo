@@ -161,6 +161,7 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 .animate-pop { animation: pop 0.25s ease-out; }
+.tour-hole { outline: 2px solid #fff; outline-offset: 2px; }
 
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(-8px); }
@@ -287,3 +288,5 @@ html[data-theme="arcade"] .btn-primary { background: #c6ff3d; color: #120e26; fo
 html[data-theme="arcade"] .chip-on { background: #c6ff3d; color: #120e26; }
 html[data-theme="arcade"] .vs-badge { background: #120e26; color: #c6ff3d; box-shadow: 0 0 0 2px #c6ff3d, 0 0 14px rgba(198, 255, 61, 0.6); font: 700 13px "Chakra Petch", sans-serif; }
 html[data-theme="arcade"] .border-ink\/12, html[data-theme="arcade"] .input { border-color: #3a3170; }
+/* Tutorial spotlight outline (the dimming is an inline box-shadow, so a ring would be overwritten). */
+html[data-theme="arcade"] .tour-hole { outline-color: #c6ff3d; box-shadow: 0 0 0 9999px rgb(5 3 15 / 0.7), 0 0 22px rgba(198, 255, 61, 0.45) !important; }

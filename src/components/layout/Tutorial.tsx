@@ -154,7 +154,7 @@ export function Tutorial({ signedIn }: { signedIn: boolean }) {
       {hole ? (
         <div
           aria-hidden
-          className="pointer-events-none fixed rounded-[14px] ring-2 ring-white transition-all duration-300 ease-out"
+          className="tour-hole pointer-events-none fixed rounded-[14px] transition-all duration-300 ease-out"
           style={{ ...hole, boxShadow: "0 0 0 9999px rgb(0 0 0 / 0.62)" }}
         />
       ) : (
