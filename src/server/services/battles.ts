@@ -15,7 +15,7 @@ import {
 import { AppError } from "../errors";
 import { createSlug } from "@/lib/id";
 import { DEFAULT_CATEGORY_ID, REASON_CHIPS, kidAgeLabel } from "@/lib/constants";
-import type { CreateBattleInput } from "@/lib/validators";
+import { createBattleInput, type CreateBattleInput } from "@/lib/validators";
 import { assertCleanText, hashMatchImage, screenImage } from "../moderation";
 import { strictest } from "./safety";
 import { recordAutoHold, recordHashMatch } from "./reports";
@@ -434,6 +434,41 @@ export async function extendDeadline(slug: string, user: User, hours: number) {
   const h = Math.min(Math.max(1, hours), 168);
   const next = new Date(Math.min(b.deadline.getTime() + h * 3600_000, latest.getTime()));
   await db.update(battles).set({ deadline: next, updatedAt: new Date() }).where(eq(battles.id, b.id));
+}
+
+/**
+ * Repost a finished battle as a brand-new one (same question, options and photos, same length up to the
+ * 5-day max). It goes through createBattle, so the close-the-loop gate and photo screening apply. Reposting
+ * does not report the old battle's outcome: that one still needs closing.
+ */
+export async function repostBattle(slug: string, user: User) {
+  const b = await getOwnedBattle(slug, user);
+  if (b.status === "OPEN") throw new AppError("CONFLICT", "This battle is still live");
+  if (b.status !== "CLOSED") throw new AppError("FORBIDDEN", "This battle can't be reposted");
+  const opts = await db.select().from(options).where(eq(options.battleId, b.id));
+  const byside = (s: "A" | "B") => opts.find((o) => o.side === s)!;
+  const toInput = (o: (typeof opts)[number]) => ({
+    label: o.label,
+    description: o.description ?? undefined,
+    imageUrl: o.imageUrl ?? undefined,
+    url: o.url ?? undefined,
+    urlTitle: o.urlTitle ?? undefined,
+    urlImage: o.urlImage ?? undefined,
+    priceCents: o.priceCents ?? undefined,
+    currency: o.currency ?? undefined,
+  });
+  const { maxBattleHours } = await getEconomy();
+  const hours = clampBattleHours(Math.round((b.deadline.getTime() - b.createdAt.getTime()) / 3600_000) || 24, maxBattleHours);
+  const { target, ...rest } = b.tags ?? {};
+  const input = createBattleInput.parse({
+    title: b.title,
+    context: b.context ?? undefined,
+    tags: { ...rest, ...(target ? { target } : {}) },
+    visibility: b.visibility,
+    deadlineHours: hours,
+    options: [toInput(byside("A")), toInput(byside("B"))],
+  });
+  return createBattle(user, input);
 }
 
 export async function deleteBattle(slug: string, user: User, asAdmin = false) {
