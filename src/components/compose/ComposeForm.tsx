@@ -10,6 +10,7 @@ import { pointsTier } from "@/server/services/priority";
 import { Bar } from "@/components/ui/Bar";
 import { OptionEditor, type OptionDraft } from "./OptionEditor";
 import { cleanTarget, type BattleTarget } from "@/server/services/targeting";
+import { useZipTargets } from "@/lib/use-zip";
 
 type Visibility = "PUBLIC" | "LINK_ONLY" | "FRIENDS";
 const DRAFT_KEY = "pt:draft";
@@ -81,6 +82,7 @@ export function ComposeForm({
     .map((z) => z.trim())
     .filter(Boolean);
   const cleanedTarget = cleanTarget({ ...target, zips });
+  const zipTargets = useZipTargets(zips);
   const targetCount = cleanedTarget ? Object.keys(cleanedTarget).filter((k) => k !== "kidAges").length : 0;
 
   const ready = a.label.trim().length > 0 && b.label.trim().length > 0;
@@ -276,7 +278,11 @@ export function ComposeForm({
                         value={zipText}
                         onChange={(e) => setZipText(e.target.value)}
                       />
-                      <p className="mt-1.5 text-xs text-zinc-500">Separate with commas. A shorter code like 941 matches every ZIP that starts with it.</p>
+                      {zipTargets.invalid.length > 0 ? (
+                        <p className="mt-1.5 text-xs text-b">Not a real ZIP code or prefix: {zipTargets.invalid.join(", ")}</p>
+                      ) : (
+                        <p className="mt-1.5 text-xs text-zinc-500">Separate with commas. A shorter code like 941 matches every ZIP that starts with it.</p>
+                      )}
                     </div>
                     {targetCount > 0 && (
                       <button
@@ -335,7 +341,7 @@ export function ComposeForm({
 
             </div>
             <div className="border-t border-ink/10 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-              <button className="btn-primary w-full py-3" disabled={busy} onClick={publish}>
+              <button className="btn-primary w-full py-3" disabled={busy || zipTargets.checking || zipTargets.invalid.length > 0} onClick={publish}>
                 {busy ? "Publishing…" : "Publish & share"}
               </button>
             </div>

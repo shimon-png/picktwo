@@ -6,6 +6,7 @@ import { track } from "../analytics";
 import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { handleBase } from "./signin-code-utils";
+import { lookupZip } from "./zip";
 
 /** A free username suggestion based on the email. */
 export async function suggestHandle(email: string | null): Promise<string> {
@@ -28,11 +29,16 @@ export async function saveQuickProfile(u: User, p: { handle: string; zipCode: st
     .from(users)
     .where(and(eq(users.handle, p.handle), ne(users.id, u.id)));
   if (taken) throw new AppError("CONFLICT", "That username is taken — try another");
+  const zip = lookupZip(p.zipCode, u.country);
+  if (!zip.ok) throw new AppError("VALIDATION", zip.message);
+  // Fill in the location from the ZIP unless the user already picked one.
+  const place = u.country ? {} : { country: zip.country, region: zip.region, city: zip.city };
   const first = !u.onboardedAt;
   await db
     .update(users)
     .set({
-      zipCode: p.zipCode,
+      zipCode: zip.code,
+      ...place,
       sex: p.sex,
       ageRange: p.ageRange,
       isAdultConfirmed: true,

@@ -10,6 +10,7 @@ import { POLICY_VERSION } from "@/lib/constants";
 import { track } from "@/server/analytics";
 import { z } from "zod";
 import { normalizeLocation } from "@/server/services/geo";
+import { lookupZip } from "@/server/services/zip";
 
 const settingsPatch = z.object({
   notifyEmail: z.boolean().optional(),
@@ -36,6 +37,10 @@ export const POST = handler(async (req) => {
   if (taken) throw new AppError("CONFLICT", "That handle is taken");
   const loc = normalizeLocation(p);
   if (!loc.ok) throw new AppError("VALIDATION", loc.message);
+  const zip = lookupZip(p.zipCode, loc.country);
+  if (!zip.ok) throw new AppError("VALIDATION", zip.message);
+  // No location picked yet: fill it in from the ZIP.
+  const place = loc.country ? loc : { country: zip.country, region: zip.region, city: zip.city };
   const first = !user.onboardedAt;
   await db
     .update(users)
@@ -46,10 +51,10 @@ export const POST = handler(async (req) => {
       isAdultConfirmed: true,
       kidsStatus: p.kidsStatus ?? (p.kidAges.length ? "YES" : null),
       kidAges: p.kidsStatus && p.kidsStatus !== "YES" ? [] : p.kidAges,
-      country: loc.country,
-      region: loc.region,
-      city: loc.city,
-      zipCode: p.zipCode,
+      country: place.country,
+      region: place.region,
+      city: place.city,
+      zipCode: zip.code,
       sex: p.sex,
       ageRange: p.ageRange,
       interests: p.interests,

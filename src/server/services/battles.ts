@@ -27,6 +27,7 @@ import { track } from "../analytics";
 import { pct } from "@/lib/utils";
 import { isAdmin } from "../viewer";
 import { cleanTarget } from "./targeting";
+import { checkZipTarget } from "./zip";
 
 // ---------------- Create ----------------
 /**
@@ -59,6 +60,8 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
   if (!actor.isAdultConfirmed || !actor.handle) throw new AppError("FORBIDDEN", "Finish setting up your profile first");
   if (input.postAs && !opts.asAdmin) throw new AppError("FORBIDDEN", "Only admins can post as another user");
   assertCleanText(input.title, input.context, input.options[0].label, input.options[1].label, input.postAs);
+  const badZips = (input.tags.target?.zips ?? []).filter((z) => z.trim() && !checkZipTarget(z));
+  if (badZips.length) throw new AppError("VALIDATION", `Not a real ZIP code or prefix: ${badZips.join(", ")}`);
   const user = input.postAs && input.postAs !== actor.handle ? await resolvePostAs(input.postAs) : actor;
   const screen = await screenPhotos(user, input.options);
   const economy = await getEconomy();

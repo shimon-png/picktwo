@@ -5,7 +5,8 @@ import { signIn } from "next-auth/react";
 import { api } from "@/lib/client";
 import { cn } from "@/lib/utils";
 import { AGE_RANGES, SEX_OPTIONS } from "@/lib/constants";
-import { ZIP_RE } from "@/lib/validators";
+import { useZipCheck } from "@/lib/use-zip";
+import { ZipHint } from "@/components/ui/ZipHint";
 import { ChipGroup } from "@/components/compose/ComposeForm";
 
 type Step = "email" | "code" | "username" | "about";
@@ -94,7 +95,8 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
   }
 
   const n = STEPS.indexOf(step) + 1;
-  const zipOk = ZIP_RE.test(zip.trim().toUpperCase());
+  const zipCheck = useZipCheck(zip);
+  const zipOk = zipCheck.state === "ok";
 
   return (
     <div className="space-y-4">
@@ -260,8 +262,10 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
               placeholder="10001"
               maxLength={10}
               value={zip}
+              aria-invalid={zipCheck.state === "bad"}
               onChange={(e) => setZip(e.target.value)}
             />
+            <ZipHint check={zipCheck} />
           </div>
           <button className="btn-primary w-full py-3" disabled={busy || !sex || !ageRange || !zipOk}>
             {busy ? "Finishing…" : finishLabel}
@@ -274,3 +278,4 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
     </div>
   );
 }
+
