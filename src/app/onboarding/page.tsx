@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/server/viewer";
 import { ProfileForm } from "@/components/layout/ProfileForm";
+import { suggestHandle } from "@/server/services/profile";
 
 export const metadata = { title: "Welcome" };
 
@@ -9,7 +10,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
   if (!user) redirect("/signin?callbackUrl=/onboarding");
   const { next } = await searchParams;
   const returning = !!user.onboardedAt;
-  const suggested = user.handle ?? (user.email?.split("@")[0] ?? "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20);
+  // Username starts from the email (the account identifier); editable.
+  const suggested = user.handle ?? (await suggestHandle(user.email));
   return (
     <div className="space-y-6">
       <div>
@@ -26,7 +28,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         next={next && next.startsWith("/") ? next : "/"}
         initial={{
           name: user.name ?? "",
-          handle: suggested.length >= 3 ? suggested : "",
+          handle: suggested,
           bio: user.bio ?? "",
           kidAges: user.kidAges,
           kidsStatus: user.kidsStatus ?? (user.kidAges.length ? "YES" : ""),

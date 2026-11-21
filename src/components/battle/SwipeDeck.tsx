@@ -10,6 +10,7 @@ import { AVATAR_TONES, REASON_CHIPS, TONE_CLASSES, kidAgeLabel } from "@/lib/con
 import { pointsTier } from "@/server/services/priority";
 import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
+import { PhotoFlag } from "./PhotoFlag";
 
 type Side = "A" | "B";
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
@@ -62,7 +63,7 @@ export function SwipeDeck({
   const [pp, setPp] = useState(initialPP);
   const [session, setSession] = useState({ votes: 0, points: 0 });
   const shownAt = useRef(Date.now());
-  const drag = useRef<{ side: Side; x: number; y: number; moved: boolean; w: number; lx: number; lt: number; v: number; armed: boolean } | null>(null);
+  const drag = useRef<{ side: Side; x: number; y: number; dx: number; moved: boolean; w: number; lx: number; lt: number; v: number; armed: boolean; end: () => void } | null>(null);
   const justDragged = useRef(false);
   const cardRef = useRef<HTMLElement>(null);
   const seen = useRef(new Set(initial.map((i) => i.id)));
@@ -72,6 +73,9 @@ export function SwipeDeck({
   useEffect(() => {
     shownAt.current = Date.now();
   }, [card?.id]);
+
+  // Drop any window listeners from an unfinished drag if the deck unmounts.
+  useEffect(() => () => drag.current?.end(), []);
 
   // Never show a battle this browser already voted on or skipped (e.g. a cached feed after switching tabs).
   useEffect(() => {
@@ -165,6 +169,68 @@ export function SwipeDeck({
     }
   }
 
+  /**
+   * Drag a photo. Listeners live on window (not the photo) so the gesture always ends, even when
+   * the mouse leaves the window, the tab loses focus or the browser cancels the pointer: whatever
+   * ends it, past the line (or off the screen edge) is a pick, short of it springs back.
+   */
+  function startDrag(side: Side, e: React.PointerEvent) {
+    drag.current?.end();
+    const w = cardRef.current?.offsetWidth ?? 360;
+    const d = { side, x: e.clientX, y: e.clientY, dx: 0, moved: false, w, lx: e.clientX, lt: e.timeStamp, v: 0, armed: false, end: () => {} };
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - d.x;
+      const dy = ev.clientY - d.y;
+      if (!d.moved && Math.hypot(dx, dy) > 6) d.moved = true;
+      if (!d.moved) return;
+      ev.preventDefault();
+      const dt = ev.timeStamp - d.lt;
+      if (dt > 0) d.v = 0.7 * ((ev.clientX - d.lx) / dt) + 0.3 * d.v;
+      d.lx = ev.clientX;
+      d.lt = ev.timeStamp;
+      d.dx = dx;
+      const isArmed = Math.abs(dx) > d.w * THROW_FRAC;
+      if (isArmed && !d.armed) buzz(8);
+      d.armed = isArmed;
+      setGrab({ side, dx, dy: dy * 0.6 });
+      // Dragged right up to the screen edge: that's a pick, don't wait for the release.
+      if (isArmed && (ev.clientX <= 2 || ev.clientX >= window.innerWidth - 2)) finish();
+    };
+    const finish = () => {
+      cleanup();
+      if (drag.current === d) drag.current = null;
+      if (!d.moved) return;
+      justDragged.current = true;
+      setTimeout(() => (justDragged.current = false), 400);
+      const flung = Math.abs(d.v) > FLING_PX_MS && Math.abs(d.dx) > 24 && Math.sign(d.v) === Math.sign(d.dx);
+      if (Math.abs(d.dx) > d.w * THROW_FRAC || flung) throwPhoto(side, d.dx < 0 ? -1 : 1);
+      else setGrab(null);
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (d.moved) {
+        d.dx = ev.clientX - d.x || d.dx;
+      }
+      finish();
+    };
+    const onLeave = (ev: MouseEvent) => {
+      if (!ev.relatedTarget) finish(); // mouse left the window
+    };
+    const cleanup = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", finish);
+      window.removeEventListener("blur", finish);
+      document.removeEventListener("mouseout", onLeave);
+    };
+    d.end = cleanup;
+    drag.current = d;
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", finish);
+    window.addEventListener("blur", finish);
+    document.addEventListener("mouseout", onLeave);
+  }
+
   // Fling: the photo flies off, the vote counts, the result flashes, then the next battle.
   async function throwPhoto(side: Side, dir: -1 | 1) {
     if (!card || thrown || fly) return;
@@ -207,6 +273,13 @@ export function SwipeDeck({
     advance(-1);
   }
 
+  /** A flagged battle leaves the deck right away. */
+  function afterFlag() {
+    if (!card) return;
+    if (voted) next();
+    else skip();
+  }
+
   function next() {
     if (!voted || fly || thrown) return;
     advance(voted === "A" ? -1 : 1);
@@ -216,7 +289,7 @@ export function SwipeDeck({
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || document.querySelector("[data-flag-sheet]")) return;
       if (e.key === "ArrowLeft") vote("A");
       else if (e.key === "ArrowRight") vote("B");
       else if (e.key === "ArrowDown") skip();
@@ -307,12 +380,12 @@ export function SwipeDeck({
     <div>
       {header}
       <div className="relative h-[calc(100dvh-14.5rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
-        {peek && <div aria-hidden className="absolute inset-0 translate-y-2.5 scale-95 rounded-2xl bg-surface opacity-60 shadow-ring" />}
+        {peek && <div aria-hidden className="absolute inset-0 translate-y-2.5 scale-95 rounded-2xl bg-white opacity-60 shadow-ring" />}
         <article
           ref={cardRef}
           key={card.id}
           aria-label={card.title}
-          className="animate-pop absolute inset-0 flex select-none flex-col rounded-2xl bg-surface p-3.5 shadow-ring"
+          className="animate-pop absolute inset-0 flex select-none flex-col rounded-2xl bg-white p-4 shadow-card"
           style={style}
         >
           <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -325,7 +398,7 @@ export function SwipeDeck({
             </span>
             <span className="ml-auto shrink-0">{timeLeft(card.deadline)}</span>
           </div>
-          <h1 className="mt-2.5 text-[21px] leading-snug" data-tour="question">
+          <h1 className="mt-3 text-[28px] leading-[1.05]" data-tour="question">
             <Link href={`/b/${card.slug}?src=feed`} data-nodrag className="hover:underline">
               {card.title}
             </Link>
@@ -333,6 +406,14 @@ export function SwipeDeck({
           {card.context && <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500">{card.context}</p>}
 
           <div className="relative mt-3 grid min-h-0 flex-1 grid-cols-2 gap-2">
+            {!grab && !thrown && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white font-display text-[18px] italic shadow-card"
+              >
+                vs
+              </span>
+            )}
             {(["A", "B"] as const).map((s) => (
               <button
                 key={s}
@@ -343,47 +424,11 @@ export function SwipeDeck({
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
                 aria-pressed={voted === s}
                 onPointerDown={(e) => {
-                  if (fly || thrown || gated) return;
-                  drag.current = { side: s, x: e.clientX, y: e.clientY, moved: false, w: cardRef.current?.offsetWidth ?? 360, lx: e.clientX, lt: e.timeStamp, v: 0, armed: false };
-                }}
-                onPointerMove={(e) => {
-                  const d = drag.current;
-                  if (!d || d.side !== s) return;
-                  const dx = e.clientX - d.x;
-                  const dy = e.clientY - d.y;
-                  if (!d.moved && Math.hypot(dx, dy) > 6) {
-                    d.moved = true;
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  }
-                  if (!d.moved) return;
-                  const dt = e.timeStamp - d.lt;
-                  if (dt > 0) d.v = 0.7 * ((e.clientX - d.lx) / dt) + 0.3 * d.v;
-                  d.lx = e.clientX;
-                  d.lt = e.timeStamp;
-                  const isArmed = Math.abs(dx) > d.w * THROW_FRAC;
-                  if (isArmed && !d.armed) buzz(8);
-                  d.armed = isArmed;
-                  setGrab({ side: s, dx, dy: dy * 0.6 });
-                }}
-                onPointerUp={(e) => {
-                  const d = drag.current;
-                  drag.current = null;
-                  if (!d?.moved) return;
-                  justDragged.current = true;
-                  const dx = e.clientX - d.x;
-                  const flung = Math.abs(d.v) > FLING_PX_MS && Math.abs(dx) > 24 && Math.sign(d.v) === Math.sign(dx);
-                  if (Math.abs(dx) > d.w * THROW_FRAC || flung) throwPhoto(s, dx < 0 ? -1 : 1);
-                  else setGrab(null);
-                }}
-                onPointerCancel={() => {
-                  drag.current = null;
-                  setGrab(null);
+                  if (fly || thrown || gated || e.button > 0) return;
+                  startDrag(s, e);
                 }}
                 onClick={() => {
-                  if (justDragged.current) {
-                    justDragged.current = false;
-                    return;
-                  }
+                  if (justDragged.current) return;
                   if (!thrown) vote(s);
                 }}
               >
@@ -399,6 +444,21 @@ export function SwipeDeck({
                 />
               </button>
             ))}
+            {!grab &&
+              !thrown &&
+              (["A", "B"] as const).map(
+                (s) =>
+                  (s === "A" ? card.imageA : card.imageB) && (
+                    <PhotoFlag
+                      key={s}
+                      battleId={card.id}
+                      side={s}
+                      label={s === "A" ? card.labelA : card.labelB}
+                      onFlagged={afterFlag}
+                      className={s === "A" ? "right-[calc(50%+0.625rem)]" : undefined}
+                    />
+                  ),
+              )}
           </div>
 
           {thrown ? (

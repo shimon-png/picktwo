@@ -16,7 +16,11 @@ export function hashCode(email: string, code: string, secret = process.env.AUTH_
 
 /** Base handle from an email: letters, digits, underscores, 3–20 chars. */
 export function handleBase(email: string | null): string {
-  let h = (email?.split("@")[0] ?? "").toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 15);
+  const clean = (x: string) => x.toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const [local = "", domain = ""] = (email ?? "").split("@");
+  let h = clean(local).slice(0, 15);
+  // Short local parts (a@b.com) borrow the domain name so the username still comes from the email: "a_b".
+  if (h.length < 3) h = [h, clean(domain.split(".")[0] ?? "")].filter(Boolean).join("_").slice(0, 15);
   if (h.length < 3) h = `user${h}`;
   return h;
 }

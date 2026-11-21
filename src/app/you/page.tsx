@@ -3,9 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { Bell, ChevronRight, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
+import { Bell, ChevronRight, Flag, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { unreadContactCount } from "@/server/services/contact";
+import { openReportCount } from "@/server/services/reports";
 import { db } from "@/server/db";
 import { battles, pointLedger, votes } from "@/server/db/schema";
 import { getEconomy } from "@/server/services/config";
@@ -49,6 +50,7 @@ export default async function YouPage() {
     db.select().from(pointLedger).where(eq(pointLedger.userId, user.id)).orderBy(desc(pointLedger.createdAt)).limit(15),
   ]);
   const newMessages = admin ? await unreadContactCount() : 0;
+  const flagged = admin ? await openReportCount() : 0;
   const reasonCounts = new Map<string, number>();
   if (mine.length) {
     const rows = await db
@@ -69,12 +71,26 @@ export default async function YouPage() {
 
   return (
     <div className="space-y-7">
-      <section className="-mx-4 bg-gradient-to-b from-section to-section-glow px-4 py-6 sm:mx-0 sm:rounded-[14px]">
-        <div className="flex items-center gap-2">
-          <Zap className="size-7 fill-pp text-pp" aria-hidden />
-          <span className="text-[34px] font-medium leading-none tabular-nums tracking-tight">{user.ppBalance}</span>
+      <header className="flex items-center gap-4 pt-1">
+        {user.image ? (
+          <img src={user.image} alt="" className="size-16 rounded-full object-cover" />
+        ) : (
+          <span className="flex size-16 items-center justify-center rounded-full bg-gradient-to-br from-a to-b font-display text-[30px] text-white" aria-hidden>
+            {(user.name || user.handle || "?")[0]?.toUpperCase()}
+          </span>
+        )}
+        <div className="min-w-0">
+          <h1 className="truncate text-[32px] leading-none">{user.name || `@${user.handle}`}</h1>
+          {user.handle && <p className="mt-1.5 text-[13px] text-zinc-500">@{user.handle}</p>}
         </div>
-        <div className="mt-1.5 text-[15px]">{t.tier} priority</div>
+      </header>
+
+      <section className="card px-4 py-5">
+        <div className="flex items-baseline gap-2">
+          <Zap className="size-6 self-center fill-pp text-pp" aria-hidden />
+          <span className="font-display text-[44px] leading-none tabular-nums">{user.ppBalance}</span>
+          <span className="text-[15px] text-zinc-600">{t.tier} priority</span>
+        </div>
         <div className="mt-4 grid grid-cols-3 gap-1.5">
           {(["Normal", "High", "Top"] as const).map((name, i) => (
             <div key={name}>
@@ -89,14 +105,14 @@ export default async function YouPage() {
           {t.next ? `${t.toNext} ⚡ to ${t.next}. ` : "You’re at the top. "}Higher priority = shown to more voters, sooner.
         </p>
         {openLoops > 0 && (
-          <p className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-[13px] text-b">
+          <p className="mt-2 rounded-lg bg-b-soft px-3 py-2 text-[13px] text-b">
             {openLoops} open loop{openLoops > 1 ? "s" : ""} — your new battles reach fewer voters until you close {openLoops > 1 ? "them" : "it"}.
           </p>
         )}
       </section>
 
       <section>
-        <h2 className="mb-2.5 font-sans text-[15px] font-medium">Earn ⚡</h2>
+        <h2 className="mb-2.5 text-[22px]">Earn ⚡</h2>
         <ul className="space-y-1.5">
           {earn.map(([tone, Icon, label, n]) => (
             <li key={label} className={cn("flex items-center gap-3 rounded-lg px-3 py-2.5", TONE_CLASSES[tone].soft)}>
@@ -116,7 +132,7 @@ export default async function YouPage() {
 
       <section>
         <div className="mb-2.5 flex items-center justify-between">
-          <h2 className="font-sans text-[15px] font-medium">Your battles</h2>
+          <h2 className="text-[22px]">Your battles</h2>
           <Link href="/post" className="text-[13px] text-accent">
             + New
           </Link>
@@ -146,6 +162,7 @@ export default async function YouPage() {
             [TOUR_URL, GraduationCap, "Tutorial", 0],
             ["/contact", LifeBuoy, "Contact us & feedback", 0],
             ...(admin ? ([["/admin/messages", Mail, "Admin · contact messages", newMessages]] as const) : []),
+            ...(admin ? ([["/admin/reports", Flag, "Admin · flagged photos", flagged]] as const) : []),
           ] as const
         ).map(([href, Icon, label, badge]) => (
           <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface">
@@ -158,7 +175,7 @@ export default async function YouPage() {
       </section>
 
       <section>
-        <h2 className="mb-2 font-sans text-[15px] font-medium">Recent ⚡</h2>
+        <h2 className="mb-2 text-[22px]">Recent ⚡</h2>
         {ledger.length === 0 ? (
           <p className="text-sm text-zinc-500">No points yet — start voting!</p>
         ) : (

@@ -125,8 +125,12 @@ export const ECONOMY_DEFAULTS = {
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 
 export const FEATURE_DEFAULTS = {
+  /** Hold every photo for admin review when no automated screener is configured. */
   requireImageModeration: false,
+  /** Open flags that hide a battle pending review (0 = off): child safety, nudity/child safety, any reason. */
   childSafetyAutoHideReports: 2,
+  severeAutoHideReports: 2,
+  autoHideReports: 3,
 };
 
 export const POLICY_VERSION = "2026-11-draft";

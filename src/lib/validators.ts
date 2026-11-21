@@ -1,3 +1,4 @@
+import { REPORT_REASON_IDS } from "@/server/services/safety";
 import { z } from "zod";
 import { AGE_RANGE_IDS, KID_AGE_IDS, KIDS_STATUS_IDS, SEX_IDS } from "./constants";
 
@@ -104,7 +105,7 @@ export const profileInput = z.object({
 export const reportInput = z.object({
   targetType: z.enum(["BATTLE", "REASON", "USER"]),
   targetId: z.string().min(1).max(64),
-  reason: z.enum(["spam", "inappropriate", "minor_safety", "harassment", "other"]),
+  reason: z.enum(REPORT_REASON_IDS),
   details: z.string().max(500).optional(),
 });
 

@@ -235,3 +235,11 @@ test("vote stack: the pick can be changed until Next", async ({ browser }) => {
   await expect(b).toHaveAttribute("aria-pressed", "true");
   await expect(a).toHaveAttribute("aria-pressed", "false");
 });
+
+test("profile setup prefills the username from the email, even a short one", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await login(page, `a@${stamp}.dev`);
+  await page.goto("/onboarding");
+  await expect(page.getByLabel("Username")).toHaveValue(new RegExp(`^a_${stamp}`.slice(0, 16)));
+});
