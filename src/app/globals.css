@@ -290,3 +290,16 @@ html[data-theme="arcade"] .vs-badge { background: #120e26; color: #c6ff3d; box-s
 html[data-theme="arcade"] .border-ink\/12, html[data-theme="arcade"] .input { border-color: #3a3170; }
 /* Tutorial spotlight outline (the dimming is an inline box-shadow, so a ring would be overwritten). */
 html[data-theme="arcade"] .tour-hole { outline-color: #c6ff3d; box-shadow: 0 0 0 9999px rgb(5 3 15 / 0.7), 0 0 22px rgba(198, 255, 61, 0.45) !important; }
+
+/* Logo mark (components/layout/Logo.tsx): soft neon glow, and a wink after each vote. */
+.mark { overflow: visible; filter: drop-shadow(0 0 2px rgb(43 210 255 / 0.45)) drop-shadow(0 0 3px rgb(255 60 172 / 0.3)); }
+.mark .mark-eye-b { transform-box: view-box; transform-origin: 34px 29px; }
+.mark .mark-wink, .mark .mark-spark { opacity: 0; }
+.mark .mark-spark { transform-box: view-box; transform-origin: 44.5px 5.5px; }
+.mark.winking .mark-eye-b { animation: cp-blink 0.9s ease-in-out; }
+.mark.winking .mark-wink { animation: cp-wink-arc 0.9s ease-in-out; }
+.mark.winking .mark-spark { animation: cp-spark 0.9s ease-out; }
+@keyframes cp-blink { 0% { transform: scaleY(1); opacity: 1; } 18%, 68% { transform: scaleY(0.1); opacity: 0; } 86%, 100% { transform: scaleY(1); opacity: 1; } }
+@keyframes cp-wink-arc { 0%, 12% { opacity: 0; } 22%, 66% { opacity: 1; } 82%, 100% { opacity: 0; } }
+@keyframes cp-spark { 0% { opacity: 0; transform: scale(0.2) rotate(0deg); } 30% { opacity: 1; transform: scale(1.2) rotate(45deg); } 70% { opacity: 1; transform: scale(1) rotate(90deg); } 100% { opacity: 0; transform: scale(0.6) rotate(120deg); } }
+@media (prefers-reduced-motion: reduce) { .mark.winking * { animation: none !important; } }
