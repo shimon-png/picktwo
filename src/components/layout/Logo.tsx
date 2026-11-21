@@ -63,14 +63,14 @@ export function Mark({ size = 22, className }: { size?: number; className?: stri
 export function Wordmark({ className }: { className?: string }) {
   return (
     <span className={cn("font-display text-[19px] font-bold tracking-[-0.01em] text-ink [font-size-adjust:none]", className)}>
-      crowdpick<span className="text-a">.ai</span>
+      crowdpick
     </span>
   );
 }
 
 export function Logo({ className = "", href = "/" }: { className?: string; href?: string }) {
   return (
-    <Link href={href} className={cn("inline-flex items-center gap-1.5", className)} aria-label="crowdpick.ai home">
+    <Link href={href} className={cn("inline-flex items-center gap-1.5", className)} aria-label="crowdpick home">
       <Mark size={26} />
       <Wordmark />
     </Link>
