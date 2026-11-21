@@ -50,8 +50,11 @@ export const createBattleInput = z.object({
     })
     .default({}),
   visibility: z.enum(["PUBLIC", "LINK_ONLY", "FRIENDS"]).default("PUBLIC"),
-  /** Battles run at most 5 days (economy maxBattleHours, enforced again in createBattle). */
-  deadlineHours: z.number().min(1).max(24 * 5),
+  /** Longer requests (old drafts, cached clients) are cut to 5 days rather than refused; createBattle also clamps to maxBattleHours. */
+  deadlineHours: z
+    .number()
+    .min(1)
+    .transform((h) => Math.min(h, 24 * 5)),
   /** Ignored: data use follows the author's account setting (Settings → Data & privacy). */
   dataConsent: z.boolean().optional(),
   options: z.tuple([optionInput, optionInput]),
