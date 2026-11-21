@@ -6,6 +6,7 @@ import { api, toast } from "@/lib/client";
 import { AGE_RANGES, INTERESTS, KID_AGES, KIDS_STATUS_OPTIONS, SEX_OPTIONS } from "@/lib/constants";
 import { ZIP_RE } from "@/lib/validators";
 import { ChipGroup } from "@/components/compose/ComposeForm";
+import { LocationFields } from "./LocationFields";
 
 type Init = {
   name: string;
@@ -15,6 +16,7 @@ type Init = {
   kidsStatus: string;
   country: string;
   region: string;
+  city: string;
   zipCode: string;
   sex: string;
   ageRange: string;
@@ -176,16 +178,7 @@ export function ProfileForm({
           </>
         )}
       </fieldset>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className="label" htmlFor="country">Country <span className="font-normal text-zinc-400">(optional)</span></label>
-          <input id="country" className="input" maxLength={60} value={f.country} onChange={(e) => set("country", e.target.value)} placeholder="US" />
-        </div>
-        <div>
-          <label className="label" htmlFor="region">City / state <span className="font-normal text-zinc-400">(optional)</span></label>
-          <input id="region" className="input" maxLength={60} value={f.region} onChange={(e) => set("region", e.target.value)} />
-        </div>
-      </div>
+      <LocationFields value={{ country: f.country, region: f.region, city: f.city }} onChange={(v) => setF((x) => ({ ...x, ...v }))} />
       <ChipGroup label="Interests (optional)" options={INTERESTS.map((i) => ({ id: i, label: i }))} value={f.interests} onChange={(v) => set("interests", v)} />
       <label className="flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-0.5 size-4 accent-zinc-900" checked={f.dataConsent} onChange={(e) => set("dataConsent", e.target.checked)} />

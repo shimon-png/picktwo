@@ -34,6 +34,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
           kidsStatus: user.kidsStatus ?? (user.kidAges.length ? "YES" : ""),
           country: user.country ?? "",
           region: user.region ?? "",
+            city: user.city ?? "",
           zipCode: user.zipCode ?? "",
           sex: user.sex ?? "",
           ageRange: user.ageRange ?? "",

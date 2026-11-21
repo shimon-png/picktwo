@@ -455,6 +455,7 @@ export type BattleCard = {
   imageB: string | null;
   authorHandle: string | null;
   authorName: string | null;
+  authorImage: string | null;
   authorKidAges: string[];
   kidAgeTags: string[];
   outcome: { chosen: string; thumb: string | null; note: string | null } | null;
@@ -466,6 +467,7 @@ export async function battleCards(where: ReturnType<typeof and>, limit = 20): Pr
       b: battles,
       authorHandle: users.handle,
       authorName: users.name,
+      authorImage: users.image,
       authorKidAges: users.kidAges,
       oChosen: outcomes.chosen,
       oThumb: outcomes.thumb,
@@ -485,6 +487,7 @@ export async function hydrateCards(
     b: Battle;
     authorHandle: string | null;
     authorName: string | null;
+    authorImage?: string | null;
     authorKidAges?: string[] | null;
     oChosen: string | null;
     oThumb: string | null;
@@ -493,7 +496,7 @@ export async function hydrateCards(
 ): Promise<BattleCard[]> {
   const ids = rows.map((r) => r.b.id);
   const opts = ids.length ? await db.select().from(options).where(inArray(options.battleId, ids)) : [];
-  return rows.map(({ b, authorHandle, authorName, authorKidAges, oChosen, oThumb, oNote }) => {
+  return rows.map(({ b, authorHandle, authorName, authorImage, authorKidAges, oChosen, oThumb, oNote }) => {
     const A = opts.find((o) => o.battleId === b.id && o.side === "A");
     const B = opts.find((o) => o.battleId === b.id && o.side === "B");
     return {
@@ -515,6 +518,7 @@ export async function hydrateCards(
       imageB: B?.imageUrl || B?.urlImage || null,
       authorHandle,
       authorName,
+      authorImage: authorImage ?? null,
       authorKidAges: authorKidAges ?? [],
       kidAgeTags: b.tags?.kidAge ?? [],
       outcome: oChosen ? { chosen: oChosen, thumb: oThumb, note: oNote } : null,

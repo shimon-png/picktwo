@@ -96,7 +96,8 @@ export const profileInput = z.object({
   sex: z.enum(SEX_IDS, { errorMap: () => ({ message: "Choose an option for sex" }) }),
   ageRange: z.enum(AGE_RANGE_IDS, { errorMap: () => ({ message: "Choose your age range" }) }),
   country: z.string().trim().max(60).optional().default(""),
-  region: z.string().trim().max(60).optional().default(""),
+  region: z.string().trim().max(80).optional().default(""),
+  city: z.string().trim().max(80).optional().default(""),
   interests: z.array(z.string().max(30)).max(12).default([]),
   dataConsent: z.boolean().default(false),
 });

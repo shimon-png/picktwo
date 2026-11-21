@@ -57,8 +57,11 @@ export const users = pgTable("user", {
   role: roleEnum("role").notNull().default("USER"),
   isAdultConfirmed: boolean("is_adult_confirmed").notNull().default(false),
   onboardedAt: ts("onboarded_at"),
+  /** ISO 3166-1 alpha-2 code, e.g. "US" (older rows may hold free text). */
   country: text("country"),
+  /** State / province / region name (from country-state-city). */
   region: text("region"),
+  city: text("city"),
   zipCode: text("zip_code"),
   sex: text("sex"),
   ageRange: text("age_range"),

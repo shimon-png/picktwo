@@ -9,6 +9,7 @@ import { assertCleanText } from "@/server/moderation";
 import { POLICY_VERSION } from "@/lib/constants";
 import { track } from "@/server/analytics";
 import { z } from "zod";
+import { normalizeLocation } from "@/server/services/geo";
 
 const settingsPatch = z.object({
   notifyEmail: z.boolean().optional(),
@@ -33,6 +34,8 @@ export const POST = handler(async (req) => {
     .from(users)
     .where(and(eq(users.handle, p.handle), ne(users.id, user.id)));
   if (taken) throw new AppError("CONFLICT", "That handle is taken");
+  const loc = normalizeLocation(p);
+  if (!loc.ok) throw new AppError("VALIDATION", loc.message);
   const first = !user.onboardedAt;
   await db
     .update(users)
@@ -43,8 +46,9 @@ export const POST = handler(async (req) => {
       isAdultConfirmed: true,
       kidsStatus: p.kidsStatus ?? (p.kidAges.length ? "YES" : null),
       kidAges: p.kidsStatus && p.kidsStatus !== "YES" ? [] : p.kidAges,
-      country: p.country || null,
-      region: p.region || null,
+      country: loc.country,
+      region: loc.region,
+      city: loc.city,
       zipCode: p.zipCode,
       sex: p.sex,
       ageRange: p.ageRange,

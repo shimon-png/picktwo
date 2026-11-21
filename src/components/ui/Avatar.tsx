@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import { AVATAR_TONES, TONE_CLASSES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -7,7 +8,12 @@ function toneFor(seed: string) {
   return AVATAR_TONES[h % AVATAR_TONES.length];
 }
 
-export function Avatar({ name, seed, size = 20, className }: { name: string; seed?: string; size?: number; className?: string }) {
+/** Round avatar: the user's photo when they set one, otherwise their initial on a tone colour. */
+export function Avatar({ name, seed, src, size = 20, className }: { name: string; seed?: string; src?: string | null; size?: number; className?: string }) {
+  if (src)
+    return (
+      <img src={src} alt="" width={size} height={size} loading="lazy" className={cn("shrink-0 rounded-full bg-surface object-cover", className)} style={{ width: size, height: size }} />
+    );
   const initial = (name.replace(/^@/, "")[0] ?? "?").toUpperCase();
   return (
     <span

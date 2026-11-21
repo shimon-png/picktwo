@@ -17,6 +17,7 @@ export const DELETE = handler(async () => {
         .map((r) => r.u)
         .filter((u): u is string => !!u && u.includes("blob.vercel-storage.com"))
     : [];
+  if (user.image?.includes(".blob.vercel-storage.com/avatars/")) blobUrls.push(user.image);
   await db.transaction(async (tx) => {
     await tx.update(votes).set({ userId: null, reason: null }).where(eq(votes.userId, user.id));
     if (ids.length) await tx.update(battles).set({ status: "DELETED" }).where(inArray(battles.id, ids));
@@ -29,7 +30,7 @@ export const DELETE = handler(async () => {
     await tx.insert(consentEvents).values({ userId: user.id, type: "account_deleted", value: true, version: POLICY_VERSION });
     await tx
       .update(users)
-      .set({ email: null, name: null, handle: null, bio: null, image: null, kidAges: [], interests: [], dataConsent: false, bannedAt: new Date() })
+      .set({ email: null, name: null, handle: null, bio: null, image: null, city: null, kidAges: [], interests: [], dataConsent: false, bannedAt: new Date() })
       .where(eq(users.id, user.id));
   });
   if (blobUrls.length && process.env.BLOB_READ_WRITE_TOKEN) await del(blobUrls).catch(() => {});
