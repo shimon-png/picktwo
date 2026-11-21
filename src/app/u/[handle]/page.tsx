@@ -62,9 +62,14 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   return (
     <div className="space-y-6">
       <header className="flex items-start gap-4">
-        <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-a to-b text-2xl font-medium text-white">
-          {(u.name || u.handle || "?").slice(0, 1).toUpperCase()}
-        </div>
+        {u.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={u.image} alt="" className="size-16 shrink-0 rounded-full bg-surface object-cover" />
+        ) : (
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-a to-b text-2xl font-medium text-white">
+            {(u.name || u.handle || "?").slice(0, 1).toUpperCase()}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <h1 className=" text-2xl font-medium">{u.name || `@${u.handle}`}</h1>
           <p className="text-sm text-zinc-500">@{u.handle}</p>

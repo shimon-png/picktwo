@@ -48,3 +48,15 @@ export async function uploadImage(file: File): Promise<string> {
   const { url } = await api<{ url: string }>("/api/upload", { form });
   return url;
 }
+
+/** Centre-crop to a square and scale to `size` px JPEG (profile photos). */
+export async function cropSquare(file: File, size = 512, quality = 0.85): Promise<Blob> {
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) throw new Error("Couldn’t read that image — try a JPG or PNG");
+  const side = Math.min(bitmap.width, bitmap.height);
+  const out = Math.min(size, side);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = out;
+  canvas.getContext("2d")!.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, out, out);
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn’t process that image"))), "image/jpeg", quality));
+}

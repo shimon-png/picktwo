@@ -163,7 +163,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
         )}
         {!v.isOwner && (
           <div className="flex items-center gap-2 text-xs text-zinc-500">
-            <Avatar name={v.author.name || v.author.handle || "?"} seed={v.author.handle ?? undefined} />
+            <Avatar name={v.author.name || v.author.handle || "?"} seed={v.author.handle ?? undefined} src={v.author.image} />
             <Link href={`/u/${v.author.handle}`} className="hover:underline">
               {v.author.name || `@${v.author.handle}`}
             </Link>

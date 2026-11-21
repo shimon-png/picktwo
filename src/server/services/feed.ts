@@ -42,6 +42,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       b: battles,
       authorHandle: users.handle,
       authorName: users.name,
+      authorImage: users.image,
       authorCountry: users.country,
       authorKidAges: users.kidAges,
       authorPP: users.ppBalance,

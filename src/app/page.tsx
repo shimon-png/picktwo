@@ -209,7 +209,7 @@ function DecidingCard({ b }: { b: BattleCard }) {
       <span className="block p-3">
         <span className="line-clamp-2 min-h-[2.6em] text-[15px] leading-snug">{b.title}</span>
         <span className="mt-2 flex items-center gap-1.5 text-xs text-zinc-500">
-          <Avatar name={handle} seed={b.authorHandle ?? b.id} size={16} />
+          <Avatar name={handle} seed={b.authorHandle ?? b.id} src={b.authorImage} size={16} />
           <span className="truncate">{handle}</span>
           <span className="ml-auto shrink-0">{total > 0 ? `${total} votes` : timeLeft(b.deadline)}</span>
         </span>
@@ -237,7 +237,7 @@ function StoryCard({ b }: { b: BattleCard }) {
         ))}
       </span>
       <span className="mt-3 flex items-center gap-1.5 text-xs text-zinc-500">
-        <Avatar name={handle} seed={b.authorHandle ?? b.id} size={16} />
+        <Avatar name={handle} seed={b.authorHandle ?? b.id} src={b.authorImage} size={16} />
         {handle}
         {parentOf && ` · ${parentOf}`}
       </span>

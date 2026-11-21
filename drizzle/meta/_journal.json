@@ -57,6 +57,13 @@
       "when": 1795216249459,
       "tag": "0007_signin_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795219757470,
+      "tag": "0008_profile_city",
+      "breakpoints": true
     }
   ]
 }

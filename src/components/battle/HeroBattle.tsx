@@ -34,7 +34,7 @@ export function HeroBattle({ b, onVoted }: { b: BattleCard; onVoted?: () => void
   return (
     <div className="relative rounded-[22px] bg-white p-4 shadow-lift">
       <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Avatar name={handle} seed={b.authorHandle ?? b.id} />
+        <Avatar name={handle} seed={b.authorHandle ?? b.id} src={b.authorImage} />
         <span className="truncate">
           {handle}
           {parentOf && ` · ${parentOf}`}

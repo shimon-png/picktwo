@@ -4,6 +4,7 @@ import { signOut } from "@/server/auth";
 import { ProfileForm } from "@/components/layout/ProfileForm";
 import { SettingsPanel } from "@/components/layout/SettingsPanel";
 import Link from "next/link";
+import { AvatarEditor } from "@/components/layout/AvatarEditor";
 
 export const metadata = { title: "Settings" };
 
@@ -19,6 +20,7 @@ export default async function SettingsPage() {
       <h1 className=" text-2xl font-medium">Settings</h1>
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Profile</h2>
+        <AvatarEditor image={user.image} name={user.name || user.handle || "?"} />
         <ProfileForm
           mode="settings"
           initial={{
@@ -29,6 +31,7 @@ export default async function SettingsPage() {
             kidsStatus: user.kidsStatus ?? (user.kidAges.length ? "YES" : ""),
             country: user.country ?? "",
             region: user.region ?? "",
+            city: user.city ?? "",
             zipCode: user.zipCode ?? "",
             sex: user.sex ?? "",
             ageRange: user.ageRange ?? "",
