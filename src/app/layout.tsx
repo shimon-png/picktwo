@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "@fontsource-variable/inter";
+import "@fontsource/instrument-serif/400.css";
+import "@fontsource/instrument-serif/400-italic.css";
 import "./globals.css";
 import { getViewer } from "@/server/viewer";
 import { linkDevice } from "@/server/services/votes";
@@ -21,7 +23,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#faf8f5",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -44,7 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <ContentShell>
           <ChromeOnly>
-            <header className="sticky top-0 z-30 bg-white/90 backdrop-blur">
+            <header className="sticky top-0 z-30 bg-page/90 backdrop-blur">
               <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
                 <HeaderLogo />
                 <div data-tour="account">

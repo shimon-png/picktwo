@@ -29,7 +29,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
   const url = appUrl(`/b/${slug}`);
 
   return (
-    <div className="-mx-4 -mt-2 flex min-h-dvh flex-col bg-gradient-to-b from-accent-900/70 to-white to-40% px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10">
+    <div className="-mx-4 -mt-2 flex min-h-dvh flex-col bg-gradient-to-b from-accent-900/70 to-page to-40% px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10">
       <CheckCircle2 className="size-8 text-accent" aria-hidden />
       <h1 className="display mt-3 text-[26px]">Your battle is live</h1>
       {postedAs && <p className="mt-1 text-[13px] text-violet">Posted as @{author?.handle}</p>}
@@ -43,7 +43,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
       <div className="flex-1" />
 
       <section className="card mt-8 p-4">
-        <h2 className="text-[15px] font-medium">Get answered faster</h2>
+        <h2 className="font-sans text-[15px] font-medium">Get answered faster</h2>
         <p className="mt-1.5 text-[13px] text-zinc-600">
           {t.next ? (
             <>

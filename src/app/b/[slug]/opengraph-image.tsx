@@ -19,7 +19,7 @@ export default async function OG({ params }: { params: Promise<{ slug: string }>
     return src && (src.startsWith("https://") || src.startsWith("data:image/png") || src.startsWith("data:image/jpeg")) ? src : null;
   };
   const tile = (o: typeof A, side: "A" | "B") => {
-    const color = side === "A" ? "#3170E8" : "#E5484D";
+    const color = side === "A" ? "#2F5FF0" : "#E8384F";
     const soft = side === "A" ? "#EAF1FD" : "#FDECEC";
     const src = img(o);
     return (
@@ -44,14 +44,14 @@ export default async function OG({ params }: { params: Promise<{ slug: string }>
           <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 40, fontWeight: 500, color: "#1A1F2E", letterSpacing: -1 }}>
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
               <circle cx="7" cy="14.5" r="4.8" stroke="#8A90A2" strokeWidth="1.6" />
-              <circle cx="17" cy="14.5" r="4.8" stroke="#3170E8" strokeWidth="1.6" />
-              <circle cx="17" cy="14.5" r="1.9" fill="#3170E8" />
-              <circle cx="13.6" cy="5.2" r="1.25" fill="#E5484D" />
-              <circle cx="17" cy="4" r="1.25" fill="#E5484D" />
-              <circle cx="20.4" cy="5.2" r="1.25" fill="#E5484D" />
+              <circle cx="17" cy="14.5" r="4.8" stroke="#2F5FF0" strokeWidth="1.6" />
+              <circle cx="17" cy="14.5" r="1.9" fill="#2F5FF0" />
+              <circle cx="13.6" cy="5.2" r="1.25" fill="#E8384F" />
+              <circle cx="17" cy="4" r="1.25" fill="#E8384F" />
+              <circle cx="20.4" cy="5.2" r="1.25" fill="#E8384F" />
             </svg>
             <span style={{ display: "flex" }}>
-              crowdpick<span style={{ color: "#3170E8" }}>.ai</span>
+              crowdpick<span style={{ color: "#2F5FF0" }}>.ai</span>
             </span>
           </div>
           <div style={{ fontSize: 28, color: "#71717a" }}>Tap to vote →</div>
