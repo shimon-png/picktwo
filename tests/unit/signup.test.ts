@@ -16,7 +16,10 @@ describe("sign-in codes", () => {
 describe("handleBase", () => {
   it("derives a valid handle from an email", () => {
     expect(handleBase("Jane.Doe+cp@example.com")).toBe("janedoecp");
-    expect(handleBase("ab@x.com")).toBe("userab");
+    expect(handleBase("ab@x.com")).toBe("ab_x");
+    expect(handleBase("a@b.com")).toBe("a_b");
+    expect(handleBase("a@1.io")).toBe("a_1");
+    expect(handleBase("é@é.com")).toBe("user");
     expect(handleBase(null)).toBe("user");
     expect(handleBase("averyveryverylongname@x.com")).toHaveLength(15);
   });
