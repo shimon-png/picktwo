@@ -1,4 +1,4 @@
-import { and, eq, gte, sql, lt, isNull, inArray, notInArray } from "drizzle-orm";
+import { and, eq, gte, sql, lt, isNull, inArray, notInArray, or } from "drizzle-orm";
 import { db, type DbOrTx } from "../db";
 import { pointLedger, users, battles, outcomes } from "../db/schema";
 import type { Economy } from "@/lib/constants";
@@ -81,6 +81,38 @@ export async function openLoopCountsFor(authorIds: string[], economy: Economy): 
     .groupBy(battles.authorId);
   for (const r of rows) m.set(r.authorId, r.n);
   return m;
+}
+
+/**
+ * Close-the-loop posting gate (docs/rules/close-the-loop-and-experts.md): the user's battles that have
+ * closed (deadline passed or closed early), got at least one vote and have no reported choice yet.
+ * No grace period: a battle counts the moment it closes. Hidden and deleted battles don't count.
+ */
+export function unreportedWhere(now = new Date()) {
+  return and(
+    or(eq(battles.status, "CLOSED"), lt(battles.deadline, now)),
+    notInArray(battles.status, ["DELETED", "HIDDEN"]),
+    sql`${battles.votesA} + ${battles.votesB} > 0`,
+    isNull(outcomes.id),
+  );
+}
+
+export async function unreportedBattles(userId: string) {
+  return db
+    .select({ slug: battles.slug, title: battles.title, deadline: battles.deadline })
+    .from(battles)
+    .leftJoin(outcomes, eq(outcomes.battleId, battles.id))
+    .where(and(eq(battles.authorId, userId), unreportedWhere()))
+    .orderBy(battles.deadline);
+}
+
+export async function countUnreported(userId: string): Promise<number> {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(battles)
+    .leftJoin(outcomes, eq(outcomes.battleId, battles.id))
+    .where(and(eq(battles.authorId, userId), unreportedWhere()));
+  return r?.n ?? 0;
 }
 
 /** Battles awaiting an outcome (past deadline or closed, no outcome) — includes ones still in the grace window. */

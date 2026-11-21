@@ -6,6 +6,8 @@ import { ArrowLeft, ChevronUp, ExternalLink, Lock, Pencil, StopCircle, ThumbsDow
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { markDone } from "@/lib/seen";
 import { SignupGate } from "@/components/auth/SignupGate";
+import { ExpertBadge } from "@/components/ui/ExpertBadge";
+import { Scores } from "./Scores";
 import { cn, formatPrice, timeAgo, timeLeft } from "@/lib/utils";
 import { TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import type { BattleView, ReasonView } from "@/server/services/battles";
@@ -164,8 +166,9 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
         {!v.isOwner && (
           <div className="flex items-center gap-2 text-xs text-zinc-500">
             <Avatar name={v.author.name || v.author.handle || "?"} seed={v.author.handle ?? undefined} src={v.author.image} />
-            <Link href={`/u/${v.author.handle}`} className="hover:underline">
+            <Link href={`/u/${v.author.handle}`} className="inline-flex items-center gap-1 hover:underline">
               {v.author.name || `@${v.author.handle}`}
+              <ExpertBadge tier={v.author.tier} />
             </Link>
             · {timeAgo(v.createdAt)}
           </div>
@@ -237,6 +240,11 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
             "Tap to vote — results appear after you pick"
           ) : null}
         </p>
+        {res && res.total > 0 && (
+          <div className="mt-3">
+            <Scores everyone={res} experts={v.expertResults} labelA={A.label} labelB={B.label} />
+          </div>
+        )}
       </div>
 
       {/* Reason after voting */}

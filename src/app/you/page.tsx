@@ -11,12 +11,15 @@ import { db } from "@/server/db";
 import { battles, pointLedger, votes } from "@/server/db/schema";
 import { getEconomy } from "@/server/services/config";
 import { battleCards, visibleStatuses, type BattleCard } from "@/server/services/battles";
-import { countOpenLoops } from "@/server/services/points";
+import { countOpenLoops, countUnreported } from "@/server/services/points";
+import { TIER_LABEL, canPostBattle, expertTier, nextTier } from "@/server/services/expertise";
+import { ExpertBadge } from "@/components/ui/ExpertBadge";
+import { Scores } from "@/components/battle/Scores";
 import { unreadCount } from "@/server/services/notifications";
 import { pointsTier } from "@/server/services/priority";
 import { TONE_CLASSES, type Tone } from "@/lib/constants";
 import { TOUR_URL } from "@/lib/tour";
-import { cn, timeAgo, timeLeft } from "@/lib/utils";
+import { cn, pct, timeAgo, timeLeft } from "@/lib/utils";
 
 export const metadata = { title: "You" };
 export const dynamic = "force-dynamic";
@@ -43,9 +46,10 @@ export default async function YouPage() {
   if (profileIncomplete(user)) redirect(onboardingUrl("/you"));
   const e = await getEconomy();
   const admin = isAdmin(user);
-  const [mine, openLoops, unread, ledger] = await Promise.all([
+  const [mine, openLoops, unreported, unread, ledger] = await Promise.all([
     battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 30),
     countOpenLoops(user.id, e),
+    countUnreported(user.id),
     unreadCount(user.id),
     db.select().from(pointLedger).where(eq(pointLedger.userId, user.id)).orderBy(desc(pointLedger.createdAt)).limit(15),
   ]);
@@ -60,6 +64,9 @@ export default async function YouPage() {
       .groupBy(votes.battleId);
     for (const r of rows) reasonCounts.set(r.id, r.n);
   }
+  const tier = expertTier(user.correctPicks, e);
+  const next = nextTier(user.correctPicks, e);
+  const blocked = !canPostBattle(unreported, e.maxUnreportedBattles);
   const t = pointsTier(user.ppBalance, e.tierHighAt, e.tierTopAt);
   const awaiting = mine.filter((b) => b.status !== "OPEN" && !b.outcome);
   const others = mine.filter((b) => !(b.status !== "OPEN" && !b.outcome));
@@ -80,8 +87,16 @@ export default async function YouPage() {
           </span>
         )}
         <div className="min-w-0">
-          <h1 className="truncate text-[32px] leading-none">{user.name || `@${user.handle}`}</h1>
+          <h1 className="flex items-center gap-1.5 text-[32px] leading-none">
+            <span className="truncate">{user.name || `@${user.handle}`}</span>
+            <ExpertBadge tier={tier} />
+          </h1>
           {user.handle && <p className="mt-1.5 text-[13px] text-zinc-500">@{user.handle}</p>}
+          <p className="mt-1 text-[13px] text-zinc-500">
+            {tier !== "NONE" && `${TIER_LABEL[tier]} · `}
+            {user.correctPicks} correct pick{user.correctPicks === 1 ? "" : "s"}
+            {next && ` · ${next.needed} more to ${TIER_LABEL[next.tier]}`}
+          </p>
         </div>
       </header>
 
@@ -137,6 +152,11 @@ export default async function YouPage() {
             + New
           </Link>
         </div>
+        {blocked && (
+          <p className="mb-2.5 rounded-lg bg-b-soft px-3 py-2 text-[13px] text-b">
+            Posting is paused: {unreported} finished battles are waiting for you to say what you picked. Each one you close frees up a new post.
+          </p>
+        )}
         {mine.length === 0 ? (
           <div className="card p-5 text-center">
             <p className="text-sm text-zinc-600">Stuck between two options? Post a battle and get answers in minutes.</p>
@@ -229,6 +249,11 @@ function BattleRow({ b, reasons, awaiting, loopPoints }: { b: BattleCard; reason
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm">{b.title}</span>
           <span className="block truncate text-xs text-zinc-500">{status}</span>
+          {votes > 0 && (
+            <span className="mt-0.5 block text-xs text-zinc-500">
+              <Scores compact everyone={pct(b.votesA, b.votesB)} experts={b.expert} labelA={b.labelA} labelB={b.labelB} />
+            </span>
+          )}
         </span>
         {awaiting && <span className="tag shrink-0 bg-accent-900 text-accent">+{loopPoints} ⚡</span>}
       </Link>

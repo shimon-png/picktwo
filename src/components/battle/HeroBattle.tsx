@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { useRef, useState } from "react";
 import { api, toast } from "@/lib/client";
 import { kidAgeLabel } from "@/lib/constants";
@@ -37,6 +38,7 @@ export function HeroBattle({ b, onVoted }: { b: BattleCard; onVoted?: () => void
         <Avatar name={handle} seed={b.authorHandle ?? b.id} src={b.authorImage} />
         <span className="truncate">
           {handle}
+          <ExpertBadge tier={b.authorTier} className="ml-1" />
           {parentOf && ` · ${parentOf}`}
         </span>
         <span className="ml-auto shrink-0">{timeLeft(b.deadline)}</span>

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowRight, Zap } from "lucide-react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
@@ -405,6 +406,7 @@ export function SwipeDeck({
             </span>
             <span className="truncate">
               {handle}
+              <ExpertBadge tier={card.authorTier} className="ml-1" />
               {parentOf && ` · ${parentOf}`}
             </span>
             <span className="ml-auto shrink-0">{timeLeft(card.deadline)}</span>

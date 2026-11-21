@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import type { DbOrTx } from "../db";
-import { reputations, votes } from "../db/schema";
+import { reputations, users, votes } from "../db/schema";
 
 /** PRD 9.4 — a vote is "correct" if it matches a 👍 pick, or opposes a 👎 pick. */
 export function isCorrectVote(side: "A" | "B", chosen: "A" | "B", thumb: "UP" | "DOWN"): boolean {
@@ -36,5 +36,7 @@ export async function applyOutcomeToReputation(
           score: sql`(${reputations.correct} + ${correct} + 2)::float / (${reputations.resolved} + 1 + 4)`,
         },
       });
+    // Lifetime correct picks drive Pro / Expert / Super expert (services/expertise.ts).
+    if (correct) await tx.update(users).set({ correctPicks: sql`${users.correctPicks} + 1` }).where(eq(users.id, v.userId!));
   }
 }

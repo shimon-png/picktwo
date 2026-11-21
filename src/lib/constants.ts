@@ -82,7 +82,7 @@ export const DEADLINE_PRESETS = [
   { id: "3h", label: "3 hours", hours: 3 },
   { id: "24h", label: "24 hours", hours: 24 },
   { id: "3d", label: "3 days", hours: 72 },
-  { id: "7d", label: "7 days", hours: 168 },
+  { id: "5d", label: "5 days", hours: 120 },
 ] as const;
 
 /** Priority Queue economy defaults (PRD 5.3). Overridable via AppConfig table. */
@@ -121,6 +121,14 @@ export const ECONOMY_DEFAULTS = {
   tierTopAt: 40,
   /** Battles a signed-out visitor can vote on before the "Sign up to keep voting" gate. */
   guestVoteLimit: 5,
+  /** Close the loop (docs/rules/close-the-loop-and-experts.md): longest a battle can run, in hours (5 days). */
+  maxBattleHours: 120,
+  /** Posting is blocked while a user has this many closed battles with no reported choice (0 = off). */
+  maxUnreportedBattles: 3,
+  /** Correct picks needed for Pro (check), Expert (gold check) and Super expert (diamond check). */
+  proAt: 20,
+  expertAt: 50,
+  superExpertAt: 100,
 } as const;
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 
