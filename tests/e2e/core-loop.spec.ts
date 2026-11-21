@@ -125,7 +125,11 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
 
   // Voter 1 called it
   await v1.goto("/activity");
-  await expect(v1.getByText(/You called it/)).toBeVisible();
+  // The notification (Updates starts open) …
+  await expect(v1.getByRole("link", { name: /You called it/ })).toBeVisible();
+  // … and the Votes history shows the battle with the voter's pick.
+  await v1.getByText("Votes", { exact: true }).click();
+  await expect(v1.getByText(/You picked/).first()).toBeVisible();
   await v1.goto("/you");
   await expect(v1.getByText("Called it!")).toBeVisible();
 });

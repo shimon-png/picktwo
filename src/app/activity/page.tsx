@@ -87,7 +87,7 @@ export default async function ActivityPage() {
         )}
       </Section>
 
-      <Section title="Updates" count={unread} countLabel="new" open={unread > 0}>
+      <Section title="Updates" count={unread} countLabel="new" open>
         {items.length === 0 ? (
           <Empty>Nothing yet. You’ll see votes on your battles, results and new followers here.</Empty>
         ) : (
