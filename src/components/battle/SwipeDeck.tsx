@@ -10,6 +10,7 @@ import { AVATAR_TONES, REASON_CHIPS, TONE_CLASSES, kidAgeLabel } from "@/lib/con
 import { pointsTier } from "@/server/services/priority";
 import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
+import { wink } from "@/components/layout/Logo";
 import { PhotoFlag } from "./PhotoFlag";
 
 type Side = "A" | "B";
@@ -148,6 +149,7 @@ export function SwipeDeck({
       if (r.ppBalance != null) setPp(r.ppBalance);
       setSession((s) => ({ votes: s.votes + (prev ? 0 : 1), points: s.points + r.points }));
       if (r.points > 0) toast(`+${r.points} for voting`, "pp");
+      if (!prev) wink();
       return true;
     } catch (e) {
       if (prev) {

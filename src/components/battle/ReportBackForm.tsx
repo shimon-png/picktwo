@@ -47,7 +47,7 @@ export function ReportBackForm(props: {
         body: { chosen, thumb: chosen === "NEITHER" ? null : thumb, note, photoUrl: photo ?? undefined },
       });
       if (r.points > 0) {
-        confetti({ particleCount: 110, spread: 80, origin: { y: 0.7 }, colors: ["#2F5FF0", "#E8384F", "#E8890C", "#7B4FE0"] });
+        confetti({ particleCount: 110, spread: 80, origin: { y: 0.7 }, colors: ["#2BD2FF", "#FF3CAC", "#C6FF3D", "#7B4FE0"] });
         toast(`+${r.points} Loop closed — thank you!`, "pp");
         const me = await api<{ ppBalance: number }>("/api/me/priority").catch(() => null);
         setPP(me?.ppBalance);
