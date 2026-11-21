@@ -108,7 +108,7 @@ export function ReportBackForm(props: {
       )}
 
       <section className="mt-6">
-        <h2 className="mb-2.5 font-sans text-[15px] font-medium">Which did you pick?</h2>
+        <h2 className="mb-2.5 text-[22px]">Which did you pick?</h2>
         <div className="flex gap-2">
           {tile("A", props.A.label, <OptionFace side="A" label={props.A.label} image={props.A.imageUrl || props.A.urlImage} ring={chosen === "A"} />)}
           {tile("B", props.B.label, <OptionFace side="B" label={props.B.label} image={props.B.imageUrl || props.B.urlImage} ring={chosen === "B"} />)}
@@ -123,7 +123,7 @@ export function ReportBackForm(props: {
 
       {needsThumb && (
         <section className="mt-6">
-          <h2 className="mb-2.5 font-sans text-[15px] font-medium">How did it go?</h2>
+          <h2 className="mb-2.5 text-[22px]">How did it go?</h2>
           <div className="grid grid-cols-2 gap-2">
             {(
               [

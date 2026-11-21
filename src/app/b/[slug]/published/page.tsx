@@ -43,7 +43,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
       <div className="flex-1" />
 
       <section className="card mt-8 p-4">
-        <h2 className="font-sans text-[15px] font-medium">Get answered faster</h2>
+        <h2 className="text-[22px]">Get answered faster</h2>
         <p className="mt-1.5 text-[13px] text-zinc-600">
           {t.next ? (
             <>
