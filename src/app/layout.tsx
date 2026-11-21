@@ -7,7 +7,7 @@ import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource/chakra-petch/600.css";
 import "@fontsource/chakra-petch/700.css";
 import { ThemePreview } from "@/components/layout/ThemePreview";
-import { themeBootScript } from "@/lib/theme-preview";
+import { DEFAULT_THEME, themeBootScript } from "@/lib/theme-preview";
 import "./globals.css";
 import { getViewer } from "@/server/viewer";
 import { linkDevice } from "@/server/services/votes";
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#faf8f5",
+  themeColor: "#120e26",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -44,7 +44,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     [unread, openLoops] = await Promise.all([unreadCount(user.id), countOpenLoops(user.id, economy)]);
   }
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-theme={DEFAULT_THEME === "prompt" ? undefined : DEFAULT_THEME} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
