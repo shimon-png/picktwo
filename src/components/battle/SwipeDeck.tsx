@@ -2,12 +2,11 @@
 import Link from "next/link";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, Zap } from "lucide-react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { doneIds, markDone, unmarkDone } from "@/lib/seen";
 import { SignupGate } from "@/components/auth/SignupGate";
 import { cn, pct, timeLeft } from "@/lib/utils";
-import { AVATAR_TONES, REASON_CHIPS, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
+import { AVATAR_TONES, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
 import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
@@ -22,13 +21,12 @@ type VoteRes = { results: { a: number; b: number; total: number }; points: numbe
 /**
  * Two ways to pick (Alex, Nov 21 2026): tap the photo you want, or swipe away the one you don't.
  * Either way the chosen photo grows to fill the card and shows result bars (Everyone, plus
- * Experts once expert votes exist). Swiping away the loser moves on by itself after the result;
- * a tap stays (results, reason chips, Next) so the pick can still change.
+ * Experts once expert votes exist), holds for RESULT_MS, then the next battle comes up by itself.
  */
 const AWAY_FRAC = 0.28; // drag past this share of the card width to swipe a photo away…
 const FLING_PX_MS = 0.55; // …or flick faster than this
 const THROW_MS = 340;
-const RESULT_MS = 1800; // how long the result shows after a swipe-away before the next battle
+const RESULT_MS = 1500; // how long the picked photo and its scores show before the next battle
 const FLY_MS = 280;
 
 /** Short buzz where the browser supports it (Android Chrome; iOS Safari has no web vibration). */
@@ -58,9 +56,6 @@ export function SwipeDeck({
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
   const [voted, setVoted] = useState<Side | null>(null);
   const [result, setResult] = useState<{ a: number; b: number; total: number } | null>(null);
-  const [reason, setReason] = useState<string | null>(null);
-  const [writing, setWriting] = useState(false);
-  const [draft, setDraft] = useState("");
   const [fly, setFly] = useState<-1 | 1 | 0>(0);
   // The grabbed photo and its offset, and the photo swiped off the card (the one NOT picked).
   const [grab, setGrab] = useState<{ side: Side; dx: number; dy: number } | null>(null);
@@ -118,15 +113,11 @@ export function SwipeDeck({
       setThrown(null);
       setVoted(null);
       setResult(null);
-      setReason(null);
-      setWriting(false);
-      setDraft("");
     }, FLY_MS);
   }, []);
 
   const gated = !signedIn && guestLeft !== null && guestLeft <= 0;
 
-  // The pick stays changeable (tap the other photo, drag the other way, ← / →) until Next.
   async function vote(side: Side): Promise<boolean> {
     if (!card || fly || gated) return false;
     if (voted === side) return true;
@@ -134,18 +125,11 @@ export function SwipeDeck({
     setVoted(side);
     const dwellMs = Date.now() - shownAt.current;
     setResult(pct(card.votesA + (side === "A" ? 1 : 0), card.votesB + (side === "B" ? 1 : 0)));
-    // A reason was for the old pick; clear it on the server too.
-    const clearReason = !!prev && !!reason;
-    if (prev) {
-      setReason(null);
-      setWriting(false);
-      setDraft("");
-    }
     // Remember it right away, so leaving the tab before the request finishes can't bring it back.
     markDone(card.id);
     try {
       const r = await api<VoteRes>(`/api/battles/${card.slug}/vote`, {
-        body: { side, source: "feed", ...(prev ? {} : { dwellMs }), ...(clearReason ? { reason: "" } : {}) },
+        body: { side, source: "feed", ...(prev ? {} : { dwellMs }) },
       });
       if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
       setResult(r.results);
@@ -237,41 +221,27 @@ export function SwipeDeck({
     document.addEventListener("mouseout", onLeave);
   }
 
-  // Swipe away: that photo flies off, the other one is the pick and fills the card, the
-  // result shows, then the next battle.
-  async function swipeAway(side: Side, dir: -1 | 1) {
-    if (!card || thrown || fly) return;
-    buzz(18);
-    setThrown({ side, dir });
-    setGrab(null);
+  // Every pick (tap, swipe-away, ← / →): the pick fills the card, its scores show for
+  // RESULT_MS, then the next battle.
+  async function pick(side: Side, dir: -1 | 1 = side === "A" ? -1 : 1) {
+    if (!card || voted || fly) return;
     const started = Date.now();
-    const ok = await vote(other(side));
+    const ok = await vote(side);
     if (!ok) {
       setThrown(null);
       return;
     }
-    setTimeout(() => advance(dir), Math.max(0, RESULT_MS - (Date.now() - started)));
     setTimeout(() => buzz(10), 120);
+    setTimeout(() => advance(dir), Math.max(0, RESULT_MS - (Date.now() - started)));
   }
 
-  async function giveReason(text: string) {
-    if (!card || !voted || reason) return;
-    const t = text.trim();
-    if (!t) return;
-    setReason(t);
-    setWriting(false);
-    try {
-      const r = await api<VoteRes>(`/api/battles/${card.slug}/vote`, { body: { side: voted, reason: t, source: "feed" } });
-      setPP(r.ppBalance);
-      if (r.ppBalance != null) setPp(r.ppBalance);
-      if (r.points > 0) {
-        setSession((s) => ({ ...s, points: s.points + r.points }));
-        toast(`+${r.points} for a reason`, "pp");
-      }
-    } catch (e) {
-      setReason(null);
-      toast((e as Error).message, "error");
-    }
+  // Swipe away: that photo flies off and the other one is the pick.
+  function swipeAway(side: Side, dir: -1 | 1) {
+    if (!card || thrown || voted || fly) return;
+    buzz(18);
+    setThrown({ side, dir });
+    setGrab(null);
+    pick(other(side), dir);
   }
 
   function skip() {
@@ -283,25 +253,17 @@ export function SwipeDeck({
 
   /** A flagged battle leaves the deck right away. */
   function afterFlag() {
-    if (!card) return;
-    if (voted) next();
-    else skip();
+    if (card && !voted) skip();
   }
 
-  function next() {
-    if (!voted || fly || thrown) return;
-    advance(voted === "A" ? -1 : 1);
-  }
-
-  // Keyboard: ← A, → B, ↓ skip, Enter next
+  // Keyboard: ← A, → B, ↓ skip
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || document.querySelector("[data-flag-sheet]")) return;
-      if (e.key === "ArrowLeft") vote("A");
-      else if (e.key === "ArrowRight") vote("B");
+      if (e.key === "ArrowLeft") pick("A");
+      else if (e.key === "ArrowRight") pick("B");
       else if (e.key === "ArrowDown") skip();
-      else if (e.key === "Enter" && voted) next();
     };
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);
@@ -355,7 +317,6 @@ export function SwipeDeck({
   const handle = card.authorHandle ? `@${card.authorHandle}` : (card.authorName ?? "someone");
   const parentOf = card.authorKidAges[0] ? `parent of a ${kidAgeLabel(card.authorKidAges[0])} y/o` : null;
   const avatarTone = AVATAR_TONES[session.votes % AVATAR_TONES.length];
-  const chips = REASON_CHIPS;
   const style: React.CSSProperties = fly
     ? { transform: `translateX(${fly * 460}px) rotate(${fly * 16}deg)`, opacity: 0, transition: `transform ${FLY_MS}ms ease, opacity ${FLY_MS}ms ease` }
     : { transition: "transform 200ms ease" };
@@ -452,12 +413,12 @@ export function SwipeDeck({
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
                 aria-pressed={voted === s}
                 onPointerDown={(e) => {
-                  if (fly || thrown || gated || e.button > 0) return;
+                  if (fly || thrown || voted || gated || e.button > 0) return;
                   startDrag(s, e);
                 }}
                 onClick={() => {
                   if (justDragged.current) return;
-                  if (!thrown) vote(s);
+                  if (!thrown) pick(s);
                 }}
               >
                 <OptionFace
@@ -489,93 +450,23 @@ export function SwipeDeck({
               (["A", "B"] as const).map(
                 (s) =>
                   (s === "A" ? card.imageA : card.imageB) &&
-                  (!winner || winner === s) && (
+                  !winner && (
                     <PhotoFlag
                       key={s}
                       battleId={card.id}
                       side={s}
                       label={s === "A" ? card.labelA : card.labelB}
                       onFlagged={afterFlag}
-                      className={s === "A" && !winner ? "right-[calc(50%+0.625rem)]" : undefined}
+                      className={s === "A" ? "right-[calc(50%+0.625rem)]" : undefined}
                     />
                   ),
               )}
           </div>
 
-          {thrown ? (
+          {winner ? (
             <p className="mt-3 text-center font-display text-[26px] leading-tight" aria-live="polite">
               {winner === "A" ? card.labelA : card.labelB}
             </p>
-          ) : voted ? (
-            <div className="mt-3 space-y-2.5" data-nodrag>
-              {signedIn ? (
-                <>
-                  <p className="flex items-center gap-1 text-xs text-zinc-500">
-                    Why? optional ·
-                    <Zap className="size-3 fill-pp text-pp" aria-hidden /> +1 for a reason
-                  </p>
-                  {writing ? (
-                    <form
-                      className="flex gap-2"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        giveReason(draft);
-                      }}
-                    >
-                      <input
-                        autoFocus
-                        className="input !py-1.5"
-                        placeholder="One line on why…"
-                        maxLength={140}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        aria-label="Reason"
-                      />
-                      <button className="btn-outline !px-3 !py-1.5 text-sm" disabled={!draft.trim()}>
-                        Add
-                      </button>
-                    </form>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {chips.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          disabled={!!reason}
-                          aria-pressed={reason === c}
-                          onClick={() => giveReason(c)}
-                          className={cn("chip", reason === c && "chip-on")}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                      {!reason && (
-                        <button type="button" className="chip text-zinc-500" onClick={() => setWriting(true)}>
-                          Other…
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-xs text-zinc-500">
-                  Counted.{" "}
-                  <Link href="/signin?callbackUrl=/vote" className="text-accent">
-                    Sign in
-                  </Link>{" "}
-                  to earn ⚡ and get your own questions answered first.
-                </p>
-              )}
-              <div className="flex items-center gap-2">
-                <button type="button" className="btn-ghost max-w-[45%] shrink-0 !px-3 text-[13px]" onClick={() => vote(other(voted))}>
-                  <span className="truncate">
-                  Switch to {voted === "A" ? card.labelB : card.labelA}</span>
-                </button>
-                <button type="button" className="btn-primary min-w-0 flex-1" onClick={next}>
-                  Next <ArrowRight className="size-4" aria-hidden />
-                </button>
-              </div>
-            </div>
           ) : (
             <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
               <span>Tap your pick, or swipe the other one away</span>
