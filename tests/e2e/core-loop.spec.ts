@@ -1,13 +1,17 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 
-// Requires DEV_LOGIN=true on the server.
+// Requires DEV_LOGIN=true and no AUTH_RESEND_KEY on the server, so the sign-in code is shown on screen.
 const stamp = Date.now().toString(36);
 
 async function login(page: Page, email: string) {
   await page.goto("/signin");
-  await page.getByLabel("Demo email").fill(email);
-  await page.getByRole("button", { name: "Sign in instantly" }).click();
-  await page.waitForURL((u) => !u.pathname.startsWith("/signin"));
+  await page.getByLabel("Your email").fill(email);
+  await page.getByRole("button", { name: "Email me a code" }).click();
+  const hint = await page.getByText(/Dev mode: your code is \d{6}/).textContent();
+  await page.getByLabel("Code").fill(hint!.match(/\d{6}/)![0]);
+  await page.getByRole("button", { name: "Verify" }).click();
+  // New accounts continue to the username step; the tests finish setup on /onboarding instead.
+  await expect(page.getByLabel(/Pick a username/)).toBeVisible();
 }
 
 async function onboard(page: Page, handle: string) {

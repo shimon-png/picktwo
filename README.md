@@ -52,7 +52,7 @@ Checks: `npm run typecheck && npm run lint && npm test` · end-to-end: `npm run 
    - `AUTH_RESEND_KEY` + `EMAIL_FROM` — for magic-link sign-in ([resend.com](https://resend.com), verify your domain)
    - optional `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` (redirect URI: `https://<your-domain>/api/auth/callback/google`)
    - optional `NEXT_PUBLIC_APP_URL` = your production URL (auto-detected on Vercel otherwise)
-   - for a quick private test before email is set up you can set `DEV_LOGIN=true` — **turn it off before sharing publicly**
+   - `DEV_LOGIN=true` shows sign-in codes on screen when Resend isn't set up, so **anyone can sign in as anyone**. Local dev and tests only; never set it in production
 5. **Deploy.** The build runs database migrations automatically (categories are created by migration).
 6. Sign in with your admin email → **Settings → Admin → Seed demo battles** so the feed isn't empty on day one.
 
