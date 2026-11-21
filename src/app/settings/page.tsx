@@ -3,6 +3,7 @@ import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { signOut } from "@/server/auth";
 import { ProfileForm } from "@/components/layout/ProfileForm";
 import { SettingsPanel } from "@/components/layout/SettingsPanel";
+import { suggestHandle } from "@/server/services/profile";
 import Link from "next/link";
 
 export const metadata = { title: "Settings" };
@@ -23,7 +24,7 @@ export default async function SettingsPage() {
           mode="settings"
           initial={{
             name: user.name ?? "",
-            handle: user.handle ?? "",
+            handle: user.handle ?? (await suggestHandle(user.email)),
             bio: user.bio ?? "",
             kidAges: user.kidAges,
             kidsStatus: user.kidsStatus ?? (user.kidAges.length ? "YES" : ""),
