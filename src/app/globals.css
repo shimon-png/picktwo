@@ -192,3 +192,84 @@ body {
 }
 .hero-card-in { animation: hero-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .hero-card-out { animation: hero-out 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }
+
+/* ------------------------------------------------------------------
+ * Preview themes (Nov 2026). Not the shipped look: only applied when a
+ * visitor opens ?theme=fizz or ?theme=arcade (stored per browser, see
+ * components/layout/ThemePreview.tsx). ?theme=off goes back to Prompt.
+ * Unlayered so they win over utilities, which read these variables.
+ * ------------------------------------------------------------------ */
+html[data-theme="fizz"] {
+  --color-accent: #2e5bff;
+  --color-a: #2e5bff;
+  --color-a-soft: #e3e9ff;
+  --color-b: #ff2e93;
+  --color-b-soft: #ffe3f1;
+  --color-pink: #ff2e93;
+  --color-pink-soft: #ffe3f1;
+  --color-pp: #ffd400;
+  --color-pp-soft: #fff6c2;
+  --color-page: #fff1f7;
+  --color-surface: #f6f0ff;
+  --color-ink: #16113a;
+  --color-zinc-200: #f1e4f0;
+  --color-zinc-500: #6d6590;
+  --color-zinc-600: #564e7a;
+  --color-zinc-700: #3e3766;
+  --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --shadow-card: 0 2px 4px rgba(46, 91, 255, 0.06), 0 14px 34px rgba(46, 91, 255, 0.16);
+  --shadow-soft: 0 1px 2px rgba(46, 91, 255, 0.06), 0 8px 22px rgba(46, 91, 255, 0.12);
+  --shadow-glow-a: 0 16px 34px rgba(46, 91, 255, 0.45);
+  --shadow-glow-b: 0 16px 34px rgba(255, 46, 147, 0.45);
+}
+html[data-theme="fizz"] :is(h1, h2, h3, .display) { font-weight: 800; letter-spacing: -0.02em; font-size-adjust: none; }
+html[data-theme="fizz"] .btn-primary { background: linear-gradient(90deg, #2e5bff, #ff2e93); font-weight: 600; }
+html[data-theme="fizz"] .vs-badge { background: linear-gradient(135deg, #2e5bff, #ff2e93); color: #fff; font: 800 13px "Bricolage Grotesque Variable", sans-serif; rotate: -8deg; }
+html[data-theme="fizz"] .chip-on { background: #ff2e93; }
+html[data-theme="fizz"] .deck-card { rotate: -0.6deg; border-radius: 24px; }
+html[data-theme="fizz"] .deck-peek { background: #ffd400; opacity: 1; rotate: 2.5deg; }
+
+html[data-theme="arcade"] {
+  color-scheme: dark;
+  --color-accent: #2bd2ff;
+  --color-accent-900: #1d2c4f;
+  --color-a: #2bd2ff;
+  --color-a-soft: #173a52;
+  --color-b: #ff3cac;
+  --color-b-soft: #4a1840;
+  --color-pink: #ff3cac;
+  --color-pink-soft: #4a1840;
+  --color-pp: #c6ff3d;
+  --color-pp-soft: #2b3a1a;
+  --color-page: #120e26;
+  --color-surface: #2c2556;
+  --color-ink: #eae6ff;
+  --color-zinc-50: #1a1535;
+  --color-zinc-100: #221c45;
+  --color-zinc-200: #2c2556;
+  --color-zinc-300: #3a3170;
+  --color-zinc-400: #7d74b0;
+  --color-zinc-500: #a29ac9;
+  --color-zinc-600: #bdb6e0;
+  --color-zinc-700: #d6d1f0;
+  --color-zinc-800: #e6e2fa;
+  --color-amber-800: #c6ff3d;
+  --font-display: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --shadow-ring: 0 0 0 1px #3a3170;
+  --shadow-soft: 0 0 0 1px #3a3170;
+  --shadow-card: 0 0 0 1px #3a3170, 0 0 40px rgba(255, 60, 172, 0.18);
+  --shadow-photo: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-button: 0 0 18px rgba(198, 255, 61, 0.35);
+  --shadow-glow-a: 0 0 0 1px #2bd2ff, 0 0 28px rgba(43, 210, 255, 0.65);
+  --shadow-glow-b: 0 0 0 1px #ff3cac, 0 0 28px rgba(255, 60, 172, 0.65);
+}
+html[data-theme="arcade"] body { background: radial-gradient(120% 60% at 50% 0%, #2a1d5c, #120e26 60%) fixed; }
+html[data-theme="arcade"] :is(h1, h2, h3, .display) { font-weight: 700; letter-spacing: 0; font-size-adjust: none; }
+html[data-theme="arcade"] .deck-card h1 { color: #c6ff3d; text-shadow: 0 0 18px rgba(198, 255, 61, 0.35); }
+/* Panels: everything that is white in Prompt becomes the night panel. Photo text stays white. */
+html[data-theme="arcade"] :is(.bg-white, .card, .card-ring, .input, .chip, .btn-outline, .deck-card, .deck-peek) { background-color: #1f1940; }
+html[data-theme="arcade"] :is(.bg-white\/90, .bg-white\/80, .bg-white\/60) { background-color: rgb(31 25 64 / 0.85); }
+html[data-theme="arcade"] .btn-primary { background: #c6ff3d; color: #120e26; font-weight: 600; }
+html[data-theme="arcade"] .chip-on { background: #c6ff3d; color: #120e26; }
+html[data-theme="arcade"] .vs-badge { background: #120e26; color: #c6ff3d; box-shadow: 0 0 0 2px #c6ff3d, 0 0 14px rgba(198, 255, 61, 0.6); font: 700 13px "Chakra Petch", sans-serif; }
+html[data-theme="arcade"] .border-ink\/12, html[data-theme="arcade"] .input { border-color: #3a3170; }

@@ -3,6 +3,11 @@ import Link from "next/link";
 import "@fontsource-variable/inter";
 import "@fontsource/instrument-serif/400.css";
 import "@fontsource/instrument-serif/400-italic.css";
+import "@fontsource-variable/bricolage-grotesque";
+import "@fontsource/chakra-petch/600.css";
+import "@fontsource/chakra-petch/700.css";
+import { ThemePreview } from "@/components/layout/ThemePreview";
+import { themeBootScript } from "@/lib/theme-preview";
 import "./globals.css";
 import { getViewer } from "@/server/viewer";
 import { linkDevice } from "@/server/services/votes";
@@ -39,8 +44,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     [unread, openLoops] = await Promise.all([unreadCount(user.id), countOpenLoops(user.id, economy)]);
   }
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body className="min-h-dvh font-sans">
+        <ThemePreview />
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
           Skip to content
         </a>

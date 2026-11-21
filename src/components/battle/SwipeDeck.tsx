@@ -389,12 +389,12 @@ export function SwipeDeck({
     <div>
       {header}
       <div className="relative h-[calc(100dvh-14.5rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
-        {peek && <div aria-hidden className="absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
+        {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}
           key={card.id}
           aria-label={card.title}
-          className="animate-pop absolute inset-0 flex select-none flex-col rounded-[20px] bg-white p-4 shadow-card"
+          className="deck-card animate-pop absolute inset-0 flex select-none flex-col rounded-[20px] bg-white p-4 shadow-card"
           style={style}
         >
           <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -418,7 +418,7 @@ export function SwipeDeck({
             {!grab && !thrown && (
               <span
                 aria-hidden
-                className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white font-display text-[18px] italic shadow-[0_6px_16px_rgba(0,0,0,0.18)]"
+                className="vs-badge pointer-events-none absolute left-1/2 top-1/2 z-20 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white font-display text-[18px] italic shadow-[0_6px_16px_rgba(0,0,0,0.18)]"
               >
                 vs
               </span>
