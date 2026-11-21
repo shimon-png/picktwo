@@ -142,7 +142,7 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await expect(v1.getByText("Called it!")).toBeVisible();
 });
 
-test("vote stack: tap to vote, reason chip, next, skip", async ({ browser }) => {
+test("vote stack: tap to vote, scores, auto-advance, skip", async ({ browser }) => {
   const p = await newUser(browser, "swiper");
   await p.goto("/vote");
   const card = p.locator("main article").first();
@@ -151,12 +151,10 @@ test("vote stack: tap to vote, reason chip, next, skip", async ({ browser }) => 
   await p.waitForTimeout(1600);
   await p.getByRole("button", { name: /^Vote for/ }).first().click();
   await expect(card.getByText(/\d+%/).first()).toBeVisible();
-  await expect(p.getByText(/Why\? optional/)).toBeVisible();
   await snap(p, "08-vote-voted");
-  await p.getByRole("button", { name: /^Next/ }).click();
-  await p.waitForTimeout(500);
+  // The next battle comes up by itself after the scores show.
+  await expect.poll(() => p.locator("main article").first().getAttribute("aria-label"), { timeout: 5000 }).not.toEqual(title1);
   const title2 = await p.locator("main article").first().getAttribute("aria-label");
-  expect(title2).not.toEqual(title1);
   await p.getByRole("button", { name: "Skip" }).click();
   await p.waitForTimeout(500);
   expect(await p.locator("main article").first().getAttribute("aria-label")).not.toEqual(title2);
@@ -233,16 +231,13 @@ test("guest gate: 5 free votes, then sign up with an emailed code (needs DEV_LOG
   expect(after.some((a) => votedSlugs.has(a.slug))).toBe(false);
 });
 
-test("vote stack: the pick can be changed until Next", async ({ browser }) => {
+test("vote stack: a pick is final and the other photo steps aside", async ({ browser }) => {
   const page = await newUser(browser, "changer");
   await page.goto("/vote");
   const [a, b] = await page.getByRole("button", { name: /^Vote for/ }).all();
   await a.click();
   await expect(a).toHaveAttribute("aria-pressed", "true");
-  // The pick fills the card; the other photo steps aside, so switch with the button.
-  await page.getByRole("button", { name: /^Switch to/ }).click();
-  await expect(b).toHaveAttribute("aria-pressed", "true");
-  await expect(a).toHaveAttribute("aria-pressed", "false");
+  await expect(b).toHaveCSS("opacity", "0");
 });
 
 test("profile setup prefills the username from the email, even a short one", async ({ browser }) => {
