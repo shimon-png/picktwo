@@ -108,7 +108,7 @@ body {
 }
 
 @utility card {
-  @apply rounded-[14px] bg-surface;
+  @apply rounded-[14px] bg-white shadow-ring;
 }
 @utility card-ring {
   @apply rounded-[14px] bg-white shadow-ring;
@@ -133,7 +133,7 @@ body {
   @apply btn bg-pp-soft text-amber-800 hover:brightness-95;
 }
 @utility input {
-  @apply w-full rounded-lg border border-ink/12 bg-surface px-3 py-2.5 text-[15px] outline-none placeholder:text-zinc-400 focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/15;
+  @apply w-full rounded-lg border border-ink/12 bg-white px-3 py-2.5 text-[15px] outline-none placeholder:text-zinc-400 focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/15;
 }
 @utility chip {
   @apply inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-[13px] text-zinc-700 transition hover:bg-zinc-200;

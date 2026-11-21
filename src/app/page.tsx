@@ -65,7 +65,7 @@ export default async function HomePage() {
         )}
         <h1 className="display mx-auto mt-5 max-w-md text-[44px] sm:text-[52px]">
           Can’t decide?{" "}
-          <span className="bg-gradient-to-r from-accent to-pink bg-clip-text text-transparent">Ask people like you.</span>
+          <em className="text-b">Ask people like you.</em>
         </h1>
         <p className="mx-auto mt-4 max-w-sm text-[17px] leading-relaxed text-zinc-600">
           Snap two options, get honest votes in minutes — from friends and parents who’ve been there.
@@ -151,7 +151,7 @@ export default async function HomePage() {
       )}
 
       {/* ---------- ⚡ band ---------- */}
-      <section className="mx-4 mb-10 overflow-hidden rounded-[24px] bg-gradient-to-br from-section to-section-glow p-6">
+      <section className="mx-4 mb-10 overflow-hidden rounded-[24px] bg-white p-6 shadow-ring">
         <Zap className="size-8 fill-pp text-pp" aria-hidden />
         <h2 className="mt-3 text-[24px] leading-tight">Help others, get answered first.</h2>
         <p className="mt-2 text-[15px] text-ink/75">Every vote earns ⚡. The more you have, the sooner your next question reaches voters.</p>

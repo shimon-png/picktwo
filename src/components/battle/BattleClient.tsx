@@ -298,7 +298,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       {/* Top reasons */}
       {res && allReasons.length > 0 && (
         <section aria-label="Reasons" className="space-y-2">
-          <h2 className="font-sans text-[15px] font-medium">Top reasons</h2>
+          <h2 className="text-[22px]">Top reasons</h2>
           <ReasonList reasons={allReasons} signedIn={signedIn} isOwner={v.isOwner} onChange={refresh} />
         </section>
       )}
@@ -312,7 +312,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       {/* Owner: share + manage */}
       {v.isOwner && (
         <section className="space-y-3 border-t border-ink/10 pt-5" aria-label="Share and manage">
-          <h2 className="font-sans text-[15px] font-medium">Get more votes</h2>
+          <h2 className="text-[22px]">Get more votes</h2>
           <CopyLink url={shareUrl} />
           <ShareGrid url={shareUrl} title={v.title} />
           <div className="flex flex-wrap gap-1 pt-1">
