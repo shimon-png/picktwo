@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   },
   experimental: { serverActions: { bodySizeLimit: "5mb" } },
   // ~8 MB of JSON: load it from node_modules at runtime instead of bundling it into the route.
-  serverExternalPackages: ["country-state-city"],
+  serverExternalPackages: ["country-state-city", "zipcodes"],
   outputFileTracingIncludes: { "/legal/[doc]": ["./content/legal/**"] },
 };
 

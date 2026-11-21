@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Zap, MessageCircle, ThumbsUp } from "lucide-react";
 import { api, toast } from "@/lib/client";
 import { AGE_RANGES, INTERESTS, KID_AGES, KIDS_STATUS_OPTIONS, SEX_OPTIONS } from "@/lib/constants";
-import { ZIP_RE } from "@/lib/validators";
+import { useZipCheck } from "@/lib/use-zip";
+import { ZipHint } from "@/components/ui/ZipHint";
 import { ChipGroup } from "@/components/compose/ComposeForm";
 import { LocationFields } from "./LocationFields";
 
@@ -41,7 +42,13 @@ export function ProfileForm({
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<"form" | "intro">("form");
   const router = useRouter();
-  const zipValid = ZIP_RE.test(f.zipCode.trim().toUpperCase());
+  const zipCheck = useZipCheck(f.zipCode, f.country || null);
+  const zipValid = zipCheck.state === "ok";
+  // A real ZIP fills in country / state / city when no location is picked yet.
+  useEffect(() => {
+    if (zipCheck.state !== "ok") return;
+    setF((x) => (x.country ? x : { ...x, country: zipCheck.country, region: zipCheck.region ?? "", city: zipCheck.city ?? "" }));
+  }, [zipCheck]);
   const requiredDone = zipValid && !!f.sex && !!f.ageRange;
   const hasKids = f.kidsStatus === "YES";
   const set = <K extends keyof Init>(k: K, v: Init[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -136,12 +143,12 @@ export function ProfileForm({
           autoComplete="postal-code"
           maxLength={10}
           required
-          aria-invalid={!!f.zipCode && !zipValid}
+          aria-invalid={zipCheck.state === "bad"}
           value={f.zipCode}
           onChange={(e) => set("zipCode", e.target.value)}
           placeholder="e.g. 10001"
         />
-        {!!f.zipCode && !zipValid && <p className="mt-1 text-xs text-b">Enter a valid ZIP / postal code</p>}
+        <ZipHint check={zipCheck} />
       </div>
       <ChipGroup
         label={<>Sex <span className="text-b">*</span></>}
