@@ -13,19 +13,22 @@ import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
 import { wink } from "@/components/layout/Logo";
 import { PhotoFlag } from "./PhotoFlag";
+import { ResultBars } from "./ResultBars";
 
 type Side = "A" | "B";
+const other = (s: Side): Side => (s === "A" ? "B" : "A");
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
 
 /**
- * Tinder-style photo throw: grab a photo, it lifts off the card and follows your finger;
- * fling it off either side to pick it, and the deck moves on by itself. Tapping a photo
- * picks it too but stays (results, reason chips, Next) so the pick can still change.
+ * Two ways to pick (Alex, Nov 21 2026): tap the photo you want, or swipe away the one you don't.
+ * Either way the chosen photo grows to fill the card and shows result bars (Everyone, plus
+ * Experts once expert votes exist). Swiping away the loser moves on by itself after the result;
+ * a tap stays (results, reason chips, Next) so the pick can still change.
  */
-const THROW_FRAC = 0.32; // drag past this share of the card width to throw…
+const AWAY_FRAC = 0.28; // drag past this share of the card width to swipe a photo away…
 const FLING_PX_MS = 0.55; // …or flick faster than this
 const THROW_MS = 340;
-const RESULT_MS = 1150; // how long the result shows after a throw before the next battle
+const RESULT_MS = 1800; // how long the result shows after a swipe-away before the next battle
 const FLY_MS = 280;
 
 /** Short buzz where the browser supports it (Android Chrome; iOS Safari has no web vibration). */
@@ -59,7 +62,7 @@ export function SwipeDeck({
   const [writing, setWriting] = useState(false);
   const [draft, setDraft] = useState("");
   const [fly, setFly] = useState<-1 | 1 | 0>(0);
-  // The grabbed photo and its offset, and a photo that has been thrown off the card.
+  // The grabbed photo and its offset, and the photo swiped off the card (the one NOT picked).
   const [grab, setGrab] = useState<{ side: Side; dx: number; dy: number } | null>(null);
   const [thrown, setThrown] = useState<{ side: Side; dir: -1 | 1 } | null>(null);
   const [pp, setPp] = useState(initialPP);
@@ -192,7 +195,7 @@ export function SwipeDeck({
       d.lx = ev.clientX;
       d.lt = ev.timeStamp;
       d.dx = dx;
-      const isArmed = Math.abs(dx) > d.w * THROW_FRAC;
+      const isArmed = Math.abs(dx) > d.w * AWAY_FRAC;
       if (isArmed && !d.armed) buzz(8);
       d.armed = isArmed;
       setGrab({ side, dx, dy: dy * 0.6 });
@@ -206,7 +209,7 @@ export function SwipeDeck({
       justDragged.current = true;
       setTimeout(() => (justDragged.current = false), 400);
       const flung = Math.abs(d.v) > FLING_PX_MS && Math.abs(d.dx) > 24 && Math.sign(d.v) === Math.sign(d.dx);
-      if (Math.abs(d.dx) > d.w * THROW_FRAC || flung) throwPhoto(side, d.dx < 0 ? -1 : 1);
+      if (Math.abs(d.dx) > d.w * AWAY_FRAC || flung) swipeAway(side, d.dx < 0 ? -1 : 1);
       else setGrab(null);
     };
     const onUp = (ev: PointerEvent) => {
@@ -234,19 +237,21 @@ export function SwipeDeck({
     document.addEventListener("mouseout", onLeave);
   }
 
-  // Fling: the photo flies off, the vote counts, the result flashes, then the next battle.
-  async function throwPhoto(side: Side, dir: -1 | 1) {
+  // Swipe away: that photo flies off, the other one is the pick and fills the card, the
+  // result shows, then the next battle.
+  async function swipeAway(side: Side, dir: -1 | 1) {
     if (!card || thrown || fly) return;
     buzz(18);
     setThrown({ side, dir });
     setGrab(null);
     const started = Date.now();
-    const ok = await vote(side);
+    const ok = await vote(other(side));
     if (!ok) {
       setThrown(null);
       return;
     }
     setTimeout(() => advance(dir), Math.max(0, RESULT_MS - (Date.now() - started)));
+    setTimeout(() => buzz(10), 120);
   }
 
   async function giveReason(text: string) {
@@ -355,38 +360,48 @@ export function SwipeDeck({
     ? { transform: `translateX(${fly * 460}px) rotate(${fly * 16}deg)`, opacity: 0, transition: `transform ${FLY_MS}ms ease, opacity ${FLY_MS}ms ease` }
     : { transition: "transform 200ms ease" };
 
+  const armed = !!grab && Math.abs(grab.dx) > (cardRef.current?.offsetWidth ?? 360) * AWAY_FRAC;
+  // The photo that fills the card: the tapped pick, or the one left after a swipe-away.
+  const winner: Side | null = thrown ? other(thrown.side) : voted;
+  const EASE = "cubic-bezier(.2,1,.3,1)";
+  const MOVE = `left 380ms ${EASE}, width 380ms ${EASE}, transform 320ms cubic-bezier(.2,1.4,.4,1), opacity 240ms ease, box-shadow 240ms ease`;
+
   function photoStyle(s: Side): React.CSSProperties {
+    const half: React.CSSProperties = { left: s === "A" ? 0 : "calc(50% + 4px)", width: "calc(50% - 4px)" };
     if (thrown?.side === s) {
       const w = cardRef.current?.offsetWidth ?? 360;
       return {
+        ...half,
         transform: `translate(${thrown.dir * (w + 160)}px, ${grab?.dy ?? -20}px) rotate(${thrown.dir * 28}deg) scale(1.05)`,
         transition: `transform ${THROW_MS}ms cubic-bezier(.4,.1,.8,.6)`,
         zIndex: 30,
         boxShadow: "0 30px 60px rgba(0,0,0,.28)",
       };
     }
+    if (winner === s)
+      return {
+        left: 0,
+        width: "100%",
+        zIndex: 10,
+        boxShadow: s === "A" ? "var(--shadow-glow-a)" : "var(--shadow-glow-b)",
+        transition: MOVE,
+      };
+    // The one not picked (after a tap) steps back out of the way.
+    if (winner) return { ...half, transform: "scale(0.9)", opacity: 0, pointerEvents: "none", transition: MOVE };
     if (grab?.side === s)
       return {
-        transform: `translate(${grab.dx}px, ${grab.dy}px) rotate(${grab.dx / 14}deg) scale(1.06)`,
+        ...half,
+        transform: `translate(${grab.dx}px, ${grab.dy}px) rotate(${grab.dx / 14}deg) scale(1.04)`,
         zIndex: 30,
         boxShadow: "0 26px 50px rgba(0,0,0,.26)",
         cursor: "grabbing",
       };
-    if (grab || thrown) return { transform: "scale(0.96)", opacity: thrown ? 1 : 0.6, transition: "transform 180ms ease, opacity 180ms ease" };
-    // Lifted: the picked photo rises off the card with a glow in its side's colour.
-    if (voted === s)
-      return {
-        transform: "translateY(-6px) scale(1.03)",
-        zIndex: 10,
-        boxShadow: s === "A" ? "var(--shadow-glow-a)" : "var(--shadow-glow-b)",
-        transition: "transform 320ms cubic-bezier(.2,1.4,.4,1), box-shadow 240ms ease",
-      };
-    if (voted) return { transform: "scale(0.97)", opacity: 0.85, transition: "transform 240ms ease, opacity 240ms ease" };
+    // While the other photo is dragged away, this one leans in as the pick-to-be.
+    if (grab) return { ...half, transform: armed ? "scale(1.03)" : "scale(1)", zIndex: 5, transition: MOVE };
     // Not touched: spring back with a little overshoot.
-    return { transition: "transform 320ms cubic-bezier(.2,1.4,.4,1), opacity 180ms ease, box-shadow 200ms ease" };
+    return { ...half, transition: MOVE };
   }
 
-  const armed = !!grab && Math.abs(grab.dx) > (cardRef.current?.offsetWidth ?? 360) * THROW_FRAC;
 
   return (
     <div>
@@ -418,8 +433,8 @@ export function SwipeDeck({
           </h1>
           {card.context && <p className="mt-0.5 line-clamp-2 text-[13px] text-zinc-500">{card.context}</p>}
 
-          <div className="relative mt-3 grid min-h-0 flex-1 grid-cols-2 gap-2">
-            {!grab && !thrown && (
+          <div className="relative mt-3 min-h-0 flex-1">
+            {!grab && !winner && (
               <span
                 aria-hidden
                 className="vs-badge pointer-events-none absolute left-1/2 top-1/2 z-20 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white font-display text-[18px] italic shadow-[0_6px_16px_rgba(0,0,0,0.18)]"
@@ -431,7 +446,7 @@ export function SwipeDeck({
               <button
                 key={s}
                 type="button"
-                className="relative h-full min-h-0 touch-none rounded-[14px] shadow-photo will-change-transform"
+                className="absolute inset-y-0 touch-none rounded-[14px] shadow-photo will-change-transform"
                 style={photoStyle(s)}
                 data-tour={s === "A" ? "option-a" : "option-b"}
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
@@ -450,25 +465,38 @@ export function SwipeDeck({
                   label={s === "A" ? card.labelA : card.labelB}
                   description={s === "A" ? card.descA : card.descB}
                   image={s === "A" ? card.imageA : card.imageB}
-                  percent={result ? (s === "A" ? result.a : result.b) : null}
-                  ring={voted === s}
-                  hot={grab?.side === s && armed}
+                  ring={winner === s}
+                  hot={!!grab && grab.side !== s && armed}
                   big
-                />
+                >
+                  {winner === s && result && (
+                    <ResultBars side={s} everyone={result} experts={card.expert} onPhoto={!!(s === "A" ? card.imageA : card.imageB)} />
+                  )}
+                </OptionFace>
+                {grab?.side === s && (
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute left-1/2 top-1/3 z-30 -translate-x-1/2 -rotate-6 whitespace-nowrap rounded-lg border-2 bg-black/55 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white"
+                    style={{ borderColor: "#fff", opacity: Math.min(1, Math.abs(grab.dx) / ((cardRef.current?.offsetWidth ?? 360) * AWAY_FRAC)) }}
+                  >
+                    Not this
+                  </span>
+                )}
               </button>
             ))}
             {!grab &&
               !thrown &&
               (["A", "B"] as const).map(
                 (s) =>
-                  (s === "A" ? card.imageA : card.imageB) && (
+                  (s === "A" ? card.imageA : card.imageB) &&
+                  (!winner || winner === s) && (
                     <PhotoFlag
                       key={s}
                       battleId={card.id}
                       side={s}
                       label={s === "A" ? card.labelA : card.labelB}
                       onFlagged={afterFlag}
-                      className={s === "A" ? "right-[calc(50%+0.625rem)]" : undefined}
+                      className={s === "A" && !winner ? "right-[calc(50%+0.625rem)]" : undefined}
                     />
                   ),
               )}
@@ -476,7 +504,7 @@ export function SwipeDeck({
 
           {thrown ? (
             <p className="mt-3 text-center font-display text-[26px] leading-tight" aria-live="polite">
-              {result ? `${thrown.side === "A" ? result.a : result.b}% picked ${thrown.side === "A" ? card.labelA : card.labelB}` : "Counted"}
+              {winner === "A" ? card.labelA : card.labelB}
             </p>
           ) : voted ? (
             <div className="mt-3 space-y-2.5" data-nodrag>
@@ -538,13 +566,19 @@ export function SwipeDeck({
                   to earn ⚡ and get your own questions answered first.
                 </p>
               )}
-              <button type="button" className="btn-primary w-full" onClick={next}>
-                Next <ArrowRight className="size-4" aria-hidden />
-              </button>
+              <div className="flex items-center gap-2">
+                <button type="button" className="btn-ghost max-w-[45%] shrink-0 !px-3 text-[13px]" onClick={() => vote(other(voted))}>
+                  <span className="truncate">
+                  Switch to {voted === "A" ? card.labelB : card.labelA}</span>
+                </button>
+                <button type="button" className="btn-primary min-w-0 flex-1" onClick={next}>
+                  Next <ArrowRight className="size-4" aria-hidden />
+                </button>
+              </div>
             </div>
           ) : (
             <div className="mt-3 flex items-center justify-between text-xs text-zinc-500">
-              <span>Throw a photo off the card to pick it</span>
+              <span>Tap your pick, or swipe the other one away</span>
               <button type="button" data-nodrag data-tour="skip" className="btn-ghost !px-2 !py-1 text-[13px] text-ink" onClick={skip}>
                 Skip
               </button>
