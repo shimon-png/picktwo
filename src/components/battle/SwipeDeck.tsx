@@ -370,6 +370,15 @@ export function SwipeDeck({
         cursor: "grabbing",
       };
     if (grab || thrown) return { transform: "scale(0.96)", opacity: thrown ? 1 : 0.6, transition: "transform 180ms ease, opacity 180ms ease" };
+    // Lifted: the picked photo rises off the card with a glow in its side's colour.
+    if (voted === s)
+      return {
+        transform: "translateY(-6px) scale(1.03)",
+        zIndex: 10,
+        boxShadow: s === "A" ? "var(--shadow-glow-a)" : "var(--shadow-glow-b)",
+        transition: "transform 320ms cubic-bezier(.2,1.4,.4,1), box-shadow 240ms ease",
+      };
+    if (voted) return { transform: "scale(0.97)", opacity: 0.85, transition: "transform 240ms ease, opacity 240ms ease" };
     // Not touched: spring back with a little overshoot.
     return { transition: "transform 320ms cubic-bezier(.2,1.4,.4,1), opacity 180ms ease, box-shadow 200ms ease" };
   }
@@ -380,12 +389,12 @@ export function SwipeDeck({
     <div>
       {header}
       <div className="relative h-[calc(100dvh-14.5rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
-        {peek && <div aria-hidden className="absolute inset-0 translate-y-2.5 scale-95 rounded-2xl bg-white opacity-60 shadow-ring" />}
+        {peek && <div aria-hidden className="absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}
           key={card.id}
           aria-label={card.title}
-          className="animate-pop absolute inset-0 flex select-none flex-col rounded-2xl bg-white p-4 shadow-card"
+          className="animate-pop absolute inset-0 flex select-none flex-col rounded-[20px] bg-white p-4 shadow-card"
           style={style}
         >
           <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -409,7 +418,7 @@ export function SwipeDeck({
             {!grab && !thrown && (
               <span
                 aria-hidden
-                className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white font-display text-[18px] italic shadow-card"
+                className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white font-display text-[18px] italic shadow-[0_6px_16px_rgba(0,0,0,0.18)]"
               >
                 vs
               </span>
@@ -418,7 +427,7 @@ export function SwipeDeck({
               <button
                 key={s}
                 type="button"
-                className="relative h-full min-h-0 touch-none rounded-lg will-change-transform"
+                className="relative h-full min-h-0 touch-none rounded-[14px] shadow-photo will-change-transform"
                 style={photoStyle(s)}
                 data-tour={s === "A" ? "option-a" : "option-b"}
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
@@ -503,13 +512,13 @@ export function SwipeDeck({
                           disabled={!!reason}
                           aria-pressed={reason === c}
                           onClick={() => giveReason(c)}
-                          className={cn("chip bg-white shadow-ring", reason === c && "chip-on")}
+                          className={cn("chip", reason === c && "chip-on")}
                         >
                           {c}
                         </button>
                       ))}
                       {!reason && (
-                        <button type="button" className="chip bg-white text-zinc-500 shadow-ring" onClick={() => setWriting(true)}>
+                        <button type="button" className="chip text-zinc-500" onClick={() => setWriting(true)}>
                           Other…
                         </button>
                       )}
