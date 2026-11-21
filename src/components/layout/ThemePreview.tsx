@@ -32,7 +32,7 @@ export function ThemePreview() {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 md:bottom-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.85rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 md:bottom-4">
       <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-ink/90 p-1 text-[12px] text-page shadow-lift backdrop-blur">
         <span className="px-2 opacity-70">Look</span>
         {PREVIEW_THEMES.map((t) => (

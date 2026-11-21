@@ -69,12 +69,12 @@ export function Nav({ unread }: { unread: number }) {
                 aria-current={active ? "page" : undefined}
                 data-tour={`nav-${it.label.toLowerCase()}`}
                 className={cn(
-                  "relative flex flex-col items-center gap-0.5 py-2 text-xs text-zinc-500 md:flex-row md:gap-3 md:rounded-lg md:px-3 md:text-[15px]",
+                  "relative flex flex-col items-center gap-1 py-2 text-[13px] font-medium text-zinc-500 md:flex-row md:gap-3 md:rounded-lg md:px-3 md:text-[15px]",
                   active && "text-ink md:bg-surface",
                 )}
               >
-                <Icon className={cn("size-5", active && "stroke-[2.25]")} aria-hidden />
-                <span>{it.label}</span>
+                <Icon className={cn("size-[26px] stroke-[2.1] md:size-5 md:stroke-2", active && "stroke-[2.5] md:stroke-[2.25]")} aria-hidden />
+                <span className="leading-none md:leading-normal">{it.label}</span>
                 {!!it.badge && (
                   <span className="absolute left-1/2 top-1 ml-2 min-w-4 rounded-full bg-b px-1 text-center text-[10px] font-medium text-white md:static md:ml-auto">
                     {it.badge > 9 ? "9+" : it.badge}
