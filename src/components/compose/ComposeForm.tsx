@@ -64,7 +64,8 @@ export function ComposeForm({
         }
         if (d.target) setTarget(d.target);
         if (d.zipText) setZipText(d.zipText);
-        if (d.deadline) setDeadline(d.deadline);
+        // Drafts saved before the 5-day max could hold 168 (7 days): fall back to the longest preset still offered.
+        if (d.deadline) setDeadline(DEADLINE_PRESETS.some((p) => p.hours === d.deadline) ? d.deadline : DEADLINE_PRESETS[DEADLINE_PRESETS.length - 1].hours);
         if (d.visibility) setVisibility(d.visibility);
       }
     } catch {}

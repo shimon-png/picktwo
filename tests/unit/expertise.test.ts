@@ -56,7 +56,7 @@ describe("battle length", () => {
     const c = new Date("2026-11-21T00:00:00Z");
     expect(latestDeadline(c, 120).toISOString()).toBe("2026-11-26T00:00:00.000Z");
   });
-  it("validator refuses more than 5 days", () => {
+  it("validator cuts longer requests to 5 days instead of refusing", () => {
     const base = {
       title: "Jeans or suit?",
       options: [{ label: "Jeans" }, { label: "Suit" }],
@@ -64,7 +64,7 @@ describe("battle length", () => {
       tags: {},
     };
     expect(createBattleInput.safeParse({ ...base, deadlineHours: 120 }).success).toBe(true);
-    expect(createBattleInput.safeParse({ ...base, deadlineHours: 168 }).success).toBe(false);
+    expect(createBattleInput.parse({ ...base, deadlineHours: 168 }).deadlineHours).toBe(120);
   });
 });
 

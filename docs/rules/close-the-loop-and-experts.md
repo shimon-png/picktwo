@@ -17,7 +17,7 @@ So a poster reporting their final choice is not optional polish. Without it ther
 - A battle can be set to 1 hour, 3 hours, 24 hours, 3 days or 5 days. Nothing longer.
 - Extending a battle can't push it past 5 days from when it was posted.
 - Battles that were already open with a longer deadline were shortened to 5 days from posting by migration `0009_expert_tiers.sql`.
-- Config: `maxBattleHours` (economy, default 120). Enforced in `createBattle` and `extendDeadline`; the request validator also refuses more than 120 hours.
+- Config: `maxBattleHours` (economy, default 120). Enforced in `createBattle` and `extendDeadline`; longer requests (e.g. old saved drafts) are cut to 120 hours rather than refused.
 
 ## Rule 2: close the loop or you can't post
 
