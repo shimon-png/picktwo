@@ -7,7 +7,7 @@ import { Logo } from "./Logo";
 
 /** Full-screen flows hide the app chrome (header + tab bar). */
 export function isFullScreen(path: string) {
-  return path.startsWith("/post") || /^\/b\/[^/]+\/(report|published)/.test(path);
+  return path.startsWith("/post") || /^\/b\/[^/]+\/report/.test(path);
 }
 
 /** The logged-out homepage is a landing page: no desktop sidebar. */
