@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, ShieldCheck, Zap } from "lucide-react";
+import { CheckCircle2, ShieldCheck, X, Zap } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
@@ -27,10 +27,18 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
   const economy = await getEconomy();
   const t = pointsTier(user.ppBalance, economy.tierHighAt, economy.tierTopAt);
   const url = appUrl(`/b/${slug}`);
+  const close = (
+    <div className="flex justify-end">
+      <Link href="/you" className="-mr-2 rounded-lg p-2 text-ink hover:bg-surface" aria-label="Close, go to your battles">
+        <X className="size-5" aria-hidden />
+      </Link>
+    </div>
+  );
 
   if (b.status === "HIDDEN")
     return (
-      <div className="space-y-3 pt-10">
+      <div className="space-y-3 pt-2">
+        {close}
         <ShieldCheck className="size-8 text-accent" aria-hidden />
         <h1 className="display text-[26px]">Your battle is in review</h1>
         <p className="text-[15px] text-zinc-600">
@@ -46,7 +54,8 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
     );
 
   return (
-    <div className="-mx-4 -mt-2 flex min-h-dvh flex-col bg-gradient-to-b from-accent-900/70 to-page to-40% px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10">
+    <div className="-mx-4 -mt-2 flex flex-col bg-gradient-to-b from-accent-900/70 to-page to-40% px-4 pb-6 pt-2">
+      {close}
       <CheckCircle2 className="size-8 text-accent" aria-hidden />
       <h1 className="display mt-3 text-[26px]">Your battle is live</h1>
       {postedAs && <p className="mt-1 text-[13px] text-violet">Posted as @{author?.handle}</p>}
@@ -56,8 +65,6 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
         <CopyLink url={url} />
         <ShareGrid url={url} title={b.title} />
       </div>
-
-      <div className="flex-1" />
 
       <section className="card mt-8 p-4">
         <h2 className="text-[22px]">Get answered faster</h2>
