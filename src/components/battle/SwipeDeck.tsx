@@ -476,8 +476,8 @@ export function SwipeDeck({
                 {grab?.side === s && (
                   <span
                     aria-hidden
-                    className="pointer-events-none absolute right-3 top-3 z-30 rotate-6 rounded-lg border-2 border-white bg-black/45 px-2 py-0.5 text-[12px] font-bold uppercase tracking-wider text-white"
-                    style={{ opacity: Math.min(1, Math.abs(grab.dx) / ((cardRef.current?.offsetWidth ?? 360) * AWAY_FRAC)) }}
+                    className="pointer-events-none absolute left-1/2 top-1/3 z-30 -translate-x-1/2 -rotate-6 whitespace-nowrap rounded-lg border-2 bg-black/55 px-2.5 py-1 text-[13px] font-bold uppercase tracking-wider text-white"
+                    style={{ borderColor: "#fff", opacity: Math.min(1, Math.abs(grab.dx) / ((cardRef.current?.offsetWidth ?? 360) * AWAY_FRAC)) }}
                   >
                     Not this
                   </span>
