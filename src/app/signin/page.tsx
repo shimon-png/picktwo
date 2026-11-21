@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { AuthError } from "next-auth";
 import { signIn, enabledProviders } from "@/server/auth";
 import { getCurrentUser } from "@/server/viewer";
 import { SignupFlow } from "@/components/auth/SignupFlow";
@@ -18,15 +17,6 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   async function googleAction() {
     "use server";
     await signIn("google", { redirectTo: callbackUrl });
-  }
-  async function devAction(form: FormData) {
-    "use server";
-    try {
-      await signIn("dev", { email: String(form.get("email") || ""), redirectTo: callbackUrl });
-    } catch (e) {
-      if (e instanceof AuthError) redirect(`/signin?error=dev&callbackUrl=${encodeURIComponent(callbackUrl)}`);
-      throw e;
-    }
   }
 
   if (sp.sent)
@@ -61,13 +51,6 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
           </form>
         )}
         <SignupFlow next={callbackUrl} />
-        {enabledProviders.dev && (
-          <form action={devAction} className="space-y-2 border-t border-dashed border-zinc-300 pt-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-amber-600">Demo login (DEV_LOGIN=true)</p>
-            <input name="email" type="email" required className="input" placeholder="any@email.com" aria-label="Demo email" />
-            <button className="btn-pp w-full">Sign in instantly</button>
-          </form>
-        )}
       </div>
     </div>
   );
