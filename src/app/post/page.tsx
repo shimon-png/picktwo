@@ -18,7 +18,6 @@ export default async function PostPage() {
       pp={user.ppBalance}
       tiers={{ highAt: economy.tierHighAt, topAt: economy.tierTopAt }}
       openLoops={openLoops}
-      accountConsent={user.dataConsent}
       isAdmin={isAdmin(user)}
     />
   );
