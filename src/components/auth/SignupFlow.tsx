@@ -8,9 +8,10 @@ import { AGE_RANGES, SEX_OPTIONS } from "@/lib/constants";
 import { ZIP_RE } from "@/lib/validators";
 import { ChipGroup } from "@/components/compose/ComposeForm";
 
-type Step = "email" | "code" | "about" | "zip";
-const STEPS: Step[] = ["email", "code", "about", "zip"];
-type Status = { complete: boolean; sex: string | null; ageRange: string | null; zipCode: string | null };
+type Step = "email" | "code" | "username" | "about";
+const STEPS: Step[] = ["email", "code", "username", "about"];
+type Status = { complete: boolean; handle: string; sex: string | null; ageRange: string | null; zipCode: string | null };
+const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 
 const CODE_ERRORS: Record<string, string> = {
   invalid: "That code isn’t right. Check the email and try again.",
@@ -19,7 +20,7 @@ const CODE_ERRORS: Record<string, string> = {
 };
 
 /**
- * Sign up / sign in in 4 steps: email → 6-digit code → sex + age → ZIP.
+ * Sign up / sign in in 4 steps: email → 6-digit code → username → sex, age + ZIP.
  * Existing users with a complete profile finish after the code. Ends with a full page load of `next`
  * so the server links this device (and its guest votes) to the account.
  */
@@ -28,6 +29,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
+  const [handle, setHandle] = useState("");
   const [sex, setSex] = useState("");
   const [ageRange, setAgeRange] = useState("");
   const [zip, setZip] = useState("");
@@ -64,10 +66,11 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
       }
       const s = await api<Status>("/api/me/quick-profile");
       if (s.complete) return done();
+      setHandle(s.handle ?? "");
       setSex(s.sex ?? "");
       setAgeRange(s.ageRange ?? "");
       setZip(s.zipCode ?? "");
-      setStep("about");
+      setStep("username");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -80,10 +83,12 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
     setBusy(true);
     setError(null);
     try {
-      await api("/api/me/quick-profile", { body: { sex, ageRange, zipCode: zip } });
+      await api("/api/me/quick-profile", { body: { handle, sex, ageRange, zipCode: zip } });
       done();
     } catch (err) {
-      setError((err as Error).message);
+      const e = err as Error & { code?: string };
+      setError(e.message);
+      if (e.code === "CONFLICT") setStep("username");
       setBusy(false);
     }
   }
@@ -191,14 +196,43 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
         </form>
       )}
 
-      {step === "about" && (
+      {step === "username" && (
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            setStep("zip");
+            setError(null);
+            setStep("about");
           }}
-          className="space-y-4"
+          className="space-y-3"
         >
+          <div>
+            <label htmlFor="signup-handle" className="label">
+              Pick a username <span className="text-b">*</span>
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400">@</span>
+              <input
+                id="signup-handle"
+                autoFocus
+                required
+                autoCapitalize="none"
+                autoComplete="username"
+                className="input !pl-7"
+                maxLength={20}
+                value={handle}
+                onChange={(e) => setHandle(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+              />
+            </div>
+            <p className="mt-1 text-xs text-zinc-500">3–20 letters, numbers or underscores. You can change it later.</p>
+          </div>
+          <button className="btn-primary w-full py-3" disabled={!HANDLE_RE.test(handle)}>
+            Continue
+          </button>
+        </form>
+      )}
+
+      {step === "about" && (
+        <form onSubmit={finish} className="space-y-4">
           <p className="text-sm text-zinc-600">This helps us match you with people like you.</p>
           <ChipGroup
             label={<>Sex <span className="text-b">*</span></>}
@@ -214,21 +248,12 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
             onChange={(v) => setAgeRange(v[0] ?? "")}
             single
           />
-          <button className="btn-primary w-full py-3" disabled={!sex || !ageRange}>
-            Continue
-          </button>
-        </form>
-      )}
-
-      {step === "zip" && (
-        <form onSubmit={finish} className="space-y-3">
           <div>
             <label htmlFor="signup-zip" className="label">
               ZIP code <span className="text-b">*</span>
             </label>
             <input
               id="signup-zip"
-              autoFocus
               required
               autoComplete="postal-code"
               className="input"
@@ -238,10 +263,10 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
               onChange={(e) => setZip(e.target.value)}
             />
           </div>
-          <button className="btn-primary w-full py-3" disabled={busy || !zipOk}>
+          <button className="btn-primary w-full py-3" disabled={busy || !sex || !ageRange || !zipOk}>
             {busy ? "Finishing…" : finishLabel}
           </button>
-          <button type="button" className="w-full text-sm text-zinc-500" onClick={() => setStep("about")}>
+          <button type="button" className="w-full text-sm text-zinc-500" onClick={() => setStep("username")}>
             Back
           </button>
         </form>

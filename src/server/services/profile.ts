@@ -1,11 +1,14 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "../db";
 import { users, consentEvents, type User } from "../db/schema";
 import { POLICY_VERSION } from "@/lib/constants";
 import { track } from "../analytics";
+import { AppError } from "../errors";
+import { assertCleanText } from "../moderation";
 import { handleBase } from "./signin-code-utils";
 
-async function freeHandle(email: string | null): Promise<string> {
+/** A free username suggestion based on the email. */
+export async function suggestHandle(email: string | null): Promise<string> {
   const base = handleBase(email);
   for (let i = 0; i < 8; i++) {
     const h = i === 0 ? base : `${base}${Math.floor(1000 + Math.random() * 9000)}`;
@@ -16,10 +19,15 @@ async function freeHandle(email: string | null): Promise<string> {
 }
 
 /**
- * Saves the required sign-up fields and finishes onboarding in one go. New users get a handle from their
- * email (editable later in Settings). Age ranges start at 18, so picking one confirms the user is an adult.
+ * Saves the sign-up fields (username, sex, age range, ZIP) and finishes onboarding in one go. Age ranges start at 18, so picking one confirms the user is an adult.
  */
-export async function saveQuickProfile(u: User, p: { zipCode: string; sex: string; ageRange: string }) {
+export async function saveQuickProfile(u: User, p: { handle: string; zipCode: string; sex: string; ageRange: string }) {
+  assertCleanText(p.handle);
+  const [taken] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.handle, p.handle), ne(users.id, u.id)));
+  if (taken) throw new AppError("CONFLICT", "That username is taken — try another");
   const first = !u.onboardedAt;
   await db
     .update(users)
@@ -28,7 +36,7 @@ export async function saveQuickProfile(u: User, p: { zipCode: string; sex: strin
       sex: p.sex,
       ageRange: p.ageRange,
       isAdultConfirmed: true,
-      handle: u.handle ?? (await freeHandle(u.email)),
+      handle: p.handle,
       onboardedAt: u.onboardedAt ?? new Date(),
     })
     .where(eq(users.id, u.id));

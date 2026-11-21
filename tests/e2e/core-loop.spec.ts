@@ -205,11 +205,15 @@ test("guest gate: 5 free votes, then sign up with an emailed code (needs DEV_LOG
   const code = (await gate.getByText(/Dev mode: your code is/).innerText()).match(/\d{6}/)![0];
   await gate.getByLabel("Code").fill(code);
   await gate.getByRole("button", { name: "Verify" }).click();
+  await expect(gate.getByText("Step 3 of 4")).toBeVisible();
+  await gate.getByLabel(/Pick a username/).fill(`gate_${stamp}`.slice(0, 20));
+  await gate.getByRole("button", { name: "Continue" }).click();
+  await expect(gate.getByText("Step 4 of 4")).toBeVisible();
   await gate.getByRole("button", { name: "Female", exact: true }).click();
   await gate.getByRole("button", { name: "35–44" }).click();
-  await gate.getByRole("button", { name: "Continue" }).click();
   await gate.getByLabel(/ZIP code/).fill("94110");
   await gate.getByRole("button", { name: "Finish and keep voting" }).click();
+  await page.waitForURL(/\/vote/);
   await expect(page.getByText(/to High priority|Top priority/)).toBeVisible();
   // Guest votes carried over: none of the 5 battles come back.
   const after = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];
