@@ -45,7 +45,7 @@ export function OptionFace({
   return (
     <span
       className={cn(
-        "relative flex h-full w-full flex-col overflow-hidden rounded-lg text-left transition",
+        "relative flex h-full w-full flex-col overflow-hidden rounded-[14px] text-left transition",
         isA ? "bg-gradient-to-b from-a-soft to-white" : "bg-gradient-to-b from-b-soft to-white",
         className,
       )}
@@ -82,7 +82,7 @@ export function OptionFace({
       {(ring || hot) && (
         <span
           aria-hidden
-          className={cn("pointer-events-none absolute inset-0 z-20 rounded-lg ring-inset", ring ? "ring-2 ring-ink" : isA ? "ring-2 ring-a/60" : "ring-2 ring-b/60")}
+          className={cn("pointer-events-none absolute inset-0 z-20 rounded-[14px] ring-inset", ring ? (isA ? "ring-[2.5px] ring-a" : "ring-[2.5px] ring-b") : isA ? "ring-2 ring-a/60" : "ring-2 ring-b/60")}
         />
       )}
     </span>

@@ -68,8 +68,14 @@
   --color-zinc-950: oklch(0.13 0 0);
 
   --shadow-ring: 0 0 0 1px oklch(0.91 0.008 75);
-  --shadow-card: 0 0 0 1px oklch(0.91 0.008 75), 0 8px 24px rgba(40, 30, 20, 0.08);
-  --shadow-lift: 0 0 0 1px oklch(0.88 0.008 75), 0 18px 44px rgba(40, 30, 20, 0.14);
+  /* "Lifted" depth (Nov 2026): two-layer soft shadows so cards and photos float off the page. */
+  --shadow-soft: 0 0 0 1px rgba(40, 30, 20, 0.04), 0 1px 2px rgba(40, 30, 20, 0.05), 0 8px 20px rgba(40, 30, 20, 0.08);
+  --shadow-card: 0 0 0 1px rgba(40, 30, 20, 0.04), 0 1px 2px rgba(40, 30, 20, 0.06), 0 14px 36px rgba(40, 30, 20, 0.13);
+  --shadow-lift: 0 0 0 1px rgba(40, 30, 20, 0.05), 0 2px 4px rgba(40, 30, 20, 0.06), 0 22px 48px rgba(40, 30, 20, 0.18);
+  --shadow-photo: 0 2px 4px rgba(0, 0, 0, 0.08), 0 10px 22px rgba(0, 0, 0, 0.14);
+  --shadow-glow-a: 0 18px 34px rgba(47, 95, 240, 0.38), 0 4px 10px rgba(47, 95, 240, 0.2);
+  --shadow-glow-b: 0 18px 34px rgba(232, 56, 79, 0.36), 0 4px 10px rgba(232, 56, 79, 0.2);
+  --shadow-button: 0 2px 4px rgba(0, 0, 0, 0.12), 0 8px 18px rgba(0, 0, 0, 0.2);
 
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Instrument Serif", ui-serif, Georgia, serif;
@@ -108,7 +114,7 @@ body {
 }
 
 @utility card {
-  @apply rounded-[14px] bg-white shadow-ring;
+  @apply rounded-2xl bg-white shadow-soft;
 }
 @utility card-ring {
   @apply rounded-[14px] bg-white shadow-ring;
@@ -118,7 +124,7 @@ body {
   @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-[15px] font-medium transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45;
 }
 @utility btn-primary {
-  @apply btn bg-ink text-white hover:bg-zinc-800;
+  @apply btn bg-ink text-white shadow-button hover:bg-zinc-800;
 }
 @utility btn-accent-outline {
   @apply btn border border-accent text-accent hover:bg-accent/12;
@@ -138,7 +144,7 @@ body {
   @apply w-full rounded-lg border border-ink/12 bg-white px-3 py-2.5 text-[16px] outline-none placeholder:text-zinc-400 focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/15;
 }
 @utility chip {
-  @apply inline-flex items-center gap-1 rounded-full bg-surface px-3 py-1.5 text-[13px] text-zinc-700 transition hover:bg-zinc-200;
+  @apply inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-[13px] text-zinc-700 shadow-[0_0_0_1px_rgba(40,30,20,0.06),0_1px_3px_rgba(40,30,20,0.08)] transition hover:bg-surface;
 }
 @utility chip-on {
   @apply bg-ink text-white ring-0 hover:bg-zinc-800;
