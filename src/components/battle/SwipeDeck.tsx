@@ -483,7 +483,7 @@ export function SwipeDeck({
                     >
                       <input
                         autoFocus
-                        className="input !py-1.5 text-sm"
+                        className="input !py-1.5"
                         placeholder="One line on why…"
                         maxLength={140}
                         value={draft}

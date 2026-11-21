@@ -128,7 +128,7 @@ export function OptionEditor({ side, value, onChange }: { side: "A" | "B"; value
           <div className="flex size-full flex-col items-center justify-center gap-2 px-4">
             <input
               autoFocus
-              className="input !bg-white text-sm"
+              className="input !bg-white"
               placeholder="Paste a link"
               value={link}
               inputMode="url"
