@@ -239,7 +239,8 @@ test("vote stack: the pick can be changed until Next", async ({ browser }) => {
   const [a, b] = await page.getByRole("button", { name: /^Vote for/ }).all();
   await a.click();
   await expect(a).toHaveAttribute("aria-pressed", "true");
-  await b.click();
+  // The pick fills the card; the other photo steps aside, so switch with the button.
+  await page.getByRole("button", { name: /^Switch to/ }).click();
   await expect(b).toHaveAttribute("aria-pressed", "true");
   await expect(a).toHaveAttribute("aria-pressed", "false");
 });

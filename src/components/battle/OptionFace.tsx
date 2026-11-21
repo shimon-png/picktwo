@@ -28,6 +28,7 @@ export function OptionFace({
   className,
   big,
   compact,
+  children,
 }: {
   side: "A" | "B";
   label: string;
@@ -40,6 +41,8 @@ export function OptionFace({
   big?: boolean;
   /** Squeezed narrow by the drag-to-grow deck: keep the photo and %, hide the text. */
   compact?: boolean;
+  /** Extra content under the name (e.g. result bars on the picked photo). */
+  children?: React.ReactNode;
 }) {
   const isA = side === "A";
   return (
@@ -78,6 +81,7 @@ export function OptionFace({
         {description && !compact && (
           <span className={cn("mt-0.5 line-clamp-2 block text-[11px] leading-snug", image ? "text-white/80" : "text-zinc-500")}>{description}</span>
         )}
+        {children}
       </span>
       {(ring || hot) && (
         <span
