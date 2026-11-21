@@ -194,9 +194,10 @@ body {
 .hero-card-out { animation: hero-out 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }
 
 /* ------------------------------------------------------------------
- * Preview themes (Nov 2026). Not the shipped look: only applied when a
- * visitor opens ?theme=fizz or ?theme=arcade (stored per browser, see
- * components/layout/ThemePreview.tsx). ?theme=off goes back to Prompt.
+ * Themes (Nov 2026). Arcade Night is the default (DEFAULT_THEME in
+ * lib/theme-preview.ts, rendered on <html>). ?theme=prompt / fizz / arcade
+ * switches per browser (components/layout/ThemePreview.tsx); ?theme=off
+ * returns to the default. Prompt is the un-themed base above.
  * Unlayered so they win over utilities, which read these variables.
  * ------------------------------------------------------------------ */
 html[data-theme="fizz"] {
@@ -254,6 +255,15 @@ html[data-theme="arcade"] {
   --color-zinc-700: #d6d1f0;
   --color-zinc-800: #e6e2fa;
   --color-amber-800: #c6ff3d;
+  --color-accent-800: #22305a;
+  --color-teal-soft: #123c46;
+  --color-green-soft: #16402a;
+  --color-violet-soft: #2e2160;
+  --color-amber-soft: #3d3418;
+  --color-section: #2a2150;
+  --color-section-glow: #1f1940;
+  /* "White" surfaces become the night panel; real white text is restored below. */
+  --color-white: #1f1940;
   --font-display: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
   --shadow-ring: 0 0 0 1px #3a3170;
   --shadow-soft: 0 0 0 1px #3a3170;
@@ -269,6 +279,10 @@ html[data-theme="arcade"] .deck-card h1 { color: #c6ff3d; text-shadow: 0 0 18px 
 /* Panels: everything that is white in Prompt becomes the night panel. Photo text stays white. */
 html[data-theme="arcade"] :is(.bg-white, .card, .card-ring, .input, .chip, .btn-outline, .deck-card, .deck-peek) { background-color: #1f1940; }
 html[data-theme="arcade"] :is(.bg-white\/90, .bg-white\/80, .bg-white\/60) { background-color: rgb(31 25 64 / 0.85); }
+html[data-theme="arcade"] .text-white { color: #fff; }
+html[data-theme="arcade"] .text-white\/80 { color: rgb(255 255 255 / 0.8); }
+html[data-theme="arcade"] .text-white\/70 { color: rgb(255 255 255 / 0.7); }
+html[data-theme="arcade"] .fill-white { fill: #fff; }
 html[data-theme="arcade"] .btn-primary { background: #c6ff3d; color: #120e26; font-weight: 600; }
 html[data-theme="arcade"] .chip-on { background: #c6ff3d; color: #120e26; }
 html[data-theme="arcade"] .vs-badge { background: #120e26; color: #c6ff3d; box-shadow: 0 0 0 2px #c6ff3d, 0 0 14px rgba(198, 255, 61, 0.6); font: 700 13px "Chakra Petch", sans-serif; }

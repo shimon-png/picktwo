@@ -3,19 +3,20 @@
 import { useEffect, useState } from "react";
 
 /**
- * Design preview switcher. Opening any page with ?theme=fizz or ?theme=arcade turns a
- * preview theme on for this browser only (globals.css `html[data-theme=…]`), and shows
- * a small pill to flip between looks. ?theme=off, or "Prompt" + ✕ on the pill, clears it.
- * Everyone else keeps the shipped Prompt look.
+ * Theme switcher. Everyone gets DEFAULT_THEME (rendered on <html>). Opening any page with
+ * ?theme=prompt|fizz|arcade saves a choice for this browser only and shows this pill to flip
+ * between looks; ✕ or ?theme=off drops the choice and hides the pill.
  */
-import { PREVIEW_THEMES, THEME_PREVIEW_KEY as KEY } from "@/lib/theme-preview";
+import { DEFAULT_THEME, PREVIEW_THEMES, THEME_PREVIEW_KEY as KEY, applyTheme } from "@/lib/theme-preview";
 
 export function ThemePreview() {
   const [theme, setTheme] = useState<string | null>(null);
 
   useEffect(() => {
     try {
-      setTheme(localStorage.getItem(KEY));
+      const t = localStorage.getItem(KEY);
+      setTheme(t);
+      applyTheme(t); // keep the attribute if React re-rendered <html>
     } catch {}
   }, []);
 
@@ -26,21 +27,20 @@ export function ThemePreview() {
       if (id) localStorage.setItem(KEY, id);
       else localStorage.removeItem(KEY);
     } catch {}
-    if (id && id !== "prompt") document.documentElement.dataset.theme = id;
-    else delete document.documentElement.dataset.theme;
+    applyTheme(id);
     setTheme(id);
   }
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-4 md:bottom-4">
       <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-ink/90 p-1 text-[12px] text-page shadow-lift backdrop-blur">
-        <span className="px-2 opacity-70">Preview</span>
+        <span className="px-2 opacity-70">Look</span>
         {PREVIEW_THEMES.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => pick(t.id)}
-            className={theme === t.id ? "rounded-full bg-page px-2.5 py-1 text-ink" : "rounded-full px-2.5 py-1"}
+            className={(theme ?? DEFAULT_THEME) === t.id ? "rounded-full bg-page px-2.5 py-1 text-ink" : "rounded-full px-2.5 py-1"}
           >
             {t.name}
           </button>
