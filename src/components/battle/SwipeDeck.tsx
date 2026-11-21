@@ -10,6 +10,7 @@ import { AVATAR_TONES, REASON_CHIPS, TONE_CLASSES, kidAgeLabel } from "@/lib/con
 import { pointsTier } from "@/server/services/priority";
 import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
+import { PhotoFlag } from "./PhotoFlag";
 
 type Side = "A" | "B";
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
@@ -272,6 +273,13 @@ export function SwipeDeck({
     advance(-1);
   }
 
+  /** A flagged battle leaves the deck right away. */
+  function afterFlag() {
+    if (!card) return;
+    if (voted) next();
+    else skip();
+  }
+
   function next() {
     if (!voted || fly || thrown) return;
     advance(voted === "A" ? -1 : 1);
@@ -281,7 +289,7 @@ export function SwipeDeck({
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (tag === "INPUT" || tag === "TEXTAREA" || document.querySelector("[data-flag-sheet]")) return;
       if (e.key === "ArrowLeft") vote("A");
       else if (e.key === "ArrowRight") vote("B");
       else if (e.key === "ArrowDown") skip();
@@ -436,6 +444,21 @@ export function SwipeDeck({
                 />
               </button>
             ))}
+            {!grab &&
+              !thrown &&
+              (["A", "B"] as const).map(
+                (s) =>
+                  (s === "A" ? card.imageA : card.imageB) && (
+                    <PhotoFlag
+                      key={s}
+                      battleId={card.id}
+                      side={s}
+                      label={s === "A" ? card.labelA : card.labelB}
+                      onFlagged={afterFlag}
+                      className={s === "A" ? "right-[calc(50%+0.625rem)]" : undefined}
+                    />
+                  ),
+              )}
           </div>
 
           {thrown ? (

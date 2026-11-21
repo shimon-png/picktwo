@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, Zap } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Zap } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
@@ -27,6 +27,23 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
   const economy = await getEconomy();
   const t = pointsTier(user.ppBalance, economy.tierHighAt, economy.tierTopAt);
   const url = appUrl(`/b/${slug}`);
+
+  if (b.status === "HIDDEN")
+    return (
+      <div className="space-y-3 pt-10">
+        <ShieldCheck className="size-8 text-accent" aria-hidden />
+        <h1 className="display text-[26px]">Your battle is in review</h1>
+        <p className="text-[15px] text-zinc-600">
+          Our photo check wants a person to take a quick look before it goes public. That usually happens within a day, and you don’t need to do anything.
+        </p>
+        <Link href="/vote" className="btn-primary w-full">
+          Vote while I wait
+        </Link>
+        <Link href={`/b/${slug}`} className="btn-ghost w-full">
+          View my battle
+        </Link>
+      </div>
+    );
 
   return (
     <div className="-mx-4 -mt-2 flex min-h-dvh flex-col bg-gradient-to-b from-accent-900/70 to-page to-40% px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10">
