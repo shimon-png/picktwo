@@ -62,7 +62,7 @@ export function HeroRotator({ battles }: { battles: BattleCard[] }) {
         className={cn("relative", leaving ? "hero-card-out" : "hero-card-in")}
       >
         {asker && (
-          <div className="absolute -top-4 left-4 z-10 rounded-full bg-ink px-3 py-1 text-xs text-white shadow-card">{asker} needs a second opinion 👇</div>
+          <div className="absolute -top-4 left-4 z-10 rounded-full bg-ink px-3 py-1 text-xs text-page shadow-card">{asker} needs a second opinion 👇</div>
         )}
         <HeroBattle b={b} onVoted={() => setVoted(true)} />
       </div>

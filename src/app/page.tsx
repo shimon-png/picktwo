@@ -82,9 +82,9 @@ export default async function HomePage() {
 
         {live && (
           <div className="relative mx-auto mt-10 max-w-sm text-left">
-            {/* fanned cards behind the live one */}
-            <div aria-hidden className="absolute inset-x-6 -top-3 h-24 -rotate-6 rounded-[22px] bg-pink-soft shadow-ring" />
-            <div aria-hidden className="absolute inset-x-6 -top-3 h-24 rotate-6 rounded-[22px] bg-accent-900 shadow-ring" />
+            {/* stacked cards behind the live one: straight, centred, symmetric inset so the edges line up */}
+            <div aria-hidden className="absolute inset-x-6 -top-5 bottom-8 rounded-[22px] bg-pink-soft shadow-ring" />
+            <div aria-hidden className="absolute inset-x-3 -top-2.5 bottom-8 rounded-[22px] bg-accent-900 shadow-ring" />
             <div className="relative">
               <HeroRotator battles={heroBattles} />
             </div>
