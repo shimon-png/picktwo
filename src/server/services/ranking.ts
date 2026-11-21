@@ -51,3 +51,31 @@ export function diversify<T extends { categoryId: string; authorId: string }>(so
   }
   return out;
 }
+
+/** FNV-1a 32-bit hash → [0, 1). Deterministic, so a seed gives a stable order. */
+function hashUnit(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0) / 0x100000000;
+}
+
+/** Spread of the per-viewer shuffle: scores are multiplied by a factor in [SHUFFLE_MIN, SHUFFLE_MIN + 1). */
+export const SHUFFLE_MIN = 0.6;
+
+/**
+ * Per-viewer random multiplier for a battle's feed score, so every viewer sees
+ * a different order. Deterministic for (seed, battleId), so the order holds
+ * still while the seed does (one viewer, one day). The spread (~2.7x max ratio)
+ * shuffles battles of similar score while a boost (2x) still lifts a battle on average.
+ */
+export function shuffleFactor(seed: string, battleId: string): number {
+  return SHUFFLE_MIN + hashUnit(`${seed}:${battleId}`);
+}
+
+/** Seed for a viewer's shuffle: their account or device, rotated daily (UTC). */
+export function shuffleSeed(viewerKey: string, now: Date): string {
+  return `${viewerKey}:${now.toISOString().slice(0, 10)}`;
+}
