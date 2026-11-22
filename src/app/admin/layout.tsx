@@ -19,6 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           Moderation
           {flagged > 0 && <span className="ml-1.5 rounded-full bg-b px-1.5 text-[11px] text-white">{flagged}</span>}
         </Link>
+        <Link href="/admin/battles" className="chip">Battles</Link>
         <Link href="/admin/messages" className="chip">
           Messages
           {unread > 0 && <span className="ml-1.5 rounded-full bg-b px-1.5 text-[11px] text-white">{unread}</span>}
