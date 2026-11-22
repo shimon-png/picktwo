@@ -14,6 +14,7 @@ import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { getEconomy } from "@/server/services/config";
 import { TIER_LABEL, expertTier } from "@/server/services/expertise";
 import { listFollowers, listFollowing } from "@/server/services/social";
+import { MessageButton } from "@/components/messages/MessageButton";
 import { PersonRow } from "@/components/people/PersonRow";
 import { ExpandList } from "@/components/ui/ExpandList";
 
@@ -101,8 +102,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
             {relation && <span className="rounded-full bg-a-soft px-2 py-0.5 text-xs text-a">{relation}</span>}
           </div>
           {!isMe && me && (
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap gap-2">
               <FollowButton userId={u.id} initial={!!iFollow} followsMe={followsMe} />
+              {u.email && <MessageButton handle={u.handle!} />}
             </div>
           )}
           {!me && (

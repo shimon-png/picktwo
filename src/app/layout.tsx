@@ -12,6 +12,8 @@ import "./globals.css";
 import { getViewer } from "@/server/viewer";
 import { linkDevice } from "@/server/services/votes";
 import { unreadCount } from "@/server/services/notifications";
+import { unreadMessageCount } from "@/server/services/messages";
+import { MessagesButton } from "@/components/messages/MessagesButton";
 import { countOpenLoops } from "@/server/services/points";
 import { getEconomy } from "@/server/services/config";
 import { Nav, ChromeOnly, ContentShell, HeaderLogo, YouButton } from "@/components/layout/Nav";
@@ -37,11 +39,12 @@ export const viewport: Viewport = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const { user, deviceId } = await getViewer();
   let unread = 0;
+  let unreadDms = 0;
   let openLoops = 0;
   const economy = await getEconomy();
   if (user) {
     if (deviceId) await linkDevice(user.id, deviceId).catch((e) => console.error("[linkDevice]", e));
-    [unread, openLoops] = await Promise.all([unreadCount(user.id), countOpenLoops(user.id, economy)]);
+    [unread, openLoops, unreadDms] = await Promise.all([unreadCount(user.id), countOpenLoops(user.id, economy), unreadMessageCount(user.id)]);
   }
   return (
     <html lang="en" data-theme={DEFAULT_THEME === "prompt" ? undefined : DEFAULT_THEME} suppressHydrationWarning>
@@ -64,6 +67,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <div data-tour="account" className="flex flex-1 justify-center">
                       <PriorityPill initial={user.ppBalance} openLoops={openLoops} highAt={economy.tierHighAt} topAt={economy.tierTopAt} />
                     </div>
+                    <MessagesButton unread={unreadDms} />
                     <YouButton name={user.name || user.handle || "?"} image={user.image} unread={unread} />
                   </>
                 ) : (

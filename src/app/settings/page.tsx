@@ -42,7 +42,7 @@ export default async function SettingsPage() {
           }}
         />
       </section>
-      <SettingsPanel initial={{ notifyEmail: user.notifyEmail, marketingEmail: user.marketingEmail, dataConsent: user.dataConsent }} />
+      <SettingsPanel initial={{ notifyEmail: user.notifyEmail, marketingEmail: user.marketingEmail, dataConsent: user.dataConsent, showInVoteMatches: user.showInVoteMatches, dmPolicy: user.dmPolicy }} />
       <div className="flex flex-wrap gap-2">
         <form action={logout}>
           <button className="btn-outline">Sign out</button>

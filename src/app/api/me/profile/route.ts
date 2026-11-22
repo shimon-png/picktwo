@@ -16,6 +16,8 @@ const settingsPatch = z.object({
   notifyEmail: z.boolean().optional(),
   marketingEmail: z.boolean().optional(),
   dataConsent: z.boolean().optional(),
+  showInVoteMatches: z.boolean().optional(),
+  dmPolicy: z.enum(["EVERYONE", "FOLLOWING", "NOBODY"]).optional(),
 });
 
 export const POST = handler(async (req) => {

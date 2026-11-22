@@ -5,7 +5,23 @@ import { FollowButton } from "@/components/layout/FollowButton";
 import { isFriend, type PersonRow as Person } from "@/server/services/social";
 
 /** One person in a list: tap the row for their profile; Follow / Follow back on the right (signed-in, not yourself). */
-export function PersonRow({ p, sub, rank, viewerId }: { p: Person; sub?: React.ReactNode; rank?: number; viewerId: string | null }) {
+export function PersonRow({
+  p,
+  sub,
+  detail,
+  rank,
+  viewerId,
+  extra,
+}: {
+  p: Person;
+  sub?: React.ReactNode;
+  /** A line of its own under the handle (not truncated together with it), e.g. a taste match. */
+  detail?: React.ReactNode;
+  rank?: number;
+  viewerId: string | null;
+  /** Extra controls on the right, before Follow (e.g. a Message button). Needs `relative z-10` to sit above the row link. */
+  extra?: React.ReactNode;
+}) {
   const button = !!viewerId && viewerId !== p.id;
   // The button already says "Friends" / "Follow back", so the tag only shows where there's no button.
   const label = button ? null : isFriend(p) ? "Friends" : p.followsMe ? "Follows you" : null;
@@ -23,7 +39,9 @@ export function PersonRow({ p, sub, rank, viewerId }: { p: Person; sub?: React.R
           {label && <span className="ml-1.5 rounded-full bg-a-soft px-1.5 py-px text-[11px] text-a">{label}</span>}
           {sub && <> · {sub}</>}
         </div>
+        {detail && <div className="mt-0.5 text-xs text-zinc-500">{detail}</div>}
       </div>
+      {extra}
       {button && <FollowButton userId={p.id} initial={p.iFollow} followsMe={p.followsMe} small />}
     </div>
   );

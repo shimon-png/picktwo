@@ -176,6 +176,13 @@
       "when": 1795374000000,
       "tag": "0024_founding_experts",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795377505091,
+      "tag": "0025_direct_messages_vote_matches",
+      "breakpoints": true
     }
   ]
 }
