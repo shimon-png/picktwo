@@ -235,6 +235,7 @@ html[data-theme="arcade"] {
   color-scheme: dark;
   --color-accent: #2bd2ff;
   --color-accent-900: #1d2c4f;
+  --color-accent-100: #bfeeff;
   --color-a: #2bd2ff;
   --color-a-soft: #173a52;
   --color-b: #ff3cac;
@@ -304,3 +305,18 @@ html[data-theme="arcade"] .tour-hole { outline-color: #c6ff3d; box-shadow: 0 0 0
 @keyframes cp-wink-arc { 0%, 12% { opacity: 0; } 22%, 66% { opacity: 1; } 82%, 100% { opacity: 0; } }
 @keyframes cp-spark { 0% { opacity: 0; transform: scale(0.2) rotate(0deg); } 30% { opacity: 1; transform: scale(1.2) rotate(45deg); } 70% { opacity: 1; transform: scale(1) rotate(90deg); } 100% { opacity: 0; transform: scale(0.6) rotate(120deg); } }
 @media (prefers-reduced-motion: reduce) { .mark.winking * { animation: none !important; } }
+
+/* "You're on a roll" flashcard (components/battle/RollCard.tsx). */
+.roll-card { background: radial-gradient(120% 80% at 50% 20%, #fff8dc, #ffffff 70%); }
+.roll-bolt { color: var(--color-pp); filter: drop-shadow(0 6px 18px rgb(240 180 60 / 0.55)); animation: roll-bolt 1.6s ease-in-out infinite; }
+@keyframes roll-bolt { 0%, 100% { transform: scale(1) rotate(-4deg); } 50% { transform: scale(1.08) rotate(4deg); } }
+html[data-theme="arcade"] .roll-card {
+  background:
+    radial-gradient(60% 40% at 15% 85%, rgb(43 210 255 / 0.28), transparent 70%),
+    radial-gradient(60% 40% at 85% 15%, rgb(255 60 172 / 0.3), transparent 70%),
+    radial-gradient(120% 80% at 50% 30%, #2a1d5c, #1f1940 70%);
+  box-shadow: 0 0 0 1px #3a3170, 0 0 50px rgb(198 255 61 / 0.18);
+}
+html[data-theme="arcade"] .roll-bolt { color: #c6ff3d; filter: drop-shadow(0 0 14px rgb(198 255 61 / 0.75)) drop-shadow(0 0 32px rgb(198 255 61 / 0.4)); }
+html[data-theme="arcade"] .roll-card .display { color: #c6ff3d; text-shadow: 0 0 18px rgb(198 255 61 / 0.35); }
+@media (prefers-reduced-motion: reduce) { .roll-bolt { animation: none; } }
