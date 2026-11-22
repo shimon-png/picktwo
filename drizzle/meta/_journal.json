@@ -148,6 +148,20 @@
       "when": 1795370000000,
       "tag": "0020_seed_who_is_right",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795371000000,
+      "tag": "0021_seed_im_right",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795372000000,
+      "tag": "0022_seed_votes",
+      "breakpoints": true
     }
   ]
 }
