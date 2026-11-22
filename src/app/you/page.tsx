@@ -55,7 +55,20 @@ export default async function YouPage() {
     countOpenLoops(user.id, e),
     countUnreported(user.id),
     unreadCount(user.id),
-    db.select().from(pointLedger).where(eq(pointLedger.userId, user.id)).orderBy(desc(pointLedger.createdAt)).limit(15),
+    db
+      .select({
+        id: pointLedger.id,
+        reason: pointLedger.reason,
+        delta: pointLedger.delta,
+        createdAt: pointLedger.createdAt,
+        slug: battles.slug,
+        title: battles.title,
+      })
+      .from(pointLedger)
+      .leftJoin(battles, eq(battles.id, pointLedger.battleId))
+      .where(eq(pointLedger.userId, user.id))
+      .orderBy(desc(pointLedger.createdAt))
+      .limit(15),
     listFollowers(user.id, user.id),
     listFollowing(user.id, user.id),
   ]);
@@ -213,18 +226,43 @@ export default async function YouPage() {
           <p className="text-sm text-zinc-500">No points yet — start voting!</p>
         ) : (
           <ul className="card divide-y divide-ink/8">
-            {ledger.map((l) => (
-              <li key={l.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
-                <span>
-                  {LEDGER_LABELS[l.reason] ?? l.reason}
-                  <span className="ml-2 text-xs text-zinc-400">{timeAgo(l.createdAt)}</span>
-                </span>
-                <span className={cn("tabular-nums", l.delta > 0 ? "text-green" : "text-b")}>
-                  {l.delta > 0 ? "+" : ""}
-                  {l.delta}
-                </span>
-              </li>
-            ))}
+            {ledger.map((l) => {
+              const body = (
+                <>
+                  <span className="min-w-0 flex-1">
+                    {l.title ? (
+                      <>
+                        <span className="block truncate">{l.title}</span>
+                        <span className="text-xs text-zinc-400">
+                          {LEDGER_LABELS[l.reason] ?? l.reason} · {timeAgo(l.createdAt)}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {LEDGER_LABELS[l.reason] ?? l.reason}
+                        <span className="ml-2 text-xs text-zinc-400">{timeAgo(l.createdAt)}</span>
+                      </>
+                    )}
+                  </span>
+                  <span className={cn("shrink-0 tabular-nums", l.delta > 0 ? "text-green" : "text-b")}>
+                    {l.delta > 0 ? "+" : ""}
+                    {l.delta}
+                  </span>
+                  {l.slug && <ChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />}
+                </>
+              );
+              return (
+                <li key={l.id}>
+                  {l.slug ? (
+                    <Link href={`/b/${l.slug}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface">
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-2.5 text-sm">{body}</div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
