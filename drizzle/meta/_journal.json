@@ -78,6 +78,13 @@
       "when": 1795360000000,
       "tag": "0010_text_demo_options",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795361000000,
+      "tag": "0011_seed_text_battles",
+      "breakpoints": true
     }
   ]
 }
