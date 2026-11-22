@@ -85,6 +85,13 @@
       "when": 1795361000000,
       "tag": "0011_seed_text_battles",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795362000000,
+      "tag": "0012_seed_photo_battles",
+      "breakpoints": true
     }
   ]
 }
