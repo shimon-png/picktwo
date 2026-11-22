@@ -73,7 +73,7 @@ async function Boards({ viewer, viewerId }: { viewer: Viewer; viewerId: string |
   const [battles, experts, voters] = await Promise.all([topBattles(viewer), topExperts(viewer), topVoters(viewer)]);
   return (
     <>
-      <Section title="Top battles" sub="Live battles with the most votes. Results show after you vote.">
+      <Section title="Top battles" sub="Live battles with the most votes. Tap one to vote.">
         <BattleList cards={battles} src="discover" empty="No live battles right now." />
       </Section>
       <Section title="Top experts" sub="Most correct picks: they voted for what the poster ended up choosing.">
@@ -111,7 +111,7 @@ function BattleList({ cards, src, empty }: { cards: DiscoverCard[]; src: string;
       items={cards.map((b) => ({
         key: b.id,
         text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB} ${b.authorHandle ?? ""}`,
-        node: <BattleCardRow b={b} src={src} hideResults={b.hideResults} />,
+        node: <BattleCardRow b={b} src={src} hideResults={b.hideResults} voted={b.voted} />,
       }))}
     />
   );

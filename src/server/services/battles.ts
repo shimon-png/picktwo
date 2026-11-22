@@ -314,6 +314,8 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     /** "Expert score": votes from Expert and Super expert voters only (status when they voted). */
     expertResults,
     totalVotes: showResults ? totalVotes : null,
+    /** Vote count only (no split); Discover shows it to everyone. */
+    voteCount: totalVotes,
     myVote,
     isOwner,
     reasons,

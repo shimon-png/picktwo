@@ -5,6 +5,7 @@ import { getViewer } from "@/server/viewer";
 import { getBattleView, getBattleRow } from "@/server/services/battles";
 import { AppError } from "@/server/errors";
 import { BattleClient } from "@/components/battle/BattleClient";
+import { DiscoverVote } from "@/components/battle/DiscoverVote";
 import { appUrl } from "@/lib/utils";
 import { db } from "@/server/db";
 import { options } from "@/server/db/schema";
@@ -56,5 +57,8 @@ export default async function BattlePage({ params, searchParams }: Props) {
   }
   if (!view) notFound();
   track("battle_viewed", { battleId: view.id, source: src ?? "link" }, { userId: viewer.user?.id, deviceId: viewer.deviceId });
-  return <BattleClient initial={view} signedIn={!!viewer.user} shareUrl={appUrl(`/b/${slug}`)} source={src === "feed" || src === "home" || src === "profile" ? src : "link"} />;
+  const source = src === "feed" || src === "home" || src === "profile" || src === "discover" || src === "search" ? src : "link";
+  // From Discover: a vote-only view (no scores or reasons; those are for the poster), then back to Discover.
+  if ((source === "discover" || source === "search") && !view.isOwner) return <DiscoverVote initial={view} source={source} />;
+  return <BattleClient initial={view} signedIn={!!viewer.user} shareUrl={appUrl(`/b/${slug}`)} source={source} />;
 }

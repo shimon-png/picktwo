@@ -10,8 +10,8 @@ export { cleanQuery };
 
 type Viewer = { user: User | null; deviceId: string | null };
 
-/** A battle card on Discover. `hideResults` keeps an open battle's split hidden until the viewer has voted (unbiased voting). */
-export type DiscoverCard = BattleCard & { hideResults: boolean };
+/** A battle card on Discover. Scores stay hidden (they're for the poster, and keep votes unbiased); `voted` = the viewer already voted. */
+export type DiscoverCard = BattleCard & { hideResults: boolean; voted: boolean };
 
 /** Visibility, status, author and block filters shared by every Discover battle query. */
 async function battleScope(viewer: Viewer): Promise<SQL> {
@@ -58,9 +58,9 @@ async function toCards(viewer: Viewer, rows: Parameters<typeof hydrateCards>[0])
   // Targeted battles only show to viewers who match, same as the Vote deck (the link still works).
   const kept = rows.filter((r) => r.b.authorId === viewer.user?.id || matchesTarget(r.b.tags?.target, viewer.user));
   const cards = await hydrateCards(kept);
-  const voted = await votedIds(viewer, cards.filter((c) => c.status === "OPEN").map((c) => c.id));
+  const voted = await votedIds(viewer, cards.map((c) => c.id));
   const me = viewer.user?.id;
-  return cards.map((c, i) => ({ ...c, hideResults: c.status === "OPEN" && !voted.has(c.id) && kept[i].b.authorId !== me }));
+  return cards.map((c, i) => ({ ...c, hideResults: kept[i].b.authorId !== me, voted: voted.has(c.id) }));
 }
 
 /** Open battles with the most votes. Includes ones the viewer already voted on. */

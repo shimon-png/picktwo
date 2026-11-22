@@ -74,7 +74,7 @@ export const voteInput = z.object({
   side: z.enum(["A", "B"]),
   reason: z.string().trim().max(140).optional(),
   dwellMs: z.number().int().min(0).max(3_600_000).optional(),
-  source: z.enum(["link", "feed", "profile", "home"]).optional(),
+  source: z.enum(["link", "feed", "profile", "home", "discover", "search"]).optional(),
 });
 
 export const reasonInput = z.object({ reason: z.string().trim().max(140) });
