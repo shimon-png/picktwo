@@ -5,6 +5,8 @@ import { ACTIVE_DAYS, cleanQuery, searchBattles, searchPeople, topBattles, topEx
 import type { PersonRow as Person } from "@/server/services/social";
 import { BattleCardRow } from "@/components/battle/BattleCardRow";
 import { PersonRow } from "@/components/people/PersonRow";
+import { MessageButton } from "@/components/messages/MessageButton";
+import { tasteTwins } from "@/server/services/matches";
 import { ExpandList } from "@/components/ui/ExpandList";
 
 export const metadata = { title: "Discover" };
@@ -70,9 +72,37 @@ async function Results({ q, viewer, viewerId }: { q: string; viewer: Viewer; vie
 }
 
 async function Boards({ viewer, viewerId }: { viewer: Viewer; viewerId: string | null }) {
-  const [battles, experts, voters] = await Promise.all([topBattles(viewer), topExperts(viewer), topVoters(viewer)]);
+  const [battles, experts, voters, twins] = await Promise.all([
+    topBattles(viewer),
+    topExperts(viewer),
+    topVoters(viewer),
+    viewer.user ? tasteTwins(viewer.user, 5) : Promise.resolve([]),
+  ]);
   return (
     <>
+      {twins.length > 0 && (
+        <section>
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[22px]">People who vote like you</h2>
+            <Link href="/people-like-you" className="text-sm text-accent">
+              See all
+            </Link>
+          </div>
+          <p className="mb-2.5 text-[13px] text-zinc-500">How often you picked the same side on battles you both voted on.</p>
+          <div className="space-y-2">
+            {twins.map((p, i) => (
+              <PersonRow
+                key={p.id}
+                p={p}
+                rank={i + 1}
+                viewerId={viewerId}
+                detail={`${p.pct}% agree · ${p.shared} in common`}
+                extra={<MessageButton handle={p.handle} small />}
+              />
+            ))}
+          </div>
+        </section>
+      )}
       <Section title="Top battles" sub="Live battles with the most votes. Tap one to vote.">
         <BattleList cards={battles} src="discover" empty="No live battles right now." />
       </Section>

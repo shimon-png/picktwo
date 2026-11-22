@@ -18,6 +18,8 @@ export const RULES = {
   signinCodeIp: { limit: 10, windowSec: 3600 },
   signinCodeEmail: { limit: 5, windowSec: 3600 },
   quickProfile: { limit: 20, windowSec: 3600 },
+  messageMinute: { limit: 15, windowSec: 60 },
+  messageDay: { limit: 300, windowSec: 86400 },
   generic: { limit: 60, windowSec: 60 },
 } satisfies Record<string, Rule>;
 

@@ -116,6 +116,16 @@ export const profileInput = z.object({
   dataConsent: z.boolean().default(false),
 });
 
+export const messageInput = z.object({
+  to: z.string().trim().min(1).max(40),
+  body: z.string().trim().min(1, "Write a message first").max(1000, "Messages can be up to 1000 characters"),
+});
+
+export const messageReportInput = z.object({
+  messageId: z.string().min(1).max(64),
+  reason: z.enum(REPORT_REASON_IDS),
+});
+
 export const reportInput = z.object({
   targetType: z.enum(["BATTLE", "REASON", "USER"]),
   targetId: z.string().min(1).max(64),

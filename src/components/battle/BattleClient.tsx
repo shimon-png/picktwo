@@ -247,6 +247,11 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
             <Scores everyone={res} experts={v.expertResults} labelA={A.label} labelB={B.label} />
           </div>
         )}
+        {signedIn && v.myVote && v.myVote.id !== "pending" && !v.isOwner && (
+          <Link href={`/b/${v.slug}/like-you`} className="mt-3 inline-flex items-center gap-1 text-sm text-accent">
+            See who voted like you →
+          </Link>
+        )}
       </div>
 
       {/* Reason after voting */}

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
-import { Bell, ChevronRight, Flag, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
+import { Bell, ChevronRight, MessageCircle, Users, Flag, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { unreadContactCount } from "@/server/services/contact";
 import { openReportCount } from "@/server/services/reports";
@@ -17,6 +17,7 @@ import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { Scores } from "@/components/battle/Scores";
 import { RepostButton } from "@/components/battle/RepostButton";
 import { unreadCount } from "@/server/services/notifications";
+import { unreadMessageCount } from "@/server/services/messages";
 import { listFollowers, listFollowing, type PersonRow as Person } from "@/server/services/social";
 import { PersonRow } from "@/components/people/PersonRow";
 import { ExpandList } from "@/components/ui/ExpandList";
@@ -50,7 +51,7 @@ export default async function YouPage() {
   if (profileIncomplete(user)) redirect(onboardingUrl("/you"));
   const e = await getEconomy();
   const admin = isAdmin(user);
-  const [mine, openLoops, unreported, unread, ledger, followers, following] = await Promise.all([
+  const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms] = await Promise.all([
     battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 100),
     countOpenLoops(user.id, e),
     countUnreported(user.id),
@@ -71,6 +72,7 @@ export default async function YouPage() {
       .limit(15),
     listFollowers(user.id, user.id),
     listFollowing(user.id, user.id),
+    unreadMessageCount(user.id),
   ]);
   const newMessages = admin ? await unreadContactCount() : 0;
   const flagged = admin ? await openReportCount() : 0;
@@ -203,6 +205,8 @@ export default async function YouPage() {
         {(
           [
             ["/activity", Bell, "Activity", unread],
+            ["/messages", MessageCircle, "Messages", unreadDms],
+            ["/people-like-you", Users, "People who vote like you", 0],
             [`/u/${user.handle}`, User, "Public profile", 0],
             ["/settings", Settings, "Settings", 0],
             [TOUR_URL, GraduationCap, "Tutorial", 0],

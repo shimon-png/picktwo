@@ -78,6 +78,10 @@ export const users = pgTable("user", {
   marketingEmail: boolean("marketing_email").notNull().default(false),
   notifyEmail: boolean("notify_email").notNull().default(true),
   bannedAt: ts("banned_at"),
+  /** Who can start a direct message with this user: EVERYONE, FOLLOWING (people they follow) or NOBODY. */
+  dmPolicy: text("dm_policy").$type<"EVERYONE" | "FOLLOWING" | "NOBODY">().notNull().default("EVERYONE"),
+  /** Listed in "Voted like you" (to same-side voters) and the taste-twin ranking. Opt-out in Settings. */
+  showInVoteMatches: boolean("show_in_vote_matches").notNull().default(true),
   referredById: text("referred_by_id"),
   createdAt: now("created_at"),
 });
@@ -354,6 +358,33 @@ export const appConfig = pgTable("app_config", {
   value: jsonb("value").notNull(),
   updatedAt: now("updated_at"),
 });
+
+// Direct messages between two users. One conversation per pair; userA < userB (string order).
+export const conversations = pgTable(
+  "conversation",
+  {
+    id: id(),
+    userA: text("user_a").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userB: text("user_b").notNull().references(() => users.id, { onDelete: "cascade" }),
+    lastMessageAt: now("last_message_at"),
+    createdAt: now("created_at"),
+  },
+  (t) => [uniqueIndex("conversation_pair").on(t.userA, t.userB), index("conversation_a").on(t.userA, t.lastMessageAt), index("conversation_b").on(t.userB, t.lastMessageAt)],
+);
+
+export const directMessages = pgTable(
+  "direct_message",
+  {
+    id: id(),
+    conversationId: text("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+    senderId: text("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    /** When the recipient opened the conversation after this message arrived. */
+    readAt: ts("read_at"),
+    createdAt: now("created_at"),
+  },
+  (t) => [index("dm_conversation_created").on(t.conversationId, t.createdAt)],
+);
 
 // Contact-us form submissions, read in /admin/messages.
 export const contactMessages = pgTable(

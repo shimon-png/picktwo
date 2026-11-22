@@ -247,3 +247,81 @@ test("profile setup prefills the username from the email: name + 4 digits, 'user
   await page.goto("/onboarding");
   await expect(page.getByLabel("Username")).toHaveValue(/^user\d{4}$/);
 });
+
+test("voted like you + taste twins + direct messages (policy, block, opt-out)", async ({ browser }) => {
+  const a = await newUser(browser, "twin_a");
+  const b = await newUser(browser, "twin_b");
+  const c = await newUser(browser, "twin_c");
+  const handle = (n: string) => `${n}_${stamp}`.slice(0, 20);
+
+  // A and B pick the same side on 3 battles; C picks the other side.
+  const feed = await (await a.request.get("/api/feed")).json();
+  const slugs: string[] = feed.items.slice(0, 3).map((i: { slug: string }) => i.slug);
+  expect(slugs.length).toBe(3);
+  for (const slug of slugs) {
+    for (const [p, side] of [[a, "A"], [b, "A"], [c, "B"]] as const) {
+      const r = await p.request.post(`/api/battles/${slug}/vote`, { data: { side, dwellMs: 4000, source: "feed" } });
+      expect(r.ok()).toBeTruthy();
+    }
+  }
+
+  // Taste twins: B ranks for A at 100%, C (always disagreed) at 0%, below B.
+  await a.goto("/people-like-you");
+  const row = (n: string) => a.getByRole("listitem").filter({ hasText: `@${handle(n)}` });
+  await expect(row("twin_b")).toContainText("100% agree");
+  await expect(row("twin_c")).toContainText("0% agree");
+  await snap(a, "10-people-like-you");
+
+  // Per battle: B is listed as voting like A; C is not.
+  await a.goto(`/b/${slugs[0]}/like-you`);
+  await expect(a.getByRole("link", { name: handle("twin_b"), exact: true })).toBeVisible();
+  await expect(a.getByRole("link", { name: handle("twin_c"), exact: true })).toHaveCount(0);
+  await snap(a, "11-like-you");
+
+  // A messages B from B's profile; B sees the unread badge and replies.
+  await a.goto(`/u/${handle("twin_b")}`);
+  await a.getByRole("link", { name: "Message", exact: true }).click();
+  await a.getByLabel(`Message @${handle("twin_b")}`).fill("Hey, we always agree!");
+  await a.getByRole("button", { name: "Send" }).click();
+  // The draft clears only once the server has saved the message.
+  await expect(a.getByLabel(`Message @${handle("twin_b")}`)).toHaveValue("", { timeout: 15_000 });
+  await expect(a.getByText("Hey, we always agree!")).toBeVisible();
+  await b.goto("/vote");
+  await expect(b.getByRole("link", { name: /Messages, 1 unread/ })).toBeVisible();
+  await b.goto("/messages");
+  await b.getByRole("link", { name: new RegExp(handle("twin_a")) }).click();
+  await expect(b.getByText("Hey, we always agree!")).toBeVisible();
+  await b.getByLabel(`Message @${handle("twin_a")}`).fill("Ha, great minds");
+  await b.getByRole("button", { name: "Send" }).click();
+  await expect(b.getByLabel(`Message @${handle("twin_a")}`)).toHaveValue("", { timeout: 15_000 });
+  await expect(a.getByText("Ha, great minds")).toBeVisible({ timeout: 12_000 }); // A's thread polls
+  await snap(a, "12-thread");
+
+  // C only accepts messages from nobody: A can't start a conversation.
+  await c.request.post("/api/me/profile", { data: { kind: "settings", dmPolicy: "NOBODY" } });
+  const denied = await a.request.post("/api/messages", { data: { to: handle("twin_c"), body: "hi" } });
+  expect(denied.status()).toBe(403);
+
+  // B blocks A from the conversation menu: A can no longer send, and they disappear from each other's lists.
+  b.once("dialog", (d) => d.accept());
+  await b.getByRole("button", { name: "Conversation options" }).click();
+  await b.getByRole("menuitem", { name: /Block/ }).click();
+  await b.waitForURL(/\/messages$/);
+  await expect(b.getByRole("link", { name: new RegExp(handle("twin_a")) })).toHaveCount(0);
+  expect((await a.request.post("/api/messages", { data: { to: handle("twin_b"), body: "still there?" } })).status()).toBe(403);
+  await a.goto(`/b/${slugs[0]}/like-you`);
+  await expect(a.getByRole("link", { name: handle("twin_b"), exact: true })).toHaveCount(0);
+  // Unblock again from the thread.
+  await b.goto(`/messages/${handle("twin_a")}`);
+  await expect(b.getByText(/You blocked this person/)).toBeVisible();
+  await b.getByRole("button", { name: "Conversation options" }).click();
+  await b.getByRole("menuitem", { name: /Unblock/ }).click();
+  await expect(b.getByLabel(`Message @${handle("twin_a")}`)).toBeVisible();
+
+  // B hides from "Voted like you": A no longer sees B, and B can't see the lists either.
+  await b.request.post("/api/me/profile", { data: { kind: "settings", showInVoteMatches: false } });
+  await a.goto(`/b/${slugs[0]}/like-you`);
+  await expect(a.getByRole("link", { name: handle("twin_b"), exact: true })).toHaveCount(0);
+  await b.goto("/people-like-you");
+  await expect(b.getByText(/You’re hidden from “Voted like you”/)).toBeVisible();
+});
