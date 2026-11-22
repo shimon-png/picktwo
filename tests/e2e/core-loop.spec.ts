@@ -240,10 +240,10 @@ test("vote stack: a pick is final and the other photo steps aside", async ({ bro
   await expect(b).toHaveCSS("opacity", "0");
 });
 
-test("profile setup prefills the username from the email, even a short one", async ({ browser }) => {
+test("profile setup prefills the username from the email: name + 4 digits, 'user' for a too-short name", async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await login(page, `a@${stamp}.dev`);
   await page.goto("/onboarding");
-  await expect(page.getByLabel("Username")).toHaveValue(new RegExp(`^a_${stamp}`.slice(0, 16)));
+  await expect(page.getByLabel("Username")).toHaveValue(/^user\d{4}$/);
 });
