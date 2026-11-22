@@ -14,7 +14,7 @@ import { linkDevice } from "@/server/services/votes";
 import { unreadCount } from "@/server/services/notifications";
 import { countOpenLoops } from "@/server/services/points";
 import { getEconomy } from "@/server/services/config";
-import { Nav, ChromeOnly, ContentShell, HeaderLogo } from "@/components/layout/Nav";
+import { Nav, ChromeOnly, ContentShell, HeaderLogo, YouButton } from "@/components/layout/Nav";
 import { PriorityPill } from "@/components/priority/PriorityPill";
 import { Toaster } from "@/components/ui/Toaster";
 import { appUrl } from "@/lib/utils";
@@ -56,17 +56,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <ContentShell>
           <ChromeOnly>
             <header className="sticky top-0 z-30 bg-page/90 backdrop-blur">
-              <div className="mx-auto flex h-14 max-w-2xl items-center justify-between px-4">
+              <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-2 px-4">
                 <HeaderLogo />
-                <div data-tour="account">
-                  {user ? (
-                    <PriorityPill initial={user.ppBalance} openLoops={openLoops} highAt={economy.tierHighAt} topAt={economy.tierTopAt} />
-                  ) : (
+                {user ? (
+                  <>
+                    {/* ⚡ sits in the middle of the bar; You (avatar + alerts) is top right. */}
+                    <div data-tour="account" className="flex flex-1 justify-center">
+                      <PriorityPill initial={user.ppBalance} openLoops={openLoops} highAt={economy.tierHighAt} topAt={economy.tierTopAt} />
+                    </div>
+                    <YouButton name={user.name || user.handle || "?"} image={user.image} unread={unread} />
+                  </>
+                ) : (
+                  <div data-tour="account">
                     <Link href="/signin" className="btn-outline !px-3 !py-1.5 text-sm">
                       Sign in
                     </Link>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </header>
           </ChromeOnly>
@@ -74,7 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {children}
           </main>
         </ContentShell>
-        <Nav unread={unread} />
+        <Nav />
         <Toaster />
       </body>
     </html>

@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { Bell, CheckCircle2, ChevronDown, Clock, Heart, ThumbsUp, UserPlus, Users, Zap } from "lucide-react";
 import { getCurrentUser } from "@/server/viewer";
 import { listNotifications } from "@/server/services/notifications";
+import { followBackInfo } from "@/server/services/social";
+import { FollowButton } from "@/components/layout/FollowButton";
 import { postedBattles, votedBattles, type VotedCard } from "@/server/services/activity";
 import { BattleCardRow } from "@/components/battle/BattleCardRow";
 import { MarkRead } from "@/components/layout/MarkRead";
@@ -43,6 +45,11 @@ export default async function ActivityPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/signin?callbackUrl=/activity");
   const [items, posted, voted] = await Promise.all([listNotifications(user.id), postedBattles(user.id), votedBattles(user.id)]);
+  // "X followed you" gets a Follow back button (or "Friends" once you follow each other).
+  const followers = await followBackInfo(
+    user.id,
+    items.filter((n) => n.type === "FOLLOW").map((n) => String((n.payload as P).handle ?? "")).filter(Boolean),
+  );
   const unread = items.filter((n) => !n.readAt).length;
   return (
     <div className="space-y-4">
@@ -103,6 +110,20 @@ export default async function ActivityPage() {
                   </div>
                 </div>
               );
+              const fb = n.type === "FOLLOW" ? followers.get(String((n.payload as P).handle ?? "").toLowerCase()) : undefined;
+              if (fb && r.href)
+                return (
+                  <li key={n.id}>
+                    <div className={`card relative flex items-center gap-3 p-3 ${!n.readAt ? "border-a/40 bg-a-soft/30" : ""}`}>
+                      <span className="mt-0.5 self-start">{r.icon}</span>
+                      <Link href={r.href} className="flex-1 text-[15px] after:absolute after:inset-0 after:content-['']">
+                        {r.text}
+                        <span className="block text-xs text-zinc-400">{timeAgo(n.createdAt)}</span>
+                      </Link>
+                      <FollowButton userId={fb.id} initial={fb.iFollow} followsMe={fb.followsMe} small />
+                    </div>
+                  </li>
+                );
               return <li key={n.id}>{r.href ? <Link href={r.href}>{inner}</Link> : inner}</li>;
             })}
           </ul>

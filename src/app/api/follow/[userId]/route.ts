@@ -17,7 +17,7 @@ export const POST = handler<{ userId: string }>(async (_req, { params }) => {
   if (!target) throw new AppError("NOT_FOUND", "User not found");
   const ins = await db.insert(follows).values({ followerId: me.id, followingId: userId }).onConflictDoNothing().returning();
   if (ins.length) {
-    await notify(db, userId, "FOLLOW", { handle: me.handle, name: me.name });
+    await notify(db, userId, "FOLLOW", { userId: me.id, handle: me.handle, name: me.name, image: me.image });
     track("follow", { userId }, { userId: me.id });
   }
   return { following: true };

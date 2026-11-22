@@ -12,6 +12,9 @@ import { ReportButton } from "@/components/battle/ReportButton";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { getEconomy } from "@/server/services/config";
 import { TIER_LABEL, expertTier } from "@/server/services/expertise";
+import { listFollowers, listFollowing } from "@/server/services/social";
+import { PersonRow } from "@/components/people/PersonRow";
+import { ExpandList } from "@/components/ui/ExpandList";
 
 export async function generateMetadata({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
@@ -36,8 +39,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   const friends = me ? await friendIds(me.id) : new Set<string>();
   const visibleTo = isMe ? sql`true` : friends.has(u.id) ? inArray(battles.visibility, ["PUBLIC", "FRIENDS"]) : eq(battles.visibility, "PUBLIC");
 
-  const [list, [stats], [{ votesCast }], [{ followers }], [{ following }], reps, [iFollow], match] = await Promise.all([
-    battleCards(and(eq(battles.authorId, u.id), visibleStatuses, visibleTo), 30),
+  const [list, [stats], [{ votesCast }], [{ followers }], [{ following }], reps, [iFollow], match, followerList, followingList] = await Promise.all([
+    battleCards(and(eq(battles.authorId, u.id), visibleStatuses, visibleTo), 100),
     db
       .select({
         total: sql<number>`count(*)::int`,
@@ -53,7 +56,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
     db.select().from(reputations).where(eq(reputations.userId, u.id)).orderBy(desc(reputations.score)),
     me && !isMe ? db.select().from(follows).where(and(eq(follows.followerId, me.id), eq(follows.followingId, u.id))) : Promise.resolve([]),
     me && !isMe ? tasteMatch(me.id, u.id) : Promise.resolve(null),
+    listFollowers(u.id, me?.id ?? null),
+    listFollowing(u.id, me?.id ?? null),
   ]);
+  // Friends = you follow each other. They follow you when you're in their following list.
+  const followsMe = !!me && !isMe && followingList.some((p) => p.id === me.id);
+  const relation = !!iFollow && followsMe ? "Friends" : followsMe ? "Follows you" : null;
   const tier = expertTier(u.correctPicks, await getEconomy());
   const loopRate = stats.past ? Math.round((100 * stats.closed) / stats.past) : null;
   const badges: string[] = [];
@@ -75,8 +83,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-1.5 text-2xl font-medium">
-            {u.name || `@${u.handle}`}
+          <h1 className="flex min-w-0 items-center gap-1.5 text-2xl font-medium">
+            <span className="truncate">{u.name || `@${u.handle}`}</span>
             <ExpertBadge tier={tier} />
           </h1>
           <p className="text-sm text-zinc-500">
@@ -84,17 +92,26 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
             {tier !== "NONE" && ` · ${TIER_LABEL[tier]} · ${u.correctPicks} correct picks`}
           </p>
           {u.bio && <p className="mt-1 text-[15px]">{u.bio}</p>}
-          <div className="mt-2 flex gap-4 text-sm">
-            <span><b>{followers}</b> followers</span>
-            <span><b>{following}</b> following</span>
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <a href="#followers" className="hover:underline"><b>{followers}</b> followers</a>
+            <a href="#following" className="hover:underline"><b>{following}</b> following</a>
+            {relation && <span className="rounded-full bg-a-soft px-2 py-0.5 text-xs text-a">{relation}</span>}
           </div>
+          {!isMe && me && (
+            <div className="mt-3">
+              <FollowButton userId={u.id} initial={!!iFollow} followsMe={followsMe} />
+            </div>
+          )}
+          {!me && (
+            <Link href={`/signin?callbackUrl=/u/${u.handle}`} className="btn-primary mt-3">
+              Follow
+            </Link>
+          )}
         </div>
         {isMe ? (
           <Link href="/settings" className="btn-outline !px-3" aria-label="Settings">
             <Settings className="size-4" />
           </Link>
-        ) : me ? (
-          <FollowButton userId={u.id} initial={!!iFollow} />
         ) : null}
       </header>
 
@@ -119,10 +136,17 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         </div>
       )}
 
-      <section className="space-y-2">
-        <h2 className=" text-lg font-medium">Battles</h2>
-        {list.length === 0 ? <p className="text-sm text-zinc-500">No public battles yet.</p> : list.map((b) => <BattleCardRow key={b.id} b={b} showAuthor={false} src="profile" />)}
+      <section>
+        <h2 className="mb-2.5 text-[22px]">Battles</h2>
+        <ExpandList
+          searchPlaceholder="Search their battles"
+          empty={<p className="text-sm text-zinc-500">{isMe ? "You haven't posted a battle yet." : "No battles you can see yet."}</p>}
+          items={list.map((b) => ({ key: b.id, text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB}`, node: <BattleCardRow b={b} showAuthor={false} src="profile" /> }))}
+        />
       </section>
+
+      <PeopleSection id="followers" title="Followers" people={followerList} viewerId={me?.id ?? null} empty="No followers yet." />
+      <PeopleSection id="following" title="Following" people={followingList} viewerId={me?.id ?? null} empty="Not following anyone yet." />
       {!isMe && me && (
         <div className="flex justify-end">
           <ReportButton targetType="USER" targetId={u.id} />
@@ -138,5 +162,20 @@ function Stat({ n, label }: { n: number | string; label: string }) {
       <div className=" text-2xl font-medium">{n}</div>
       <div className="text-xs text-zinc-500">{label}</div>
     </div>
+  );
+}
+
+function PeopleSection({ id, title, people, viewerId, empty }: { id: string; title: string; people: Awaited<ReturnType<typeof listFollowers>>; viewerId: string | null; empty: string }) {
+  return (
+    <section id={id} className="scroll-mt-16">
+      <h2 className="mb-2.5 text-[22px]">
+        {title} <span className="font-sans text-sm text-zinc-500">{people.length}</span>
+      </h2>
+      <ExpandList
+        searchPlaceholder={`Search ${title.toLowerCase()}`}
+        empty={<p className="text-sm text-zinc-500">{empty}</p>}
+        items={people.map((p) => ({ key: p.id, text: `${p.name ?? ""} ${p.handle}`, node: <PersonRow p={p} viewerId={viewerId} /> }))}
+      />
+    </section>
   );
 }
