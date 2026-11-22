@@ -9,7 +9,7 @@ import { SignupGate } from "@/components/auth/SignupGate";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { Scores } from "./Scores";
 import { cn, formatPrice, timeAgo, timeLeft } from "@/lib/utils";
-import { TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
+import { TITLE_MAX, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import type { BattleView, ReasonView } from "@/server/services/battles";
 import { Avatar } from "@/components/ui/Avatar";
 import { OptionFace } from "./OptionFace";
@@ -486,7 +486,7 @@ function EditForm({ v, onDone }: { v: V; onDone: () => void }) {
   }
   return (
     <div className="space-y-2">
-      <input className="input" value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
+      <input className="input" value={title} maxLength={TITLE_MAX} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
       <textarea className="input" rows={2} value={context} maxLength={280} onChange={(e) => setContext(e.target.value)} aria-label="Context" />
       <div className="flex gap-2">
         <button className="btn-primary !py-1.5" onClick={save}>

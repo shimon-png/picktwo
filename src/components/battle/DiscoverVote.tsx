@@ -8,7 +8,7 @@ import { markDone } from "@/lib/seen";
 import { SignupGate } from "@/components/auth/SignupGate";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { Avatar } from "@/components/ui/Avatar";
-import { cn, timeLeft } from "@/lib/utils";
+import { cn, timeLeft, titleSizeClass } from "@/lib/utils";
 import type { BattleView } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
 
@@ -79,7 +79,7 @@ export function DiscoverVote({ initial, source }: { initial: V; source: "discove
             · {v.voteCount} vote{v.voteCount === 1 ? "" : "s"}
           </span>
         </div>
-        <h1 className="text-[28px] leading-[1.08]">{v.title}</h1>
+        <h1 className={titleSizeClass(v.title, "text-[28px] leading-[1.08]")}>{v.title}</h1>
         {v.context && <p className="text-[13px] text-zinc-500">{v.context}</p>}
       </header>
 

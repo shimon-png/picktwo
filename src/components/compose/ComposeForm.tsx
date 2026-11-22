@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, ChevronDown, X } from "lucide-react";
 import { api, setPP, toast } from "@/lib/client";
 import { cn } from "@/lib/utils";
-import { AGE_RANGES, DEADLINE_PRESETS, KID_AGES } from "@/lib/constants";
+import { AGE_RANGES, DEADLINE_PRESETS, KID_AGES, TITLE_MAX } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
 import { Bar } from "@/components/ui/Bar";
 import { OptionEditor, type OptionDraft } from "./OptionEditor";
@@ -188,7 +188,7 @@ export function ComposeForm({
                 <input
                   id="title"
                   className="input"
-                  maxLength={100}
+                  maxLength={TITLE_MAX}
                   value={question}
                   onChange={(e) => {
                     setTitle(e.target.value);

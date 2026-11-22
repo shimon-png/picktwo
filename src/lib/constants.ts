@@ -142,3 +142,6 @@ export const FEATURE_DEFAULTS = {
 };
 
 export const POLICY_VERSION = "2026-11-draft";
+
+/** Battle questions can tell a short story (Alex, Nov 22 2026). The deck shrinks long ones to fit. */
+export const TITLE_MAX = 160;

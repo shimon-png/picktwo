@@ -1,6 +1,6 @@
 import { REPORT_REASON_IDS } from "@/server/services/safety";
 import { z } from "zod";
-import { AGE_RANGE_IDS, KID_AGE_IDS, KIDS_STATUS_IDS, SEX_IDS } from "./constants";
+import { AGE_RANGE_IDS, KID_AGE_IDS, KIDS_STATUS_IDS, SEX_IDS, TITLE_MAX } from "./constants";
 
 const optionalUrl = z
   .string()
@@ -30,7 +30,7 @@ export const optionInput = z.object({
 });
 
 export const createBattleInput = z.object({
-  title: z.string().trim().min(3).max(100),
+  title: z.string().trim().min(3).max(TITLE_MAX),
   context: z.string().trim().max(280).optional().default(""),
   tags: z
     .object({

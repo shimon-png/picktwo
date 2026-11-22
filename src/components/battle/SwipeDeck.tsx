@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { doneIds, markDone, unmarkDone } from "@/lib/seen";
 import { SignupGate } from "@/components/auth/SignupGate";
-import { cn, pct, timeLeft } from "@/lib/utils";
+import { cn, pct, timeLeft, titleSizeClass } from "@/lib/utils";
 import { AVATAR_TONES, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
 import type { BattleCard } from "@/server/services/battles";
@@ -420,7 +420,7 @@ export function SwipeDeck({
             )}
             <span className="ml-auto shrink-0">{timeLeft(card.deadline)}</span>
           </div>
-          <h1 className="mt-3 text-[28px] leading-[1.05]" data-tour="question">
+          <h1 className={`mt-3 ${titleSizeClass(card.title)}`} data-tour="question">
             <Link href={`/b/${card.slug}?src=feed`} data-nodrag className="hover:underline">
               {card.title}
             </Link>

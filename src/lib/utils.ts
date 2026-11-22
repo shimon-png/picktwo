@@ -34,6 +34,14 @@ export function timeAgo(date: Date | string, now = new Date()): string {
   return new Date(date).toLocaleDateString();
 }
 
+/** Font size for a battle question: long, story-style titles step down so the photos keep their room. */
+export function titleSizeClass(title: string, base = "text-[28px] leading-[1.05]") {
+  const n = title.length;
+  if (n > 110) return "text-[19px] leading-[1.15]";
+  if (n > 70) return "text-[22px] leading-[1.1]";
+  return base;
+}
+
 export function formatPrice(cents?: number | null, currency?: string | null) {
   if (cents == null) return null;
   try {
