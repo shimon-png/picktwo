@@ -440,7 +440,7 @@ export function SwipeDeck({
               <button
                 key={s}
                 type="button"
-                className="absolute inset-y-0 touch-none rounded-[14px] shadow-photo will-change-transform"
+                className="absolute inset-y-0 h-full max-h-full overflow-hidden touch-none rounded-[14px] p-0 shadow-photo will-change-transform"
                 style={photoStyle(s)}
                 data-tour={s === "A" ? "option-a" : "option-b"}
                 aria-label={`Vote for ${s === "A" ? card.labelA : card.labelB}`}
@@ -462,6 +462,7 @@ export function SwipeDeck({
                   ring={winner === s}
                   hot={!!grab && grab.side !== s && armed}
                   big
+                  className="absolute inset-0"
                 >
                   {winner === s && result && (
                     <ResultBars side={s} everyone={result} experts={card.expert} onPhoto={!!(s === "A" ? card.imageA : card.imageB)} />
