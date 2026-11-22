@@ -11,6 +11,8 @@ import { pointsTier } from "@/server/services/priority";
 import type { BattleCard } from "@/server/services/battles";
 import { OptionFace } from "./OptionFace";
 import { wink } from "@/components/layout/Logo";
+import { RollCard } from "./RollCard";
+import { isRollMilestone, ROLL_KEY } from "@/lib/streak";
 import { PhotoFlag } from "./PhotoFlag";
 import { ResultBars } from "./ResultBars";
 
@@ -62,6 +64,14 @@ export function SwipeDeck({
   const [thrown, setThrown] = useState<{ side: Side; dir: -1 | 1 } | null>(null);
   const [pp, setPp] = useState(initialPP);
   const [session, setSession] = useState({ votes: 0, points: 0 });
+  // "You're on a roll" card: picks this tab session (survives switching tabs), and the milestone on screen.
+  const rollCount = useRef(0);
+  const [roll, setRoll] = useState<number | null>(null);
+  useEffect(() => {
+    try {
+      rollCount.current = Number(sessionStorage.getItem(ROLL_KEY)) || 0;
+    } catch {}
+  }, []);
   const shownAt = useRef(Date.now());
   const drag = useRef<{ side: Side; x: number; y: number; dx: number; moved: boolean; w: number; lx: number; lt: number; v: number; armed: boolean; end: () => void } | null>(null);
   const justDragged = useRef(false);
@@ -225,15 +235,25 @@ export function SwipeDeck({
   // Every pick (tap, swipe-away, ← / →): the pick fills the card, its scores show for
   // RESULT_MS, then the next battle.
   async function pick(side: Side, dir: -1 | 1 = side === "A" ? -1 : 1) {
-    if (!card || voted || fly) return;
+    if (!card || voted || fly || roll) return;
     const started = Date.now();
     const ok = await vote(side);
     if (!ok) {
       setThrown(null);
       return;
     }
+    const n = ++rollCount.current;
+    try {
+      sessionStorage.setItem(ROLL_KEY, String(n));
+    } catch {}
     setTimeout(() => buzz(10), 120);
-    setTimeout(() => advance(dir), Math.max(0, RESULT_MS - (Date.now() - started)));
+    setTimeout(() => {
+      advance(dir);
+      if (isRollMilestone(n)) {
+        setRoll(n);
+        buzz(30);
+      }
+    }, Math.max(0, RESULT_MS - (Date.now() - started)));
   }
 
   // Swipe away: that photo flies off and the other one is the pick.
@@ -246,7 +266,7 @@ export function SwipeDeck({
   }
 
   function skip() {
-    if (!card || voted || fly || thrown) return;
+    if (!card || voted || fly || thrown || roll) return;
     markDone(card.id);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
     advance(-1);
@@ -369,6 +389,7 @@ export function SwipeDeck({
     <div>
       {header}
       <div className="relative h-[calc(100dvh-15.35rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
+        {roll != null && <RollCard count={roll} onDone={() => setRoll(null)} />}
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}
