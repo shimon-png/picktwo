@@ -1,6 +1,7 @@
 /**
- * Friendly generated usernames like "brunchclub_mia" or "latenight_jo27".
- * Used to prefill the sign-up username (still editable) and for seed profiles, so both look alike.
+ * Usernames. Sign-up suggests `suggestedHandle()` ("zoe4859", from the email's first name + 4 digits),
+ * which users can edit; `generateHandle()` makes the kind of name people pick themselves ("brunchclub_mia").
+ * Seed posters use both (mostly the suggested style) so they look like real sign-ups.
  * Pure: pass your own random function to make it deterministic.
  */
 export const HANDLE_WORDS = [
@@ -22,11 +23,16 @@ export const HANDLE_NAMES = [
   "maya", "lexi", "gabs", "steph", "megs", "cass", "lily", "rose", "jules", "nora", "amir", "leo", "sofi", "vee",
 ];
 
-/** Name part from an email's local part: its leading letters, 2–6 of them, or "" if there aren't enough. */
+/** Name part from an email's local part: its leading letters (up to 10), or "" if there are fewer than 2. */
 export function namePart(email: string | null | undefined): string {
   const local = (email ?? "").split("@")[0]?.toLowerCase() ?? "";
   const letters = local.match(/^[a-z]+/)?.[0] ?? "";
-  return letters.length >= 2 ? letters.slice(0, 6) : "";
+  return letters.length >= 2 ? letters.slice(0, 10) : "";
+}
+
+/** The username sign-up suggests: email name + 4 digits ("jessica.lee@…" → "jessica4859"), else "user4859". */
+export function suggestedHandle(email: string | null | undefined, rand: () => number = Math.random): string {
+  return `${namePart(email) || "user"}${1000 + Math.floor(rand() * 9000)}`;
 }
 
 /**

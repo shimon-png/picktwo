@@ -106,6 +106,13 @@
       "when": 1795364000000,
       "tag": "0014_seed_launch_battles",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795365000000,
+      "tag": "0015_seed_handles_relaunch",
+      "breakpoints": true
     }
   ]
 }
