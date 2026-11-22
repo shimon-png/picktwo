@@ -30,8 +30,14 @@ const limiters = new Map<string, Ratelimit>();
 // In-memory fallback (per serverless instance — fine for dev and low traffic).
 const mem = new Map<string, { count: number; reset: number }>();
 
+/**
+ * E2E_RELAX_RATE_LIMITS=true multiplies every limit by 100. Only for the CI / local end-to-end run, where every test
+ * user signs in from the same IP. Never set it in production.
+ */
+const relax = process.env.E2E_RELAX_RATE_LIMITS === "true" ? 100 : 1;
+
 export async function rateLimit(rule: keyof typeof RULES, key: string) {
-  const r = RULES[rule];
+  const r = { ...RULES[rule], limit: RULES[rule].limit * relax };
   if (redis) {
     let l = limiters.get(rule);
     if (!l) {

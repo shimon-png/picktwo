@@ -47,7 +47,7 @@ npm run typecheck && npm run lint && npm test
 npm run db:generate    # after editing src/server/db/schema.ts
 npm run db:migrate
 npm run db:seed
-npm run build && npm start && npm run test:e2e   # e2e needs DEV_LOGIN=true
+npm run build && npm start && npm run test:e2e   # e2e needs DEV_LOGIN=true and E2E_RELAX_RATE_LIMITS=true (all test users share one IP)
 ```
 
 ## Stack

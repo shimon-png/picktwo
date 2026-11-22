@@ -23,6 +23,8 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       CRON_SECRET: ci
       DEV_LOGIN: "true"
+      # Every e2e user signs in from the same IP; relax rate limits for the test run only.
+      E2E_RELAX_RATE_LIMITS: "true"
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
