@@ -169,6 +169,13 @@
       "when": 1795373000000,
       "tag": "0023_seed_who_is_right_varied",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795374000000,
+      "tag": "0024_founding_experts",
+      "breakpoints": true
     }
   ]
 }
