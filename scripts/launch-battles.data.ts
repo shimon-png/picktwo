@@ -226,7 +226,7 @@ export const LAUNCH_BATTLES: SeedBattle[] = [
   ["Just found out the guy at the next desk makes $15k more for my exact job. Tell my other coworkers my salary?", "", "Share it", "", "Keep quiet", ""],
   ["Do I lie and tell my boss I have a competing offer to get a raise? I don't have one.", "I could probably get one though.", "Bluff", "", "Don't", "if they call it I'm cooked"],
   ["Applying for a project manager job. Which line on my resume sounds stronger?", "", "Led a team of 12 to launch on time", "", "Shipped 4 products in 18 months, zero missed deadlines", ""],
-  ["A guy on another team at work asked me to dinner. Do I go?", "We're on different teams.", "Go", "", "Don't", "if it goes bad I see him daily"],
+  ["A guy on another team at work asked me to dinner. Do I go?", "He's really cute. That's the problem.", "Go", "", "Don't", "if it goes bad I see him daily"],
   ["My boss yells, HR does nothing, and my new job starts Monday. Do I still give two weeks notice?", "", "Give notice", "", "Just leave", ""],
   ["Two job offers, same pay. One is 3 days in office, one is full remote. Which one?", "", "Office", "", "Remote", ""],
   ["I'm 10 weeks pregnant and my promotion decision is in 3 weeks. Tell my boss now or after?", "", "Tell her now", "", "Wait", ""],
