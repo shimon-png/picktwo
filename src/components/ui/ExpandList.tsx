@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 export type ExpandItem = { key: string; /** What the search box matches against. */ text: string; node: React.ReactNode };
 
 /**
- * Shows the first `initial` items with "Show more", plus a search box once the list is longer than that.
+ * Shows the first `initial` items with "Show more", plus a search box whenever there's more than one item.
  * While searching, every match shows.
  */
 export function ExpandList({
@@ -31,7 +31,7 @@ export function ExpandList({
   const hidden = matches.length - shown.length;
   return (
     <div className="space-y-2">
-      {items.length > initial && (
+      {items.length > 1 && (
         <label className="relative block">
           <span className="sr-only">{searchPlaceholder}</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden />
