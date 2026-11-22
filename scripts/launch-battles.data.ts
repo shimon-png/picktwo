@@ -55,7 +55,7 @@ export const LAUNCH_BATTLES: SeedBattle[] = [
 
   // ── Cheating, flirting, thirst traps ───────────────────────────────────────
   ["Bf keeps liking his ex's thirst traps. Like literally every bikini pic she posts. Am I crazy for being mad?", "He says liking is 'just a tap'.", "I'm allowed to be mad", "", "Let it go", ""],
-  ["My husband follows like 40 random IG models. Never comments, just follows. Is that cheating?", "Never comments. Just follows.", "Yes", "", "No", ""],
+  ["My husband follows like 40 random IG models. Never comments, just follows. Is that cheating?", "He says he doesn't even remember following them.", "Yes", "", "No", ""],
   ["Found out my bf has a finsta (secret IG) and it follows a ton of girls. Do I bring it up?", "I found it by accident. He doesn't know I know.", "Bring it up", "", "Say nothing for now", ""],
   ["My bf's coworker texted him 'goodnight 😴' at 11pm. He says it's 'just how she is'.", "They work together. She has a boyfriend too.", "Red flag", "", "I'm overthinking", ""],
   ["My girlfriend is still swiping on Hinge 'just to see what's out there'. Is that cheating?", "Her words: 'I'm not messaging anyone, I just swipe when I'm bored'.", "Yes", "", "No", ""],
@@ -89,7 +89,7 @@ export const LAUNCH_BATTLES: SeedBattle[] = [
   ["My Hinge 'My most irrational fear' prompt. Trying to be funny, not unhinged. Which answer would you like?", "", "Geese. I've seen what they can do.", "", "My mom reading my texts out loud at Thanksgiving", ""],
   ["Writing my Hinge 'I'm looking for' prompt. 29F, want something real but not desperate. Which one?", "", "Someone who texts back like they mean it", "", "My person. And a decent taco place.", ""],
   ["I always open first on Bumble and every convo dies. Which opener would you actually answer?", "", "Two truths and a lie. Go.", "", "Ok what's your most controversial food opinion", ""],
-  ["I'm 35, divorced 2 years, no kids. Do I say I'm divorced on my dating profile?", "Amicable. No kids.", "Say it upfront", "", "Wait till the date", ""],
+  ["I'm 35, divorced 2 years, no kids. Do I say I'm divorced on my dating profile?", "It was amicable. We're still friendly.", "Say it upfront", "", "Wait till the date", ""],
   ["I'm a single mom of a 4 year old getting back on the apps. Put my daughter in the profile or wait?", "She's my whole world but I don't want that to be my whole profile.", "Upfront", "she comes first, always", "After the first date", "I'm a person too, not just a mom"],
   ["My Hinge 'Dating me is like' answer. My sister says option A is cringe. Which one?", "I like A. Be honest.", "Dating a golden retriever who can do taxes", "", "Free therapy but I also need some", ""],
   ["Back on the apps after a breakup. Lead pic: my best solo photo or a fun group shot?", "Friends say solo. My roommate says group.", "Solo pic", "", "Group shot", ""],
