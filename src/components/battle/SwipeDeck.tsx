@@ -127,6 +127,8 @@ export function SwipeDeck({
     setResult(pct(card.votesA + (side === "A" ? 1 : 0), card.votesB + (side === "B" ? 1 : 0)));
     // Remember it right away, so leaving the tab before the request finishes can't bring it back.
     markDone(card.id);
+    // Wink the logo the instant the pick lands, not after the server answers.
+    if (!prev) wink();
     try {
       const r = await api<VoteRes>(`/api/battles/${card.slug}/vote`, {
         body: { side, source: "feed", ...(prev ? {} : { dwellMs }) },
@@ -137,7 +139,6 @@ export function SwipeDeck({
       if (r.ppBalance != null) setPp(r.ppBalance);
       setSession((s) => ({ votes: s.votes + (prev ? 0 : 1), points: s.points + r.points }));
       if (r.points > 0) toast(`+${r.points} for voting`, "pp");
-      if (!prev) wink();
       return true;
     } catch (e) {
       if (prev) {
@@ -273,7 +274,7 @@ export function SwipeDeck({
   const tierLine = tier ? (tier.next ? `${tier.toNext} ⚡ to ${tier.next} priority.` : "Top priority — your battles go first.") : null;
 
   const header = (
-    <div className="sticky top-14 z-20 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
+    <div className="sticky top-16 z-20 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
       <p className="text-xs text-zinc-500" data-tour="status">
         {tierLine ?? (
           <>
@@ -367,7 +368,7 @@ export function SwipeDeck({
   return (
     <div>
       {header}
-      <div className="relative h-[calc(100dvh-14.85rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
+      <div className="relative h-[calc(100dvh-15.35rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}

@@ -17,7 +17,7 @@ export function Toaster() {
     return () => window.removeEventListener("pt:toast", on);
   }, []);
   return (
-    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-3 z-[60] flex flex-col items-center gap-2 px-4 pt-[env(safe-area-inset-top)]">
+    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 top-[4.6rem] z-[60] flex flex-col items-center gap-2 px-4 pt-[env(safe-area-inset-top)]">
       {items.map((t) => (
         <div
           key={t.id}

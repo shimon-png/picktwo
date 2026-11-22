@@ -62,7 +62,7 @@ export function Mark({ size = 22, className }: { size?: number; className?: stri
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("font-display text-[22px] font-bold tracking-[-0.01em] text-ink [font-size-adjust:none]", className)}>
+    <span className={cn("font-display text-[20px] min-[375px]:text-[25px] font-bold tracking-[-0.01em] text-ink [font-size-adjust:none]", className)}>
       crowdpick
     </span>
   );
@@ -70,8 +70,8 @@ export function Wordmark({ className }: { className?: string }) {
 
 export function Logo({ className = "", href = "/" }: { className?: string; href?: string }) {
   return (
-    <Link href={href} className={cn("inline-flex items-center gap-2", className)} aria-label="crowdpick home">
-      <Mark size={30} />
+    <Link href={href} className={cn("inline-flex shrink-0 items-center gap-1.5 min-[375px]:gap-2", className)} aria-label="crowdpick home">
+      <Mark size={36} className="size-7 min-[375px]:size-9" />
       <Wordmark />
     </Link>
   );
