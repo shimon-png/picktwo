@@ -238,6 +238,8 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
             </>
           ) : v.isOpen && !v.isOwner ? (
             "Tap to vote — results appear after you pick"
+          ) : !v.isOpen && !v.isOwner ? (
+            "Voting has closed. Results are only shown to people who voted."
           ) : null}
         </p>
         {res && res.total > 0 && (

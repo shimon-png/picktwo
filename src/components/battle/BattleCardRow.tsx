@@ -22,9 +22,10 @@ function Thumb({ img, label, side }: { img: string | null; label: string; side: 
 
 /**
  * A battle in a list. The whole card opens the battle; the poster's name opens their profile.
- * `hideResults` hides the split (Discover: open battles you haven't voted on, so votes stay unbiased).
+ * `hideResults` hides every score (Discover: votes stay unbiased; scores are for the poster).
  */
-export function BattleCardRow({ b, showAuthor = true, src = "home", hideResults = false }: { b: BattleCard; showAuthor?: boolean; src?: string; hideResults?: boolean }) {
+export function BattleCardRow({ b, showAuthor = true, src = "home", hideResults = false, voted = false }: { b: BattleCard; showAuthor?: boolean; src?: string; hideResults?: boolean; voted?: boolean }) {
+  // hideResults: only the vote count and time left (Discover), never the split, Expert score or outcome.
   const p = pct(b.votesA, b.votesB);
   const closed = b.status !== "OPEN";
   const chosenLabel = b.outcome?.chosen === "A" ? b.labelA : b.outcome?.chosen === "B" ? b.labelB : null;
@@ -52,7 +53,7 @@ export function BattleCardRow({ b, showAuthor = true, src = "home", hideResults 
           )}
         </div>
         <div className="mt-1 flex items-center gap-2 text-xs">
-          {b.outcome ? (
+          {b.outcome && !hideResults ? (
             <span className={cn("inline-flex items-center gap-1 font-medium", b.outcome.thumb === "DOWN" ? "text-zinc-600" : "text-ok")}>
               {b.outcome.thumb === "UP" ? <ThumbsUp className="size-3.5" /> : b.outcome.thumb === "DOWN" ? <ThumbsDown className="size-3.5" /> : null}
               {chosenLabel ? `Picked ${chosenLabel}` : "Picked neither"}
@@ -61,7 +62,7 @@ export function BattleCardRow({ b, showAuthor = true, src = "home", hideResults 
             <span className={cn("font-medium", closed ? "text-b" : "text-zinc-500")}>{closed ? "Awaiting report-back" : timeLeft(b.deadline)}</span>
           )}
           <span className="text-zinc-400">· {p.total} votes</span>
-          {hideResults && <span className="text-zinc-400">· vote to see results</span>}
+          {voted && <span className="text-ok">· ✓ You voted</span>}
         </div>
         {results && (
           <div className="mt-1 text-xs text-zinc-500">
