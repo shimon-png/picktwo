@@ -136,7 +136,8 @@ function TextFace({
       <span className="optcard-badge relative z-10 m-2.5 flex size-5 items-center justify-center rounded-full text-[11px]" aria-hidden>
         {side}
       </span>
-      <span className="flex flex-1 flex-col justify-center px-3.5 pb-1">
+      {/* Extra room on the inner edge so the deck's centred "vs" badge never covers the words. */}
+      <span className={cn("flex flex-1 flex-col justify-center pb-1", isA ? "pl-3.5 pr-[26px]" : "pl-[26px] pr-3.5")}>
         {!compact && (
           <span className={cn("optcard-label block break-words leading-[1.1]", textSize(label.length, big), big ? "line-clamp-6" : "line-clamp-4")}>{label}</span>
         )}
