@@ -17,6 +17,9 @@ import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { Scores } from "@/components/battle/Scores";
 import { RepostButton } from "@/components/battle/RepostButton";
 import { unreadCount } from "@/server/services/notifications";
+import { listFollowers, listFollowing, type PersonRow as Person } from "@/server/services/social";
+import { PersonRow } from "@/components/people/PersonRow";
+import { ExpandList } from "@/components/ui/ExpandList";
 import { pointsTier } from "@/server/services/priority";
 import { TONE_CLASSES, type Tone } from "@/lib/constants";
 import { TOUR_URL } from "@/lib/tour";
@@ -47,12 +50,14 @@ export default async function YouPage() {
   if (profileIncomplete(user)) redirect(onboardingUrl("/you"));
   const e = await getEconomy();
   const admin = isAdmin(user);
-  const [mine, openLoops, unreported, unread, ledger] = await Promise.all([
-    battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 30),
+  const [mine, openLoops, unreported, unread, ledger, followers, following] = await Promise.all([
+    battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 100),
     countOpenLoops(user.id, e),
     countUnreported(user.id),
     unreadCount(user.id),
     db.select().from(pointLedger).where(eq(pointLedger.userId, user.id)).orderBy(desc(pointLedger.createdAt)).limit(15),
+    listFollowers(user.id, user.id),
+    listFollowing(user.id, user.id),
   ]);
   const newMessages = admin ? await unreadContactCount() : 0;
   const flagged = admin ? await openReportCount() : 0;
@@ -166,13 +171,20 @@ export default async function YouPage() {
             </Link>
           </div>
         ) : (
-          <ul className="divide-y divide-ink/8">
-            {[...awaiting, ...others].map((b) => (
-              <BattleRow key={b.id} b={b} reasons={reasonCounts.get(b.id) ?? 0} awaiting={awaiting.includes(b)} loopPoints={e.loopClosedPoints} />
-            ))}
-          </ul>
+          <ExpandList
+            searchPlaceholder="Search your battles"
+            className="!space-y-0 divide-y divide-ink/8"
+            items={[...awaiting, ...others].map((b) => ({
+              key: b.id,
+              text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB}`,
+              node: <BattleRow b={b} reasons={reasonCounts.get(b.id) ?? 0} awaiting={awaiting.includes(b)} loopPoints={e.loopClosedPoints} />,
+            }))}
+          />
         )}
       </section>
+
+      <PeopleSection title="Followers" people={followers} viewerId={user.id} empty="No followers yet. Share a battle and people can follow you from your name." />
+      <PeopleSection title="Following" people={following} viewerId={user.id} empty="You're not following anyone yet. Find people in Discover." />
 
       <section className="card divide-y divide-ink/8 overflow-hidden !bg-white shadow-ring">
         {(
@@ -241,7 +253,7 @@ function BattleRow({ b, reasons, awaiting, loopPoints }: { b: BattleCard; reason
       ? "Voting closed · tell people what you picked"
       : `Live · ${votes} vote${votes === 1 ? "" : "s"} · ${reasons} reason${reasons === 1 ? "" : "s"} · ${timeLeft(b.deadline)}`;
   return (
-    <li className="flex items-center gap-2">
+    <div className="flex items-center gap-2">
       <Link href={awaiting ? `/b/${b.slug}/report` : `/b/${b.slug}`} className="flex min-w-0 flex-1 items-center gap-3 py-3">
         <span className="flex gap-1">
           <Thumb img={b.imageA} label={b.labelA} side="A" />
@@ -259,6 +271,33 @@ function BattleRow({ b, reasons, awaiting, loopPoints }: { b: BattleCard; reason
         {awaiting && <span className="tag shrink-0 bg-accent-900 text-accent">+{loopPoints} ⚡</span>}
       </Link>
       {b.status === "CLOSED" && <RepostButton slug={b.slug} />}
-    </li>
+    </div>
+  );
+}
+
+function PeopleSection({ title, people, viewerId, empty }: { title: string; people: Person[]; viewerId: string; empty: string }) {
+  return (
+    <section>
+      <h2 className="mb-2.5 text-[22px]">
+        {title} <span className="font-sans text-sm text-zinc-500">{people.length}</span>
+      </h2>
+      <ExpandList
+        searchPlaceholder={`Search ${title.toLowerCase()}`}
+        empty={
+          <p className="text-sm text-zinc-500">
+            {empty}
+            {title === "Following" && (
+              <>
+                {" "}
+                <Link href="/discover" className="text-accent">
+                  Discover
+                </Link>
+              </>
+            )}
+          </p>
+        }
+        items={people.map((p) => ({ key: p.id, text: `${p.name ?? ""} ${p.handle}`, node: <PersonRow p={p} viewerId={viewerId} /> }))}
+      />
+    </section>
   );
 }

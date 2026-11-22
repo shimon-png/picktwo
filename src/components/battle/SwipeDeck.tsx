@@ -377,14 +377,25 @@ export function SwipeDeck({
           style={style}
         >
           <div className="flex items-center gap-2 text-xs text-zinc-500">
-            <span className={cn("inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]", TONE_CLASSES[avatarTone].solid)} aria-hidden>
-              {handle.replace(/^@/, "")[0]?.toUpperCase()}
-            </span>
-            <span className="truncate">
-              {handle}
-              <ExpertBadge tier={card.authorTier} className="ml-1" />
-              {parentOf && ` · ${parentOf}`}
-            </span>
+            {card.authorHandle ? (
+              <Link href={`/u/${card.authorHandle}`} data-nodrag className="flex min-w-0 items-center gap-2 py-1 hover:underline" aria-label={`${handle}'s profile`}>
+                <AuthorDot handle={handle} image={card.authorImage} tone={TONE_CLASSES[avatarTone].solid} />
+                <span className="truncate">
+                  {handle}
+                  <ExpertBadge tier={card.authorTier} className="ml-1" />
+                  {parentOf && ` · ${parentOf}`}
+                </span>
+              </Link>
+            ) : (
+              <>
+                <AuthorDot handle={handle} image={card.authorImage} tone={TONE_CLASSES[avatarTone].solid} />
+                <span className="truncate">
+                  {handle}
+                  <ExpertBadge tier={card.authorTier} className="ml-1" />
+                  {parentOf && ` · ${parentOf}`}
+                </span>
+              </>
+            )}
             <span className="ml-auto shrink-0">{timeLeft(card.deadline)}</span>
           </div>
           <h1 className="mt-3 text-[28px] leading-[1.05]" data-tour="question">
@@ -478,5 +489,17 @@ export function SwipeDeck({
         </article>
       </div>
     </div>
+  );
+}
+
+/** Poster's avatar on a deck card: their photo, else their initial. */
+function AuthorDot({ handle, image, tone }: { handle: string; image: string | null; tone: string }) {
+  return image ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={image} alt="" className="size-5 shrink-0 rounded-full object-cover" />
+  ) : (
+    <span className={cn("inline-flex size-5 shrink-0 items-center justify-center rounded-full text-[11px]", tone)} aria-hidden>
+      {handle.replace(/^@/, "")[0]?.toUpperCase()}
+    </span>
   );
 }

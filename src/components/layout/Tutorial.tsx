@@ -21,7 +21,10 @@ function steps(signedIn: boolean): Step[] {
     { target: "status", title: "Where you stand", body: signedIn ? "This line shows how close you are to the next priority level." : "Your progress and tips show up here." },
     { target: "nav-vote", title: "Vote", body: "Your stack of battles to vote on. This is home." },
     { target: "nav-post", title: "Post", body: "Can’t decide? Add two options with photos or links and ask the crowd." },
-    { target: "nav-you", title: "You", body: "Your ⚡, your battles, activity, settings, and the Tutorial button to replay this tour any time." },
+    { target: "nav-discover", title: "Discover", body: "Top battles, the biggest experts and most active voters. Search for battles or people to follow." },
+    ...(signedIn
+      ? [{ target: "nav-you", title: "You", body: "Tap your photo for your ⚡, battles, followers, updates, settings, and the Tutorial button to replay this tour any time." }]
+      : []),
     { title: "You’re all set", body: "Start swiping. Tap anywhere to finish." },
   ];
 }

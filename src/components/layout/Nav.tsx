@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Layers, PlusSquare, User } from "lucide-react";
+import { Compass, Layers, PlusSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
 
@@ -33,19 +33,14 @@ export function ChromeOnly({ children }: { children: React.ReactNode }) {
   return isFullScreen(path) ? null : <>{children}</>;
 }
 
-export function Nav({ unread }: { unread: number }) {
+export function Nav() {
   const path = usePathname();
   if (isFullScreen(path)) return null;
-  const items = [
+  // "You" lives in the header (avatar, top right); the tab bar is Vote · Post · Discover.
+  const items: { href: string; label: string; icon: typeof Layers; badge?: number; match: (p: string) => boolean }[] = [
     { href: "/vote", label: "Vote", icon: Layers, match: (p: string) => p.startsWith("/vote") || p === "/" },
     { href: "/post", label: "Post", icon: PlusSquare, match: (p: string) => p.startsWith("/post") },
-    {
-      href: "/you",
-      label: "You",
-      icon: User,
-      badge: unread,
-      match: (p: string) => ["/you", "/priority", "/activity", "/settings", "/u/"].some((x) => p.startsWith(x)),
-    },
+    { href: "/discover", label: "Discover", icon: Compass, match: (p: string) => p.startsWith("/discover") || p.startsWith("/u/") },
   ];
   return (
     <nav
@@ -86,5 +81,34 @@ export function Nav({ unread }: { unread: number }) {
         })}
       </ul>
     </nav>
+  );
+}
+
+/** Header avatar (top right): opens You. A red count shows unread updates. */
+export function YouButton({ name, image, unread }: { name: string; image: string | null; unread: number }) {
+  const path = usePathname();
+  const active = ["/you", "/priority", "/activity", "/settings"].some((x) => path.startsWith(x));
+  return (
+    <Link
+      href="/you"
+      data-tour="nav-you"
+      aria-label={`You${unread ? `, ${unread} new updates` : ""}`}
+      aria-current={active ? "page" : undefined}
+      className={cn("relative block rounded-full ring-2 ring-transparent transition", active && "ring-ink")}
+    >
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={image} alt="" className="size-9 rounded-full bg-surface object-cover" />
+      ) : (
+        <span className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-a to-b text-[15px] font-medium text-white" aria-hidden>
+          {(name.replace(/^@/, "")[0] ?? "?").toUpperCase()}
+        </span>
+      )}
+      {unread > 0 && (
+        <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full border-2 border-page bg-b px-1 text-center text-[10px] font-semibold leading-[14px] text-white">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      )}
+    </Link>
   );
 }
