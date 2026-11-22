@@ -92,6 +92,13 @@
       "when": 1795362000000,
       "tag": "0012_seed_photo_battles",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795363000000,
+      "tag": "0013_seed_life_battles",
+      "breakpoints": true
     }
   ]
 }
