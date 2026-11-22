@@ -306,6 +306,15 @@ html[data-theme="arcade"] .tour-hole { outline-color: #c6ff3d; box-shadow: 0 0 0
 @keyframes cp-spark { 0% { opacity: 0; transform: scale(0.2) rotate(0deg); } 30% { opacity: 1; transform: scale(1.2) rotate(45deg); } 70% { opacity: 1; transform: scale(1) rotate(90deg); } 100% { opacity: 0; transform: scale(0.6) rotate(120deg); } }
 @media (prefers-reduced-motion: reduce) { .mark.winking * { animation: none !important; } }
 
+/* Text-only options (OptionFace → TextFace): fun font on a plain colour, same in every theme. */
+.optcard { color: #1d1a2e; }
+.optcard-a { background: #c4d3ff; }
+.optcard-b { background: #ffcfc4; }
+.optcard-label { font-family: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif; font-weight: 650; letter-spacing: -0.01em; }
+.optcard-desc { font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif; color: rgb(29 26 46 / 0.72); }
+.optcard-badge { border: 1px solid rgb(29 26 46 / 0.35); background: rgb(255 255 255 / 0.55); }
+.optcard :is(.text-zinc-500, .text-zinc-600, .font-display) { color: rgb(29 26 46 / 0.8); }
+.optcard .font-display { color: #1d1a2e; }
 /* "You're on a roll" flashcard (components/battle/RollCard.tsx). */
 .roll-card { background: radial-gradient(120% 80% at 50% 20%, #fff8dc, #ffffff 70%); }
 .roll-bolt { color: var(--color-pp); filter: drop-shadow(0 6px 18px rgb(240 180 60 / 0.55)); animation: roll-bolt 1.6s ease-in-out infinite; }
