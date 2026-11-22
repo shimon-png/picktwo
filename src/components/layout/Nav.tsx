@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Compass, Layers, PlusSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
@@ -33,9 +34,40 @@ export function ChromeOnly({ children }: { children: React.ReactNode }) {
   return isFullScreen(path) ? null : <>{children}</>;
 }
 
+/** Text fields that bring up the on-screen keyboard (not checkboxes, radios, buttons…). */
+function isTextField(el: EventTarget | null) {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable || el instanceof HTMLTextAreaElement) return true;
+  if (!(el instanceof HTMLInputElement)) return false;
+  return !["checkbox", "radio", "button", "submit", "reset", "file", "range", "color", "image", "hidden"].includes(el.type);
+}
+
+/**
+ * True while a text field is focused on a touch device, i.e. the keyboard is up. iOS Safari keeps
+ * `position: fixed` bars pinned to the layout viewport, so the tab bar would float above the keyboard
+ * with the page scrolling behind it; we hide it instead.
+ */
+function useKeyboardOpen() {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!window.matchMedia("(pointer: coarse)").matches) return;
+    const onIn = (e: FocusEvent) => isTextField(e.target) && setOpen(true);
+    // focusout fires before focus moves to the next field; re-check on the next tick.
+    const onOut = () => setTimeout(() => setOpen(isTextField(document.activeElement)), 0);
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, []);
+  return open;
+}
+
 export function Nav() {
   const path = usePathname();
-  if (isFullScreen(path)) return null;
+  const keyboard = useKeyboardOpen();
+  if (isFullScreen(path) || keyboard) return null;
   // "You" lives in the header (avatar, top right); the tab bar is Vote · Post · Discover.
   const items: { href: string; label: string; icon: typeof Layers; badge?: number; match: (p: string) => boolean }[] = [
     { href: "/vote", label: "Vote", icon: Layers, match: (p: string) => p.startsWith("/vote") || p === "/" },
