@@ -183,11 +183,14 @@ function useFitText(key: string) {
     const fit = () => {
       let f = 1;
       b.style.setProperty("--fit", "1");
-      while (f > MIN_FIT && i.offsetHeight > b.clientHeight + 1) {
+      // Too tall, or a single word wider than the card (words never break mid-word).
+      const tooBig = () =>
+        i.offsetHeight > b.clientHeight + 1 || i.scrollWidth > i.clientWidth + 1;
+      while (f > MIN_FIT && tooBig()) {
         f = Math.max(MIN_FIT, f - 0.05);
         b.style.setProperty("--fit", f.toFixed(2));
       }
-      setOverflow(i.offsetHeight > b.clientHeight + 1);
+      setOverflow(tooBig());
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -322,7 +325,7 @@ function TextFace({
           <span ref={inner} className="my-auto block">
             {!compact && (
               <span
-                className="optcard-label block break-words leading-[1.1]"
+                className="optcard-label block break-normal leading-[1.1] [hyphens:none]"
                 style={{ fontSize: `calc(${labelPx}px * var(--fit, 1))` }}
               >
                 {label}
