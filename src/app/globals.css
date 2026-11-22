@@ -306,11 +306,11 @@ html[data-theme="arcade"] .tour-hole { outline-color: #c6ff3d; box-shadow: 0 0 0
 @media (prefers-reduced-motion: reduce) { .mark.winking * { animation: none !important; } }
 
 /* Text-only options (OptionFace → TextFace): fun font on a plain colour, same in every theme. */
-.text-face { color: #1d1a2e; }
-.text-face-a { background: #c4d3ff; }
-.text-face-b { background: #ffcfc4; }
-.text-face-label { font-family: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif; font-weight: 650; letter-spacing: -0.01em; }
-.text-face-desc { font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif; color: rgb(29 26 46 / 0.72); }
-.text-face-badge { border: 1px solid rgb(29 26 46 / 0.35); background: rgb(255 255 255 / 0.55); }
-.text-face :is(.text-zinc-500, .text-zinc-600, .font-display) { color: rgb(29 26 46 / 0.8); }
-.text-face .font-display { color: #1d1a2e; }
+.optcard { color: #1d1a2e; }
+.optcard-a { background: #c4d3ff; }
+.optcard-b { background: #ffcfc4; }
+.optcard-label { font-family: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif; font-weight: 650; letter-spacing: -0.01em; }
+.optcard-desc { font-family: "Inter Variable", ui-sans-serif, system-ui, sans-serif; color: rgb(29 26 46 / 0.72); }
+.optcard-badge { border: 1px solid rgb(29 26 46 / 0.35); background: rgb(255 255 255 / 0.55); }
+.optcard :is(.text-zinc-500, .text-zinc-600, .font-display) { color: rgb(29 26 46 / 0.8); }
+.optcard .font-display { color: #1d1a2e; }

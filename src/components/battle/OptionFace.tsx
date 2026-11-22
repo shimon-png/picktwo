@@ -105,7 +105,7 @@ function textSize(len: number, big?: boolean) {
 
 /**
  * Text-only option (no photo): the label (and a sentence or two of description) in a fun font on a
- * plain colour. Colours are fixed in `.text-face` (globals.css) so every theme reads the same.
+ * plain colour. Colours are fixed in `.optcard` (globals.css) so every theme reads the same.
  */
 function TextFace({
   side,
@@ -132,16 +132,16 @@ function TextFace({
 }) {
   const isA = side === "A";
   return (
-    <span className={cn("text-face relative flex h-full w-full flex-col overflow-hidden rounded-[14px] text-left transition", isA ? "text-face-a" : "text-face-b", className)}>
-      <span className="text-face-badge relative z-10 m-2.5 flex size-5 items-center justify-center rounded-full text-[11px]" aria-hidden>
+    <span className={cn("optcard relative flex h-full w-full flex-col overflow-hidden rounded-[14px] text-left transition", isA ? "optcard-a" : "optcard-b", className)}>
+      <span className="optcard-badge relative z-10 m-2.5 flex size-5 items-center justify-center rounded-full text-[11px]" aria-hidden>
         {side}
       </span>
       <span className="flex flex-1 flex-col justify-center px-3.5 pb-1">
         {!compact && (
-          <span className={cn("text-face-label block break-words leading-[1.1]", textSize(label.length, big), big ? "line-clamp-6" : "line-clamp-4")}>{label}</span>
+          <span className={cn("optcard-label block break-words leading-[1.1]", textSize(label.length, big), big ? "line-clamp-6" : "line-clamp-4")}>{label}</span>
         )}
         {description && !compact && (
-          <span className={cn("text-face-desc mt-2 block leading-snug", big ? "line-clamp-4 text-[14px]" : "line-clamp-3 text-[12px]")}>{description}</span>
+          <span className={cn("optcard-desc mt-2 block leading-snug", big ? "line-clamp-4 text-[14px]" : "line-clamp-3 text-[12px]")}>{description}</span>
         )}
       </span>
       <span className="relative z-10 px-2.5 pb-2.5">
