@@ -55,8 +55,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <ContentShell>
           <ChromeOnly>
-            <header className="sticky top-0 z-30 bg-page/90 backdrop-blur">
-              <div className="mx-auto flex h-14 max-w-2xl items-center justify-between gap-2 px-4">
+            <header className="sticky top-0 z-30 border-b border-ink/10 bg-page/95 backdrop-blur">
+              <div className="mx-auto flex h-16 max-w-2xl items-center justify-between gap-2 px-4">
                 <HeaderLogo />
                 {user ? (
                   <>
