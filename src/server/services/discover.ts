@@ -10,7 +10,7 @@ export { cleanQuery };
 
 type Viewer = { user: User | null; deviceId: string | null };
 
-/** A battle card on Discover. Scores stay hidden (they're for the poster, and keep votes unbiased); `voted` = the viewer already voted. */
+/** A battle card on Discover. Scores stay hidden until the viewer has voted (the poster always sees them); `voted` = the viewer already voted. */
 export type DiscoverCard = BattleCard & { hideResults: boolean; voted: boolean };
 
 /** Visibility, status, author and block filters shared by every Discover battle query. */
@@ -43,7 +43,7 @@ const rowCols = {
 };
 
 /** Battle ids (of `ids`) this viewer already voted on: their account, or this device when signed out. */
-async function votedIds(viewer: Viewer, ids: string[]) {
+export async function votedIds(viewer: Viewer, ids: string[]) {
   if (!ids.length || (!viewer.user && !viewer.deviceId)) return new Set<string>();
   const who = viewer.user
     ? viewer.deviceId
@@ -60,7 +60,7 @@ async function toCards(viewer: Viewer, rows: Parameters<typeof hydrateCards>[0])
   const cards = await hydrateCards(kept);
   const voted = await votedIds(viewer, cards.map((c) => c.id));
   const me = viewer.user?.id;
-  return cards.map((c, i) => ({ ...c, hideResults: kept[i].b.authorId !== me, voted: voted.has(c.id) }));
+  return cards.map((c, i) => ({ ...c, hideResults: kept[i].b.authorId !== me && !voted.has(c.id), voted: voted.has(c.id) }));
 }
 
 /** Open battles with the most votes. Includes ones the viewer already voted on. */

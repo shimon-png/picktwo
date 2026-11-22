@@ -15,8 +15,8 @@ import { OptionFace } from "./OptionFace";
 type V = NonNullable<BattleView>;
 
 /**
- * Vote-only battle view, opened from Discover. No scores, Expert score or reasons: those are for the poster,
- * and hiding them keeps votes unbiased. Tap a photo to vote, then you go straight back. X skips.
+ * Vote-only battle view, opened from Discover for a battle you haven't voted on. No scores, Expert score or
+ * reasons (you see those once you've voted). Tap a photo to vote, then you go straight back. X skips.
  */
 export function DiscoverVote({ initial, source }: { initial: V; source: "discover" | "search" }) {
   const v = initial;
@@ -110,7 +110,7 @@ export function DiscoverVote({ initial, source }: { initial: V; source: "discove
         ) : done ? (
           "You already voted on this one."
         ) : v.isOpen ? (
-          "Tap your pick. Results are only shown to the poster."
+          "Tap your pick to vote. Results show once you vote."
         ) : (
           "Voting has closed on this one."
         )}

@@ -274,7 +274,8 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
 
   const isOwner = viewer.user?.id === b.authorId;
   const isOpen = b.status === "OPEN";
-  const showResults = isOwner || !!myVote || !isOpen;
+  // Results (split, Expert score, reasons) only for the poster and people who voted on it, even after it closes (Alex, Nov 22).
+  const showResults = isOwner || !!myVote;
   const results = showResults ? pct(b.votesA, b.votesB) : null;
 
   let reasons: { A: ReasonView[]; B: ReasonView[] } = { A: [], B: [] };

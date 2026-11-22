@@ -58,7 +58,7 @@ export default async function BattlePage({ params, searchParams }: Props) {
   if (!view) notFound();
   track("battle_viewed", { battleId: view.id, source: src ?? "link" }, { userId: viewer.user?.id, deviceId: viewer.deviceId });
   const source = src === "feed" || src === "home" || src === "profile" || src === "discover" || src === "search" ? src : "link";
-  // From Discover: a vote-only view (no scores or reasons; those are for the poster), then back to Discover.
-  if ((source === "discover" || source === "search") && !view.isOwner) return <DiscoverVote initial={view} source={source} />;
+  // From Discover, not voted yet: a vote-only view (no scores or reasons until you vote), then back to Discover.
+  if ((source === "discover" || source === "search") && !view.isOwner && !view.myVote) return <DiscoverVote initial={view} source={source} />;
   return <BattleClient initial={view} signedIn={!!viewer.user} shareUrl={appUrl(`/b/${slug}`)} source={source} />;
 }

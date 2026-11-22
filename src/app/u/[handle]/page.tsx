@@ -4,7 +4,8 @@ import { and, eq, inArray, sql, desc } from "drizzle-orm";
 import { Settings } from "lucide-react";
 import { db } from "@/server/db";
 import { users, battles, votes, outcomes, follows, reputations } from "@/server/db/schema";
-import { getCurrentUser } from "@/server/viewer";
+import { getCurrentUser, getDeviceId } from "@/server/viewer";
+import { votedIds } from "@/server/services/discover";
 import { battleCards, friendIds, visibleStatuses } from "@/server/services/battles";
 import { BattleCardRow } from "@/components/battle/BattleCardRow";
 import { FollowButton } from "@/components/layout/FollowButton";
@@ -62,6 +63,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   // Friends = you follow each other. They follow you when you're in their following list.
   const followsMe = !!me && !isMe && followingList.some((p) => p.id === me.id);
   const relation = !!iFollow && followsMe ? "Friends" : followsMe ? "Follows you" : null;
+  // Scores only on battles you voted on (or your own).
+  const voted = isMe ? null : await votedIds({ user: me, deviceId: await getDeviceId() }, list.map((b) => b.id));
   const tier = expertTier(u.correctPicks, await getEconomy());
   const loopRate = stats.past ? Math.round((100 * stats.closed) / stats.past) : null;
   const badges: string[] = [];
@@ -141,7 +144,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
         <ExpandList
           searchPlaceholder="Search their battles"
           empty={<p className="text-sm text-zinc-500">{isMe ? "You haven't posted a battle yet." : "No battles you can see yet."}</p>}
-          items={list.map((b) => ({ key: b.id, text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB}`, node: <BattleCardRow b={b} showAuthor={false} src="profile" /> }))}
+          items={list.map((b) => ({ key: b.id, text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB}`, node: <BattleCardRow b={b} showAuthor={false} src="profile" hideResults={!!voted && !voted.has(b.id)} voted={!!voted?.has(b.id)} /> }))}
         />
       </section>
 
