@@ -1,3 +1,4 @@
+import { TITLE_MAX } from "@/lib/constants";
 import { z } from "zod";
 import { handler, json } from "@/server/api";
 import { getViewer, requireUser, isAdmin } from "@/server/viewer";
@@ -13,7 +14,7 @@ export const GET = handler<{ slug: string }>(async (_req, { params }) => {
 
 const patch = z.object({
   action: z.enum(["edit", "close", "extend"]),
-  title: z.string().trim().min(3).max(100).optional(),
+  title: z.string().trim().min(3).max(TITLE_MAX).optional(),
   context: z.string().trim().max(280).optional(),
   hours: z.number().min(1).max(168).optional(),
 });

@@ -6,17 +6,18 @@ import { track } from "../analytics";
 import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { handleBase } from "./signin-code-utils";
+import { generateHandle, namePart } from "@/lib/handles";
 import { lookupZip } from "./zip";
 
-/** A free username suggestion based on the email. */
+/** A free, friendly username suggestion ("brunchclub_mia"), using the email's first name when it has one. The user can edit it. */
 export async function suggestHandle(email: string | null): Promise<string> {
-  const base = handleBase(email);
+  const name = namePart(email);
   for (let i = 0; i < 8; i++) {
-    const h = i === 0 ? base : `${base}${Math.floor(1000 + Math.random() * 9000)}`;
+    const h = generateHandle({ name: i < 4 ? name : "" });
     const [taken] = await db.select({ id: users.id }).from(users).where(eq(users.handle, h));
     if (!taken) return h;
   }
-  return `${base}${Date.now().toString(36).slice(-5)}`;
+  return `${handleBase(email).slice(0, 14)}${Date.now().toString(36).slice(-5)}`;
 }
 
 /**
