@@ -49,7 +49,16 @@ async function vercel(now: Date): Promise<Live> {
   // `to` is exclusive and day-granular: ask through tomorrow so today's partial day is included.
   const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
   const qs = new URLSearchParams({ from: start.toISOString(), to: to.toISOString(), teamId: process.env.VERCEL_TEAM_ID! });
-  const text = (await getJson(`https://api.vercel.com/v1/billing/charges?${qs}`, process.env.VERCEL_TOKEN!, true)) as string;
+  const url = (q: URLSearchParams) => `https://api.vercel.com/v1/billing/charges?${q}`;
+  let text: string;
+  try {
+    text = (await getJson(url(qs), process.env.VERCEL_TOKEN!, true)) as string;
+  } catch (e) {
+    // Some ranges reaching past "now" are refused; fall back to ending at the current moment.
+    if (!(e instanceof Error) || !e.message.startsWith("400")) throw e;
+    qs.set("to", now.toISOString());
+    text = (await getJson(url(qs), process.env.VERCEL_TOKEN!, true)) as string;
+  }
   const f = sumFocusRows(text);
   const usageProjected = projectMonthEnd(f.usage, now);
   const overCredit = (n: number) => Math.max(0, n - VERCEL_INCLUDED_CREDIT);
@@ -163,6 +172,12 @@ export async function getFinance(now = new Date()) {
           : vercelLive.state === "connect"
             ? vercelLive
             : { state: "none" };
+    }
+    // Neon bought through the Vercel Marketplace is invoiced by Vercel: keep its estimate as detail, don't add it twice.
+    if (p.id === "neon" && live.state === "live" && vercelLive.state === "live") {
+      const viaVercel = vercelLive.detail.filter((d) => /neon/i.test(d.name));
+      if (viaVercel.length)
+        live = { ...live, mtd: 0, projected: 0, note: `Billed through Vercel (in the Vercel total). ${live.note ?? ""}` };
     }
     const fixedMtd = round2(p.monthly * (win.elapsed / win.days));
     const mtd = live.state === "live" ? live.mtd : p.id === "vercel" ? p.monthly : fixedMtd;
