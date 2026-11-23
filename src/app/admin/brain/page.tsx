@@ -3,6 +3,7 @@ import { getBrainStats, type BrainView } from "@/server/services/brain";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
+import { signupJourneys } from "@/server/services/signup-journeys";
 import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ const battleLink = (slug: string, title: string) => (
   <Link href={`/b/${slug}`} className="line-clamp-2 underline-offset-2 hover:underline">{title}</Link>
 );
 
+const nyTime = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const nyDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
 
 /** "+12" / "−3" next to a number: change vs the day before. */
@@ -70,7 +72,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30))]);
+  const [s, taste, wb, acq, journeys] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30)), signupJourneys()]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const viewedTotal = s.byKind.reduce((a, k) => a + k.views, 0);
@@ -151,6 +153,53 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           </div>
         ))}
       </div>
+
+      <Section
+        title="New sign-ups, one by one"
+        note="Real accounts since the clean start date, newest first (admins left out, no emails, ZIP cut to 3 digits). Source is their first visit. Tap a row to see every vote, before and after signing up. Back days = later New York days they visited again."
+      >
+        {journeys.length === 0 ? (
+          <p className="text-sm text-zinc-500">No sign-ups yet.</p>
+        ) : (
+          <div className="divide-y divide-ink/10">
+            {journeys.map((j) => (
+              <details key={`${j.handle}-${j.signedUpAt}`} className="py-2">
+                <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                  <span className="font-medium">@{j.handle ?? "?"}</span>
+                  <span className="text-xs text-zinc-500">{nyTime(j.signedUpAt)}</span>
+                  <span className={`chip !py-0.5 text-[11px] ${j.source.startsWith("x_") ? "chip-on" : ""}`}>{j.sourceLabel}</span>
+                  <span className="text-xs text-zinc-500">
+                    {[j.sex, j.ageRange, j.zip3 && `ZIP ${j.zip3}xx`].filter(Boolean).join(" · ") || "no profile"}
+                  </span>
+                  <span className="ml-auto text-xs tabular-nums">
+                    votes {j.votesBefore} before / <b>{j.votesAfter} after</b> · posts {j.posts} · back days {j.returnDays}
+                  </span>
+                </summary>
+                <div className="mt-2 space-y-1 pl-1 text-xs">
+                  <p className="text-zinc-500">
+                    First visit tag: {j.sourceTag || "none"} · follows {j.follows} · last seen {j.lastSeen ? nyTime(j.lastSeen) : "—"}
+                  </p>
+                  {j.votes.length === 0 ? (
+                    <p className="text-zinc-500">No votes.</p>
+                  ) : (
+                    <ol className="space-y-0.5">
+                      {j.votes.map((v, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="w-28 shrink-0 text-zinc-500">{nyTime(v.at)}</span>
+                          <span className={`w-12 shrink-0 ${v.after ? "text-green" : "text-zinc-500"}`}>{v.after ? "after" : "before"}</span>
+                          <span className="min-w-0 flex-1">
+                            {battleLink(v.slug, v.title)} <span className="text-zinc-500">→ {v.picked}{v.method ? ` (${v.method})` : ""}</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
+      </Section>
 
       <Section
         title={`Sign-ups by source · last ${acq.days} days`}
