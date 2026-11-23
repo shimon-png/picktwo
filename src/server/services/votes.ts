@@ -15,7 +15,7 @@ import { isReasonChip } from "@/lib/constants";
 const VOTE_MILESTONES = [1, 10, 50, 100];
 
 type VoteViewer = { user: User | null; deviceId: string | null };
-type VoteInput = { side: "A" | "B"; reason?: string; dwellMs?: number; source?: string };
+type VoteInput = { side: "A" | "B"; reason?: string; dwellMs?: number; source?: string; meta?: { method?: string; pos?: number; sessionId?: string } };
 
 type Exec = Pick<typeof db, "execute">;
 
@@ -68,6 +68,8 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
   const reasonEarns =
     isValidReason(input.reason, economy.reasonMinChars) || (!!input.reason && isReasonChip(input.reason));
 
+  // A changed vote overwrites vote.side, so the first pick is kept in the event log (data brain).
+  let changedFrom: "A" | "B" | null = null;
   const res = await db.transaction(async (tx) => {
     const owner = user ? eq(votes.userId, user.id) : eq(votes.deviceId, viewer.deviceId!);
     const [existing] = await tx.select().from(votes).where(and(eq(votes.battleId, b.id), owner)).for("update");
@@ -80,6 +82,7 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
       voteId = existing.id;
       const patch: Partial<typeof votes.$inferInsert> = {};
       if (existing.side !== input.side) {
+        changedFrom = existing.side;
         patch.side = input.side;
         patch.changedAt = new Date();
         await tx
@@ -196,7 +199,22 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
   if (res.isNew)
     track(
       "vote_cast",
-      { battleId: b.id, anon: !user, source: input.source, dwellMs: input.dwellMs, withReason: !!input.reason, points: res.points },
+      {
+        battleId: b.id,
+        side: input.side,
+        anon: !user,
+        source: input.source,
+        dwellMs: input.dwellMs,
+        withReason: !!input.reason,
+        points: res.points,
+        ...input.meta,
+      },
+      { userId: user?.id, deviceId: viewer.deviceId },
+    );
+  else if (changedFrom)
+    track(
+      "vote_changed",
+      { battleId: b.id, from: changedFrom, to: input.side, source: input.source, ...input.meta },
       { userId: user?.id, deviceId: viewer.deviceId },
     );
   return res;

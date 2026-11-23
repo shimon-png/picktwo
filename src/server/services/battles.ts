@@ -122,7 +122,18 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
   });
   track(
     "battle_published",
-    { visibility: input.visibility, hours, ...(user.id !== actor.id ? { postedBy: actor.id } : {}) },
+    {
+      battleId: result.battle.id,
+      visibility: input.visibility,
+      hours,
+      ...(user.id !== actor.id ? { postedBy: actor.id } : {}),
+      // Snapshot of what was posted (data brain): later edits or seed rewrites never erase the original.
+      title: input.title,
+      context: input.context || null,
+      options: input.options.map((o) => ({ label: o.label, description: o.description || null, imageUrl: o.imageUrl || null, url: o.url || null })),
+      target: result.battle.tags?.target ?? null,
+      inReview: screen.verdict === "review",
+    },
     { userId: user.id },
   );
   if (screen.verdict === "review") await recordAutoHold(result.battle.id, result.battle.title, result.battle.slug, screen.reasons);

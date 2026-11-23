@@ -2,7 +2,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { db } from "../db";
 import { users, consentEvents, type User } from "../db/schema";
 import { POLICY_VERSION } from "@/lib/constants";
-import { track } from "../analytics";
+import { track, trackProfileChanges } from "../analytics";
 import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { handleBase } from "./signin-code-utils";
@@ -46,6 +46,7 @@ export async function saveQuickProfile(u: User, p: { handle: string; zipCode: st
       onboardedAt: u.onboardedAt ?? new Date(),
     })
     .where(eq(users.id, u.id));
+  trackProfileChanges(u.id, u, { zipCode: zip.code, ...place, sex: p.sex, ageRange: p.ageRange }, "quick_profile");
   if (first) {
     await db.insert(consentEvents).values({ userId: u.id, type: "terms", value: true, version: POLICY_VERSION });
     track("onboarding_completed", { quick: true }, { userId: u.id });

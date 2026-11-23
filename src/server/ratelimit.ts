@@ -20,6 +20,8 @@ export const RULES = {
   quickProfile: { limit: 20, windowSec: 3600 },
   messageMinute: { limit: 15, windowSec: 60 },
   messageDay: { limit: 300, windowSec: 86400 },
+  events: { limit: 60, windowSec: 60 },
+  eventsIpHour: { limit: 3000, windowSec: 3600 },
   generic: { limit: 60, windowSec: 60 },
 } satisfies Record<string, Rule>;
 
