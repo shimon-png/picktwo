@@ -36,11 +36,11 @@ Code: GitHub `shimon-png/picktwo`. Every merge to `main` deploys to production o
 | **Upstash Redis** | Rate limits shared across servers | Not set up unless `UPSTASH_REDIS_*` is set | Free tier | $0 |
 | **Google sign-in** | Optional "Sign in with Google" | Confirm | Free | $0 |
 | **Pexels** | Free stock photos used in seed battles (hotlinked) | None needed | Free | $0 |
-| **crowdpick.ai domain** | The web address | Confirm registrar | .ai, renews every 1–2 years | ~$80/yr (estimate) |
+| **crowdpick.ai domain** | The web address | Confirm registrar | .ai, 2-year term | $200 per term (~$8.33/mo) |
 | **Apple Developer** | iOS app (next, Capacitor) | Alex | Not started | $99/yr |
 | **NCMEC CyberTipline** | Where apparent CSAM must be reported | Alex (registration submitted Nov 21) | Free | $0 |
 
-Typical bill today: **about $27/month fixed** (Vercel $20 + domain ~$7) plus Neon usage and any Vercel usage over the included $20.
+Typical bill today: **about $28/month fixed** (Vercel $20 + domain ~$8) plus Neon usage and any Vercel usage over the included $20.
 
 ## What drives cost
 
