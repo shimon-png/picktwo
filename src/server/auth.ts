@@ -8,6 +8,7 @@ import { db } from "./db";
 import { users, accounts, sessions, verificationTokens } from "./db/schema";
 import { sendEmail, magicLinkEmail } from "./email";
 import { verifySigninCode } from "./services/signin-code";
+import { AppError } from "./errors";
 
 const providers: NextAuthConfig["providers"] = [];
 
@@ -36,8 +37,19 @@ providers.push(
     name: "Email code",
     credentials: { email: { label: "Email", type: "email" }, code: { label: "Code", type: "text" } },
     async authorize(creds) {
-      const r = await verifySigninCode(String(creds?.email || ""), String(creds?.code || ""));
-      if ("error" in r) throw new CodeError(r.error);
+      let r: Awaited<ReturnType<typeof verifySigninCode>>;
+      try {
+        r = await verifySigninCode(String(creds?.email || ""), String(creds?.code || ""));
+      } catch (e) {
+        // Don't let a server problem look like a wrong code.
+        if (e instanceof AppError && e.code === "FORBIDDEN") throw new CodeError("blocked");
+        console.error("[signin-code] verify failed", e);
+        throw new CodeError("server");
+      }
+      if ("error" in r) {
+        console.warn("[signin-code] rejected:", r.error);
+        throw new CodeError(r.error);
+      }
       return { id: r.user.id, email: r.user.email, name: r.user.name, image: r.user.image };
     },
   }),

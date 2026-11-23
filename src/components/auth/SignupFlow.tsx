@@ -18,6 +18,8 @@ const CODE_ERRORS: Record<string, string> = {
   invalid: "That code isn’t right. Check the email and try again.",
   expired: "That code has expired. Tap “Send a new code”.",
   too_many: "Too many tries. Tap “Send a new code”.",
+  blocked: "This account is not available.",
+  server: "Something went wrong on our side, not your code. Try again in a minute.",
 };
 
 /**
@@ -62,7 +64,12 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
     try {
       const r = await signIn("code", { email, code: code.trim(), redirect: false });
       if (!r || r.error) {
-        setError(CODE_ERRORS[r?.code ?? ""] ?? CODE_ERRORS.invalid);
+        // CredentialsSignin carries our code; anything else (Configuration, MissingCSRF…) is a server-side problem.
+        setError(
+          r?.error === "CredentialsSignin"
+            ? (CODE_ERRORS[r.code ?? ""] ?? CODE_ERRORS.invalid)
+            : `${CODE_ERRORS.server} (${r?.error ?? "no response"})`,
+        );
         return;
       }
       const s = await api<Status>("/api/me/quick-profile");
