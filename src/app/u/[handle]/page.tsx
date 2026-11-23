@@ -34,11 +34,16 @@ async function tasteMatch(a: string, b: string) {
 
 export default async function ProfilePage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
-  const [u] = await db.select().from(users).where(eq(users.handle, handle.toLowerCase()));
+  // Who they are, who you are, your friends and your device don't depend on each other: fetch them together.
+  const mePromise = getCurrentUser();
+  const [[u], me, friends, deviceId] = await Promise.all([
+    db.select().from(users).where(eq(users.handle, handle.toLowerCase())),
+    mePromise,
+    mePromise.then((m) => (m ? friendIds(m.id) : new Set<string>())),
+    getDeviceId(),
+  ]);
   if (!u || u.bannedAt) notFound();
-  const me = await getCurrentUser();
   const isMe = me?.id === u.id;
-  const friends = me ? await friendIds(me.id) : new Set<string>();
   const visibleTo = isMe ? sql`true` : friends.has(u.id) ? inArray(battles.visibility, ["PUBLIC", "FRIENDS"]) : eq(battles.visibility, "PUBLIC");
 
   const [list, [stats], [{ votesCast }], [{ followers }], [{ following }], reps, [iFollow], match, followerList, followingList] = await Promise.all([
@@ -65,8 +70,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
   const followsMe = !!me && !isMe && followingList.some((p) => p.id === me.id);
   const relation = !!iFollow && followsMe ? "Friends" : followsMe ? "Follows you" : null;
   // Scores only on battles you voted on (or your own).
-  const voted = isMe ? null : await votedIds({ user: me, deviceId: await getDeviceId() }, list.map((b) => b.id));
-  const tier = expertTier(u.correctPicks, await getEconomy());
+  const [voted, economy] = await Promise.all([isMe ? null : votedIds({ user: me, deviceId }, list.map((b) => b.id)), getEconomy()]);
+  const tier = expertTier(u.correctPicks, economy);
   const loopRate = stats.past ? Math.round((100 * stats.closed) / stats.past) : null;
   const badges: string[] = [];
   // Reputation is still stored per (legacy) category; the badge uses the overall record.

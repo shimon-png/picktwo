@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { Bell, ChevronRight, MessageCircle, Users, Flag, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { unreadContactCount } from "@/server/services/contact";
@@ -51,7 +51,8 @@ export default async function YouPage() {
   if (profileIncomplete(user)) redirect(onboardingUrl("/you"));
   const e = await getEconomy();
   const admin = isAdmin(user);
-  const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms] = await Promise.all([
+  // Everything below is independent, so it all runs at once (one round of DB trips instead of ~7 in a row).
+  const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms, newMessages, flagged, reasonRows] = await Promise.all([
     battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 100),
     countOpenLoops(user.id, e),
     countUnreported(user.id),
@@ -73,18 +74,17 @@ export default async function YouPage() {
     listFollowers(user.id, user.id),
     listFollowing(user.id, user.id),
     unreadMessageCount(user.id),
-  ]);
-  const newMessages = admin ? await unreadContactCount() : 0;
-  const flagged = admin ? await openReportCount() : 0;
-  const reasonCounts = new Map<string, number>();
-  if (mine.length) {
-    const rows = await db
+    admin ? unreadContactCount() : Promise.resolve(0),
+    admin ? openReportCount() : Promise.resolve(0),
+    // Reason counts per battle of mine, keyed by author so it doesn't wait for the battle list.
+    db
       .select({ id: votes.battleId, n: sql<number>`count(*)::int` })
       .from(votes)
-      .where(and(inArray(votes.battleId, mine.map((m) => m.id)), isNotNull(votes.reason)))
-      .groupBy(votes.battleId);
-    for (const r of rows) reasonCounts.set(r.id, r.n);
-  }
+      .innerJoin(battles, eq(battles.id, votes.battleId))
+      .where(and(eq(battles.authorId, user.id), isNotNull(votes.reason)))
+      .groupBy(votes.battleId),
+  ]);
+  const reasonCounts = new Map(reasonRows.map((r) => [r.id, r.n]));
   const tier = expertTier(user.correctPicks, e);
   const next = nextTier(user.correctPicks, e);
   const blocked = !canPostBattle(unreported, e.maxUnreportedBattles);

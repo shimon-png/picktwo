@@ -584,12 +584,13 @@ export async function hydrateCards(
 ): Promise<BattleCard[]> {
   const ids = rows.map((r) => r.b.id);
   const authorIds = [...new Set(rows.map((r) => r.b.authorId))];
-  const [opts, authors, economy] = await Promise.all([
+  // Economy is cached in memory, so read it first and run the three lookups side by side.
+  const economy = await getEconomy();
+  const [opts, authors, experts] = await Promise.all([
     ids.length ? db.select().from(options).where(inArray(options.battleId, ids)) : Promise.resolve([]),
     authorIds.length ? db.select({ id: users.id, correctPicks: users.correctPicks }).from(users).where(inArray(users.id, authorIds)) : Promise.resolve([]),
-    getEconomy(),
+    expertScores(ids, economy.expertAt),
   ]);
-  const experts = await expertScores(ids, economy.expertAt);
   const picks = new Map(authors.map((a) => [a.id, a.correctPicks]));
   return rows.map(({ b, authorHandle, authorName, authorImage, authorKidAges, oChosen, oThumb, oNote }) => {
     const A = opts.find((o) => o.battleId === b.id && o.side === "A");
