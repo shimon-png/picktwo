@@ -79,3 +79,19 @@ export function shuffleFactor(seed: string, battleId: string): number {
 export function shuffleSeed(viewerKey: string, now: Date): string {
   return `${viewerKey}:${now.toISOString().slice(0, 10)}`;
 }
+
+/**
+ * Data brain Phase 3: multiplier from Shimon's engagement score (0–1, starts at the 0.2 prior). A battle at the
+ * prior is unchanged; better ones rise, worse ones sink, clamped to [0.5, 2]. weight 0 = off.
+ */
+export function engagementFactor(score: number, weight: number, prior = 0.2): number {
+  if (!weight || !Number.isFinite(score)) return 1;
+  return Math.min(2, Math.max(0.5, 1 + weight * (score - prior)));
+}
+
+/** Stable holdout assignment: the same account/device is always in or out. pct in [0, 100]. */
+export function inHoldout(viewerKey: string, pct: number): boolean {
+  if (pct <= 0) return false;
+  if (pct >= 100) return true;
+  return hashUnit(`holdout:${viewerKey}`) < pct / 100;
+}

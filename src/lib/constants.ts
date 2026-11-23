@@ -129,6 +129,10 @@ export const ECONOMY_DEFAULTS = {
   proAt: 20,
   expertAt: 50,
   superExpertAt: 100,
+  /** Data brain Phase 3: how much Shimon's engagement score moves the Vote deck order (0 = off). */
+  engagementWeight: 2,
+  /** Percent of people (by account/device) who keep the old deck order, to measure the engine's lift. */
+  engagementHoldoutPct: 10,
 } as const;
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 
