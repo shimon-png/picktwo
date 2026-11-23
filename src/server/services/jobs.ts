@@ -1,10 +1,10 @@
 import { and, eq, isNull, lt, sql, gt } from "drizzle-orm";
 import { db } from "../db";
-import { battles, outcomes, users, options } from "../db/schema";
+import { battles, outcomes, users } from "../db/schema";
 import { closeDueBattles } from "./battles";
 import { reminderDue } from "./priority";
 import { notify } from "./notifications";
-import { sendEmail, reportBackEmail } from "../email";
+import { emailLoopReminder } from "./lifecycle";
 import { getEconomy } from "./config";
 import { awardPoints } from "./points";
 
@@ -13,7 +13,7 @@ export { closeDueBattles };
 /** Report-back reminders at deadline +2h, +48h, +7d (in-app always; email if opted in). */
 export async function sendReminders(now = new Date()) {
   const rows = await db
-    .select({ b: battles, email: users.email, notifyEmail: users.notifyEmail })
+    .select({ b: battles })
     .from(battles)
     .innerJoin(users, eq(users.id, battles.authorId))
     .leftJoin(outcomes, eq(outcomes.battleId, battles.id))
@@ -28,7 +28,7 @@ export async function sendReminders(now = new Date()) {
     )
     .limit(500);
   let sent = 0;
-  for (const { b, email, notifyEmail } of rows) {
+  for (const { b } of rows) {
     if (!reminderDue(b.deadline, b.reminderCount, now)) continue;
     const updated = await db
       .update(battles)
@@ -37,21 +37,8 @@ export async function sendReminders(now = new Date()) {
       .returning({ id: battles.id });
     if (!updated.length) continue;
     await notify(db, b.authorId, "REMINDER", { slug: b.slug, title: b.title, n: b.reminderCount + 1 });
-    if (email && notifyEmail) {
-      const opts = await db.select().from(options).where(eq(options.battleId, b.id));
-      await sendEmail({
-        to: email,
-        ...reportBackEmail({
-          title: b.title,
-          slug: b.slug,
-          labelA: opts.find((o) => o.side === "A")?.label ?? "A",
-          labelB: opts.find((o) => o.side === "B")?.label ?? "B",
-          votesA: b.votesA,
-          votesB: b.votesB,
-          reminder: b.reminderCount,
-        }),
-      });
-    }
+    // The first reminder's email is "Results are in" (hourly job); later ones are close-the-loop reminders.
+    if (b.reminderCount > 0) await emailLoopReminder(b.id, b.reminderCount + 1);
     sent++;
   }
   return sent;

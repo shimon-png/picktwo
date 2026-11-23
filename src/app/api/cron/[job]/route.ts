@@ -1,19 +1,26 @@
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
+import { runDailyEmails, runHourlyEmails } from "@/server/services/lifecycle";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const JOBS: Record<string, () => Promise<unknown>> = {
   "close-battles": () => closeDueBattles(),
   reminders: () => sendReminders(),
   decay: () => decayPoints(),
   rollups: () => dailyRollup(),
-  // Runs everything — used by the single daily cron on Vercel Hobby plans.
+  // Vercel Pro: every hour. Closes battles on time and sends the time-based emails (docs/emails.md).
+  hourly: async () => ({
+    closed: await closeDueBattles(),
+    emails: await runHourlyEmails(),
+  }),
+  // Once a day.
   daily: async () => ({
     closed: await closeDueBattles(),
     reminders: await sendReminders(),
     decayed: await decayPoints(),
     rollup: await dailyRollup(),
+    emails: await runDailyEmails(),
   }),
 };
 

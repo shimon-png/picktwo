@@ -80,6 +80,8 @@ export const users = pgTable("user", {
   bannedAt: ts("banned_at"),
   /** Direct messages on/off (Settings). Off by default: you can't send DMs or accept message requests until you turn it on. */
   chatEnabled: boolean("chat_enabled").notNull().default(false),
+  /** Email groups switched OFF in Settings, e.g. { weekly: false }. Missing = on. "My battles" uses notifyEmail. */
+  emailPrefs: jsonb("email_prefs").$type<Partial<Record<"voted" | "weekly" | "tips" | "messages", boolean>>>().notNull().default({}),
   /** Listed in "Voted like you" (to same-side voters) and the taste-twin ranking. Opt-out in Settings. */
   showInVoteMatches: boolean("show_in_vote_matches").notNull().default(true),
   referredById: text("referred_by_id"),
@@ -388,6 +390,31 @@ export const directMessages = pgTable(
     createdAt: now("created_at"),
   },
   (t) => [index("dm_conversation_created").on(t.conversationId, t.createdAt)],
+);
+
+// Every lifecycle email we decide about: one row per (user, kind, ref), so nothing sends twice.
+// status: QUEUED (waiting for sendAfter, e.g. quiet hours or a batch), SENT, SKIPPED (prefs/caps/budget), FAILED.
+export const emailLog = pgTable(
+  "email_log",
+  {
+    id: id(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    ref: text("ref").notNull().default(""),
+    status: text("status").$type<"QUEUED" | "SENT" | "SKIPPED" | "FAILED">().notNull(),
+    reason: text("reason"),
+    /** For QUEUED rows: the data needed to build the email later. */
+    payload: jsonb("payload").$type<Record<string, unknown>>(),
+    sendAfter: ts("send_after"),
+    sentAt: ts("sent_at"),
+    providerId: text("provider_id"),
+    createdAt: now("created_at"),
+  },
+  (t) => [
+    uniqueIndex("email_log_user_kind_ref").on(t.userId, t.kind, t.ref),
+    index("email_log_status_after").on(t.status, t.sendAfter),
+    index("email_log_user_sent").on(t.userId, t.sentAt),
+  ],
 );
 
 // Contact-us form submissions, read in /admin/messages.

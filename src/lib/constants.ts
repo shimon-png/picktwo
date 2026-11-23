@@ -129,6 +129,28 @@ export const ECONOMY_DEFAULTS = {
   proAt: 20,
   expertAt: 50,
   superExpertAt: 100,
+  /** Lifecycle emails (docs/emails.md). Vote milestones that send an email (0 = unused slot). */
+  emailMilestone1: 1,
+  emailMilestone2: 10,
+  emailMilestone3: 50,
+  emailMilestone4: 100,
+  /** At most one milestone email per battle in this many hours (the highest crossed one wins). */
+  emailMilestoneGapHours: 6,
+  /** Engagement emails (roundup, nudges, voter updates…) per person. */
+  emailPerDay: 1,
+  emailPerWeek: 4,
+  /** All emails except sign-in codes, per UTC day. Keeps Resend's free 100/day free for codes. */
+  emailDailyBudget: 80,
+  /** Local quiet hours: nothing sends from emailQuietStart:00 until emailQuietEnd:00. */
+  emailQuietStart: 21,
+  emailQuietEnd: 8,
+  /** Skip "real-time" emails if the person used the app in the last N minutes (they already saw it). */
+  emailActiveSkipMinutes: 30,
+  /** "Needs more votes" goes out at the halfway point if a battle has fewer votes than this. */
+  emailNeedsVotesUnder: 5,
+  /** Weekly roundup: local day (0 = Sunday) and hour. */
+  emailWeeklyDay: 0,
+  emailWeeklyHour: 9,
 } as const;
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 

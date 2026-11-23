@@ -16,7 +16,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const user = await getCurrentUser();
   if (!user) redirect("/signin?callbackUrl=/settings");
   const panel = (
-    <SettingsPanel initial={{ notifyEmail: user.notifyEmail, marketingEmail: user.marketingEmail, dataConsent: user.dataConsent, showInVoteMatches: user.showInVoteMatches, chatEnabled: user.chatEnabled }} focusChat={sp.enable === "chat"} returnTo={returnTo} />
+    <SettingsPanel initial={{ notifyEmail: user.notifyEmail, marketingEmail: user.marketingEmail, dataConsent: user.dataConsent, showInVoteMatches: user.showInVoteMatches, chatEnabled: user.chatEnabled }} emailPrefs={user.emailPrefs} focusChat={sp.enable === "chat"} returnTo={returnTo} />
   );
   async function logout() {
     "use server";

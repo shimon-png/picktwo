@@ -19,6 +19,8 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | Demographics (current) | `user` (`sex`, `age_range`, `zip_code`, `country`, `region`, `city`, `kids_status`, `kid_ages`) | 2026-11-20 | history in `profile_changed` |
 | Data consent | `user.data_consent`, `consent_event` | launch | |
 | Follows, blocks, DMs | `follow`, `block`, `direct_message` | 2026-11-22 | |
+| Lifecycle emails (every decision) | `email_log` (`user_id`, `kind`, `ref`, `status` SENT/SKIPPED/QUEUED/FAILED, `reason`, `sent_at`, `provider_id`) | 2026-11-23 | one row per (user, kind, ref). `reason` explains skips: prefs, daily_cap, weekly_cap, budget, active_in_app, no_postal_address, no_email. `voter_item` rows are batch inputs (reason `batched:<result>`). Kinds in `docs/emails.md` |
+| Email preferences | `user.notify_email` (My battles), `user.email_prefs` (`voted`/`weekly`/`tips`/`messages` = false when off) | 2026-11-23 | missing key = on |
 
 ## Events
 
@@ -28,6 +30,7 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | `page_view` | browser, every route | 2026-11-23 | `path` |
 | `card_shown` | browser, each card that reaches the top of the Vote deck | 2026-11-23 | `battleId`, `pos` (1 = first card of this deck load), `kind` (text/photo/mixed), `prevKinds` (up to 3 previous kinds), `votesShown`, `ageHours`, `hasContext`, `titleLen`, `authorTier`, `cv` (content fingerprint), `signedIn`, `surface` |
 | `signup_gate_shown` | browser, guest hits the free-vote limit | 2026-11-23 | `pos`, `battleId` |
+| `email_sent` | server, when a lifecycle email is accepted by Resend (not sign-in codes) | 2026-11-23 | `kind`, `ref`, `group`. Links in the email carry `utm_source=email`, `utm_medium=email`, `utm_campaign=<kind>`, so the visit shows up in `session_start` (H13, H14) |
 | `vote_cast` | server, first vote on a battle | launch; `side`, `method`, `pos`, `sessionId` from 2026-11-23 | `battleId`, `side`, `source`, `dwellMs`, `withReason`, `points`, `anon`, `method` (tap/swipe/key), `pos`, `sessionId` |
 | `vote_changed` | server, side changed | 2026-11-23 | `battleId`, `from`, `to`, `method`, `pos`, `sessionId` |
 | `skip` | server | launch | `battleId` |
