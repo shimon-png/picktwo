@@ -6,8 +6,9 @@ import {
 const limits = { emailPerDay: 1, emailPerWeek: 4, emailDailyBudget: 80 };
 
 describe("email caps", () => {
-  it("the global budget stops everything (keeps room for sign-in codes)", () => {
+  it("an optional global budget stops everything; 0 means no budget", () => {
     expect(capBlock("battle_live", { userToday: 0, userWeek: 0, globalToday: 80 }, limits)).toBe("budget");
+    expect(capBlock("battle_live", { userToday: 0, userWeek: 0, globalToday: 100_000 }, { ...limits, emailDailyBudget: 0 })).toBeNull();
   });
   it("engagement emails are capped per person; battle emails aren't", () => {
     expect(capBlock("weekly", { userToday: 1, userWeek: 1, globalToday: 3 }, limits)).toBe("daily_cap");

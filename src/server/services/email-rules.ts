@@ -61,9 +61,9 @@ export function groupEnabled(group: EmailGroup, u: { notifyEmail: boolean; email
 export type CapCounts = { userToday: number; userWeek: number; globalToday: number };
 export type CapLimits = { emailPerDay: number; emailPerWeek: number; emailDailyBudget: number };
 
-/** Why an email can't go now (null = it can). The global budget applies to everything except sign-in codes. */
+/** Why an email can't go now (null = it can). The optional global budget (0 = off) applies to everything except sign-in codes. */
 export function capBlock(kind: EmailKind, c: CapCounts, l: CapLimits): "budget" | "daily_cap" | "weekly_cap" | null {
-  if (c.globalToday >= l.emailDailyBudget) return "budget";
+  if (l.emailDailyBudget > 0 && c.globalToday >= l.emailDailyBudget) return "budget";
   if (!EMAIL_KINDS[kind].engagement) return null;
   if (c.userToday >= l.emailPerDay) return "daily_cap";
   if (c.userWeek >= l.emailPerWeek) return "weekly_cap";

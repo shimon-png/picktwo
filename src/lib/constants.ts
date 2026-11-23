@@ -139,8 +139,8 @@ export const ECONOMY_DEFAULTS = {
   /** Engagement emails (roundup, nudges, voter updates…) per person. */
   emailPerDay: 1,
   emailPerWeek: 4,
-  /** All emails except sign-in codes, per UTC day. Keeps Resend's free 100/day free for codes. */
-  emailDailyBudget: 80,
+  /** Optional ceiling on all emails except sign-in codes, per UTC day. 0 = no ceiling (Resend Pro, Nov 23 2026). */
+  emailDailyBudget: 0,
   /** Local quiet hours: nothing sends from emailQuietStart:00 until emailQuietEnd:00. */
   emailQuietStart: 21,
   emailQuietEnd: 8,

@@ -26,7 +26,7 @@ Sign-in codes don't go through the mailer and always send.
 
 - **Once only:** `email_log` has one row per (user, kind, ref); reruns and retries can't double-send.
 - **Caps:** engagement emails (needs votes, voter updates, nudge, tier up, win-back, weekly) at most `emailPerDay` (1) and `emailPerWeek` (4) per person.
-- **Daily budget:** at most `emailDailyBudget` (80) emails a UTC day in total, so Resend's free plan (100/day) always has room for sign-in codes. Raise it after upgrading Resend.
+- **Daily budget:** off (`emailDailyBudget` = 0) since Resend Pro (Nov 23 2026). Set a number to cap all non-sign-in emails per UTC day, e.g. if ever back on a plan with a daily limit.
 - **Quiet hours:** nothing between `emailQuietStart` (21) and `emailQuietEnd` (8) local time (time zone from the profile's state/country, default US Eastern). Held emails go out on the hourly run after it ends. Battle-live and welcome are exempt (they follow the person's own action).
 - **Marketing-type emails** (weekly, win-back, first-battle nudge) need `MAIL_POSTAL_ADDRESS` for the footer (CAN-SPAM); without it they're skipped with reason `no_postal_address`.
 - **Unsubscribe:** every email has "Unsubscribe from these" (signed link → `/email/unsubscribe`, asks first) and one-click `List-Unsubscribe` headers (`POST /api/email/unsubscribe`). Settings → Email has a switch per group.
