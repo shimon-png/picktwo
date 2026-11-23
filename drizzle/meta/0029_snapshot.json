@@ -1,5 +1,5 @@
 {
-  "id": "6c719205-24ca-4574-a9f6-b62e8e6e6a00",
+  "id": "ad798e29-e155-4041-91b7-ecf0773fd8ed",
   "prevId": "2115864b-13ef-4d6c-a899-ed29a0ba3044",
   "version": "7",
   "dialect": "postgresql",
@@ -154,6 +154,48 @@
           "columns": [
             {
               "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "analytics_device_created": {
+          "name": "analytics_device_created",
+          "columns": [
+            {
+              "expression": "device_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "analytics_user_created": {
+          "name": "analytics_user_created",
+          "columns": [
+            {
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -332,6 +374,33 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "engagement_score": {
+          "name": "engagement_score",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "engagement_voters": {
+          "name": "engagement_voters",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "engagement_returns": {
+          "name": "engagement_returns",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "engagement_at": {
+          "name": "engagement_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "last_reminder_at": {
           "name": "last_reminder_at",
@@ -2272,6 +2341,12 @@
           "notNull": true,
           "default": 0
         },
+        "returned_after_days": {
+          "name": "returned_after_days",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "flagged": {
           "name": "flagged",
           "type": "boolean",
@@ -2341,6 +2416,27 @@
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "vote_device_created": {
+          "name": "vote_device_created",
+          "columns": [
+            {
+              "expression": "device_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

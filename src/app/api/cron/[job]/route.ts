@@ -1,3 +1,4 @@
+import { refreshEngagement } from "@/server/services/engagement";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 
 export const dynamic = "force-dynamic";
@@ -8,12 +9,14 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   reminders: () => sendReminders(),
   decay: () => decayPoints(),
   rollups: () => dailyRollup(),
+  engagement: () => refreshEngagement(),
   // Runs everything — used by the single daily cron on Vercel Hobby plans.
   daily: async () => ({
     closed: await closeDueBattles(),
     reminders: await sendReminders(),
     decayed: await decayPoints(),
     rollup: await dailyRollup(),
+    engagement: await refreshEngagement(),
   }),
 };
 

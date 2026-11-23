@@ -18,6 +18,8 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | Outcome (poster's final pick + why) | `outcome` (`chosen`, `thumb`, `note`, `reported_at`) | launch | |
 | Demographics (current) | `user` (`sex`, `age_range`, `zip_code`, `country`, `region`, `city`, `kids_status`, `kid_ages`) | 2026-11-20 | history in `profile_changed` |
 | Data consent | `user.data_consent`, `consent_event` | launch | |
+| Came back after voting | `vote.returned_after_days` (1–3, New York calendar days; null = not yet) | 2026-11-23 | set live on a new visit (`recordReturn`) and back-filled daily from later votes/visits |
+| Engagement score (Shimon) | `battle.engagement_score` (0–1), `engagement_voters` (real voters with a day to come back), `engagement_returns` (weighted: day 1 = 1, day 2 = 0.6, day 3 = 0.3), `engagement_at` | 2026-11-23 | `services/engagement.ts`; smoothed toward 0.2 with weight 5; seed/flagged votes excluded. Shown on `/admin/brain` |
 | Follows, blocks, DMs | `follow`, `block`, `direct_message` | 2026-11-22 | |
 
 ## Events
@@ -39,4 +41,4 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 
 ## Derived later (not stored, computed from the above)
 
-Engagement score per battle (Shimon: share of voters who return within 1/2/3 days, weighted), votes per view, skip rate, median time to pick, split closeness, taste groups, lapse (days since last visit vs the person's usual gap), theme / stakes / photo tags (Claude classifies battle content; retroactive).
+Votes per view, skip rate, median time to pick, split closeness, taste groups, lapse (days since last visit vs the person's usual gap), theme / stakes / photo tags (Claude classifies battle content; retroactive).

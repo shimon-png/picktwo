@@ -158,6 +158,13 @@ export const battles = pgTable(
     votesB: integer("votes_b").notNull().default(0),
     reportCount: integer("report_count").notNull().default(0),
     reminderCount: integer("reminder_count").notNull().default(0),
+    /** Shimon's engagement score (services/engagement.ts): weighted share of real voters who came back 1–3 days later. */
+    engagementScore: doublePrecision("engagement_score").notNull().default(0),
+    /** Real voters who have had at least a day to come back. */
+    engagementVoters: integer("engagement_voters").notNull().default(0),
+    /** Weighted returns (day 1 = 1, day 2 = 0.6, day 3 = 0.3). */
+    engagementReturns: doublePrecision("engagement_returns").notNull().default(0),
+    engagementAt: ts("engagement_at"),
     lastReminderAt: ts("last_reminder_at"),
     createdAt: now("created_at"),
     updatedAt: now("updated_at"),
@@ -204,6 +211,8 @@ export const votes = pgTable(
     pointsAwarded: integer("points_awarded").notNull().default(0),
     /** Voter's correct picks when they voted (snapshot), so the Expert score uses their status at vote time. */
     voterCorrect: integer("voter_correct").notNull().default(0),
+    /** Days after this vote (1–3, New York calendar days) that the voter first came back; null = not (yet). Engagement score input. */
+    returnedAfterDays: integer("returned_after_days"),
     flagged: boolean("flagged").notNull().default(false),
     changedAt: ts("changed_at"),
     createdAt: now("created_at"),
@@ -212,6 +221,7 @@ export const votes = pgTable(
     uniqueIndex("vote_battle_user").on(t.battleId, t.userId),
     uniqueIndex("vote_battle_device").on(t.battleId, t.deviceId),
     index("vote_user_created").on(t.userId, t.createdAt),
+    index("vote_device_created").on(t.deviceId, t.createdAt),
   ],
 );
 
@@ -352,7 +362,11 @@ export const analyticsEvents = pgTable(
     props: jsonb("props").$type<Record<string, unknown>>().notNull().default({}),
     createdAt: now("created_at"),
   },
-  (t) => [index("analytics_name_created").on(t.name, t.createdAt)],
+  (t) => [
+    index("analytics_name_created").on(t.name, t.createdAt),
+    index("analytics_device_created").on(t.deviceId, t.createdAt),
+    index("analytics_user_created").on(t.userId, t.createdAt),
+  ],
 );
 
 export const appConfig = pgTable("app_config", {
