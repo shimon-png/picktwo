@@ -289,7 +289,7 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await a.getByRole("link", { name: "Turn on messages" }).click();
   await a.waitForURL(/\/settings\?enable=chat/);
   await expect(a.getByRole("heading", { name: "Turn on messages to continue" })).toBeVisible();
-  await a.getByRole("switch", { name: /Direct messages/ }).check();
+  await a.getByRole("switch", { name: /Direct messages/ }).click();
   await a.waitForURL(new RegExp(`/messages/${handle("twin_b")}$`));
   await a.getByLabel(`Message @${handle("twin_b")}`).fill("Hey, we always agree!");
   await a.getByRole("button", { name: "Send" }).click();
@@ -302,7 +302,7 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await b.goto("/messages");
   await expect(b.getByText(/1 person who follows you wants/)).toBeVisible();
   await b.getByRole("link", { name: "Yes, turn on messages" }).click();
-  await b.getByRole("switch", { name: /Direct messages/ }).check();
+  await b.getByRole("switch", { name: /Direct messages/ }).click();
   await b.waitForURL(/\/messages$/);
   await b.getByRole("link", { name: new RegExp(handle("twin_a")) }).click();
   await expect(b.getByText(/who follows you, wants to send you a message/)).toBeVisible();
