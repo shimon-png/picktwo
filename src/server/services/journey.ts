@@ -16,6 +16,10 @@ export type Visitor = {
   signedUp: boolean;
   posted: boolean;
   cards: number;
+  /** Clicked or scrolled (`engaged` event), moved to another page, saw a deck card, or voted. */
+  engaged: boolean;
+  /** Opened the Vote deck or a battle page, or voted (the homepage hero card takes votes too). */
+  opened: boolean;
   /** Account fields (null for guests). Never email; ZIP cut to 3 digits. */
   handle: string | null;
   sex: string | null;
@@ -28,7 +32,7 @@ export async function journeyData(view: BrainView, days: number) {
   const scope = await brainScope(view, days);
   const { since, ev, vt } = scope;
   const TZ = "America/New_York";
-  const rows = await db.execute<{ who: string; props: Record<string, unknown> | null; votes: number; days: number; signed: boolean; posted: boolean; cards: number; handle: string | null; sex: string | null; age_range: string | null; zip_code: string | null; last_seen: string }>(sql`
+  const rows = await db.execute<{ who: string; props: Record<string, unknown> | null; votes: number; days: number; signed: boolean; posted: boolean; cards: number; engaged: boolean; opened: boolean; handle: string | null; sex: string | null; age_range: string | null; zip_code: string | null; last_seen: string }>(sql`
     WITH s AS (
       SELECT COALESCE(e.user_id, d.user_id, e.device_id) AS who, e.props, e.created_at
       FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
@@ -41,15 +45,25 @@ export async function journeyData(view: BrainView, days: number) {
       FROM vote v LEFT JOIN device dv ON dv.id = v.device_id
       WHERE v.created_at > ${since} AND NOT v.flagged AND ${vt} GROUP BY 1
     ),
+    pv AS (
+      SELECT COALESCE(e.user_id, d.user_id, e.device_id) AS who,
+        count(*) FILTER (WHERE e.name = 'page_view')::int AS views,
+        bool_or(e.name = 'engaged') AS engaged,
+        bool_or(e.name = 'page_view' AND (e.props->>'path' LIKE '/vote%' OR e.props->>'path' LIKE '/b/%')) AS opened
+      FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+      WHERE e.name IN ('page_view', 'engaged') AND e.created_at > ${since} AND ${ev} GROUP BY 1
+    ),
     cc AS (
       SELECT COALESCE(e.user_id, d.user_id, e.device_id) AS who, count(*)::int AS n
       FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
       WHERE e.name = 'card_shown' AND e.created_at > ${since} AND ${ev} GROUP BY 1
     )
-    SELECT f.who, f.props, COALESCE(vv.n, 0) AS votes, COALESCE(dd.days, 1) AS days, COALESCE(cc.n, 0) AS cards, dd.last_seen, u.handle, u.sex, u.age_range, u.zip_code,
+    SELECT f.who, f.props, COALESCE(vv.n, 0) AS votes, COALESCE(dd.days, 1) AS days, COALESCE(cc.n, 0) AS cards, dd.last_seen,
+      (COALESCE(pv.engaged, false) OR COALESCE(pv.views, 0) > 1 OR COALESCE(cc.n, 0) > 0 OR COALESCE(vv.n, 0) > 0) AS engaged,
+      (COALESCE(pv.opened, false) OR COALESCE(cc.n, 0) > 0 OR COALESCE(vv.n, 0) > 0) AS opened, u.handle, u.sex, u.age_range, u.zip_code,
       (u.onboarded_at IS NOT NULL AND u.onboarded_at > ${since} AND u.email IS NOT NULL) AS signed,
       EXISTS (SELECT 1 FROM battle b WHERE b.author_id = f.who AND b.created_at > ${since}) AS posted
-    FROM f LEFT JOIN vv USING (who) LEFT JOIN dd USING (who) LEFT JOIN cc USING (who)
+    FROM f LEFT JOIN vv USING (who) LEFT JOIN dd USING (who) LEFT JOIN cc USING (who) LEFT JOIN pv USING (who)
     LEFT JOIN "user" u ON u.id = f.who
     LIMIT 200000`);
   const visitors: Visitor[] = rows.map((r) => ({
@@ -60,6 +74,8 @@ export async function journeyData(view: BrainView, days: number) {
     signedUp: r.signed,
     posted: r.posted,
     cards: r.cards,
+    engaged: r.engaged,
+    opened: r.opened,
     handle: r.handle,
     sex: SEX_OPTIONS.find((o) => o.id === r.sex)?.label ?? null,
     ageRange: AGE_RANGES.find((o) => o.id === r.age_range)?.label ?? null,
@@ -95,7 +111,18 @@ export async function journeyData(view: BrainView, days: number) {
       .sort((a, b) => b.back + b.gone - (a.back + a.gone));
   };
 
-  return { scope, visitors, byKind: mix("kind"), byTheme: mix("theme"), sourceLabels: SOURCE_LABELS };
+  // Homepage taps (home_click events): how many visitors tapped each thing at least once.
+  const homeClicks = await db.execute<{ target: string; people: number }>(sql`
+    SELECT e.props->>'target' AS target, count(DISTINCT COALESCE(e.user_id, d.user_id, e.device_id))::int AS people
+    FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+    WHERE e.name = 'home_click' AND e.created_at > ${since} AND ${ev}
+    GROUP BY 1 ORDER BY 2 DESC LIMIT 20`);
+  const [{ landed }] = await db.execute<{ landed: number }>(sql`
+    SELECT count(DISTINCT COALESCE(e.user_id, d.user_id, e.device_id))::int AS landed
+    FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+    WHERE e.name = 'page_view' AND e.props->>'path' = '/' AND e.created_at > ${since} AND ${ev}`);
+
+  return { scope, visitors, homeClicks: [...homeClicks], homeVisitors: landed, byKind: mix("kind"), byTheme: mix("theme"), sourceLabels: SOURCE_LABELS };
 }
 
 /** Median of a list (0 for empty). */

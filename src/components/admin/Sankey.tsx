@@ -46,14 +46,15 @@ export function Sankey({
   const dim = (id: string) => (selected && selected !== id ? 0.55 : 1);
   // Wide canvas so every column has room for its label (Alex, Nov 23: labels collided). Each node gets at least
   // MIN_SLOT of height for a two-line label (name, then count), so tiny steps never stack on top of each other.
-  const W = 1400,
-    NODE_W = 14,
+  const NODE_W = 14,
     GAP = 22,
     PAD_T = 10,
     MIN_SLOT = 54,
     LABEL_W = 270,
     BASE_H = 520;
   const cols = Math.max(...nodes.map((n) => n.col)) + 1;
+  // ~240 units per column keeps a 22-unit label from running into the next column.
+  const W = Math.max(1200, 20 + LABEL_W + (cols - 1) * 240);
   const colX = (c: number) =>
     10 + (c * (W - 20 - LABEL_W)) / Math.max(1, cols - 1);
   const byCol = Array.from({ length: cols }, (_, c) =>

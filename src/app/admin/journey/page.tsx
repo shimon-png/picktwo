@@ -56,10 +56,12 @@ const SHORT: Record<Source, string> = {
 
 /** Who is in each Sankey step (node id → test), so clicking a node can list its people. */
 const STEP_TEST: Record<string, { label: string; test: (v: Visitor) => boolean }> = {
-  visitors: { label: "Visitors", test: () => true },
+  engaged: { label: "Engaged", test: (v) => v.engaged },
+  bounced: { label: "Bounced", test: (v) => !v.engaged },
+  opened: { label: "Opened a battle", test: (v) => v.engaged && v.opened },
+  browsed: { label: "Engaged, didn't open", test: (v) => v.engaged && !v.opened },
   voted: { label: "Voted", test: (v) => v.votes > 0 },
-  saw: { label: "Saw cards, left", test: (v) => v.votes === 0 && v.cards > 0 },
-  bounced: { label: "Left before a card", test: (v) => v.votes === 0 && v.cards === 0 },
+  novote: { label: "Opened, didn't vote", test: (v) => v.engaged && v.opened && v.votes === 0 },
   signed: { label: "Signed up", test: (v) => v.votes > 0 && v.signedUp },
   nosign: { label: "No sign-up", test: (v) => v.votes > 0 && !v.signedUp },
   back: { label: "Came back another day", test: (v) => v.votes > 0 && v.signedUp && v.days >= 2 },
@@ -109,48 +111,67 @@ function Bars({ title, rows, total, hrefFor, active }: { title: string; rows: [s
   );
 }
 
+const HOME_TARGETS: Record<string, string> = {
+  ask_crowd: "Ask the crowd (top)",
+  start_voting: "Start voting",
+  hero_card: "Homepage preview card",
+  deciding_see_all: "Deciding right now → Vote",
+  deciding_card: "Deciding right now card",
+  story_card: "How it turned out story",
+  bottom_ask: "Ask the crowd (bottom)",
+};
+
+/**
+ * Funnel columns (Shimon, Nov 23): source → engaged (tapped or scrolled) vs bounced → opened a battle →
+ * voted → signed up → came back. A vote on the homepage preview card counts as opening a battle.
+ */
 function flow(vs: Visitor[]) {
   const nodes: SankeyNode[] = [];
   const links: SankeyLink[] = [];
+  const T = (id: string) => vs.filter(STEP_TEST[id].test);
   const sources = [...new Set(vs.map((v) => v.source))];
   for (const s of sources) {
-    const n = vs.filter((v) => v.source === s).length;
-    nodes.push({ id: `s:${s}`, col: 0, label: SHORT[s], value: n, tone: s.startsWith("x_") ? "blue" : "grey" });
-    links.push({ from: `s:${s}`, to: "visitors", value: n, tone: s.startsWith("x_") ? "blue" : "grey" });
+    const g = vs.filter((v) => v.source === s);
+    const tone = s.startsWith("x_") ? "blue" : "grey";
+    nodes.push({ id: `s:${s}`, col: 0, label: SHORT[s], value: g.length, tone });
+    links.push({ from: `s:${s}`, to: "engaged", value: g.filter((v) => v.engaged).length, tone });
+    links.push({ from: `s:${s}`, to: "bounced", value: g.filter((v) => !v.engaged).length, tone });
   }
-  const voted = vs.filter((v) => v.votes > 0);
-  const sawNoVote = vs.filter((v) => v.votes === 0 && v.cards > 0);
-  const bounced = vs.filter((v) => v.votes === 0 && v.cards === 0);
-  const signed = voted.filter((v) => v.signedUp);
-  const noSign = voted.filter((v) => !v.signedUp);
-  const back = signed.filter((v) => v.days >= 2);
-  const notBack = signed.filter((v) => v.days < 2);
-  const guestBack = noSign.filter((v) => v.days >= 2);
-  const guestGone = noSign.filter((v) => v.days < 2);
-  nodes.push(
-    { id: "visitors", col: 1, label: "Visitors", value: vs.length, tone: "grey" },
-    { id: "voted", col: 2, label: "Voted", value: voted.length, tone: "green" },
-    { id: "saw", col: 2, label: "Saw cards, left", value: sawNoVote.length, tone: "red" },
-    { id: "bounced", col: 2, label: "Left before a card", value: bounced.length, tone: "red" },
-    { id: "signed", col: 3, label: "Signed up", value: signed.length, tone: "green" },
-    { id: "nosign", col: 3, label: "No sign-up", value: noSign.length, tone: "red" },
-    { id: "back", col: 4, label: "Came back another day", value: back.length, tone: "green" },
-    { id: "notback", col: 4, label: "Not back yet", value: notBack.length, tone: "red" },
-    { id: "guestback", col: 4, label: "Guest came back", value: guestBack.length, tone: "green" },
-    { id: "guestgone", col: 4, label: "Guest gone", value: guestGone.length, tone: "red" },
-  );
-  links.push(
-    { from: "visitors", to: "voted", value: voted.length, tone: "green" },
-    { from: "visitors", to: "saw", value: sawNoVote.length, tone: "red" },
-    { from: "visitors", to: "bounced", value: bounced.length, tone: "red" },
-    { from: "voted", to: "signed", value: signed.length, tone: "green" },
-    { from: "voted", to: "nosign", value: noSign.length, tone: "red" },
-    { from: "signed", to: "back", value: back.length, tone: "green" },
-    { from: "signed", to: "notback", value: notBack.length, tone: "red" },
-    { from: "nosign", to: "guestback", value: guestBack.length, tone: "green" },
-    { from: "nosign", to: "guestgone", value: guestGone.length, tone: "red" },
-  );
-  return { nodes, links, voted, signed, back };
+  const steps: [string, number, SankeyNode["tone"]][] = [
+    ["engaged", 1, "green"],
+    ["bounced", 1, "red"],
+    ["opened", 2, "green"],
+    ["browsed", 2, "red"],
+    ["voted", 3, "green"],
+    ["novote", 3, "red"],
+    ["signed", 4, "green"],
+    ["nosign", 4, "red"],
+    ["back", 5, "green"],
+    ["notback", 5, "red"],
+    ["guestback", 5, "green"],
+    ["guestgone", 5, "red"],
+  ];
+  const count: Record<string, number> = {};
+  for (const [id, col, tone] of steps) {
+    count[id] = T(id).length;
+    nodes.push({ id, col, label: STEP_TEST[id].label, value: count[id], tone });
+  }
+  const edges: [string, string][] = [
+    ["engaged", "opened"],
+    ["engaged", "browsed"],
+    ["opened", "voted"],
+    ["opened", "novote"],
+    ["voted", "signed"],
+    ["voted", "nosign"],
+    ["signed", "back"],
+    ["signed", "notback"],
+    ["nosign", "guestback"],
+    ["nosign", "guestgone"],
+  ];
+  for (const [from, to] of edges) {
+    links.push({ from, to, value: count[to], tone: steps.find((x) => x[0] === to)![2] });
+  }
+  return { nodes, links, engaged: T("engaged"), opened: T("opened"), voted: T("voted"), signed: T("signed"), back: T("back") };
 }
 
 export default async function JourneyPage({ searchParams }: { searchParams: Promise<{ days?: string; view?: string; step?: string; by?: string; val?: string }> }) {
@@ -170,15 +191,18 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
     }
     return `/admin/journey?${q}`;
   };
-  const { visitors: vs, byKind, byTheme, scope } = await journeyData(view, days);
+  const { visitors: vs, byKind, byTheme, scope, homeClicks, homeVisitors } = await journeyData(view, days);
   const f = flow(vs);
   const returners = vs.filter((v) => v.days >= 2);
   const oneTime = vs.filter((v) => v.days < 2 && v.votes > 0);
   const posted = vs.filter((v) => v.posted).length;
   const sources = [...new Set(vs.map((v) => v.source))];
 
+  const bounced = vs.length - f.engaged.length;
   const tiles: [string, string | number][] = [
     ["Visitors", vs.length],
+    ["Engaged (tapped or scrolled)", `${f.engaged.length} (${pct(f.engaged.length, vs.length)})`],
+    ["Opened a battle", `${f.opened.length} (${pct(f.opened.length, vs.length)})`],
     ["Voted", `${f.voted.length} (${pct(f.voted.length, vs.length)})`],
     ["Signed up (of voters)", `${f.signed.length} (${pct(f.signed.length, f.voted.length)})`],
     ["Came back another day", `${returners.length} (${pct(returners.length, vs.length)})`],
@@ -204,10 +228,24 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
       </div>
       <p className="text-xs text-zinc-500">
         One person = an account, or a browser not linked to one. Same filters as the Brain ({view === "clean" ? "Clean: real people only, from the clean start date" : "All data: includes seed and test activity"}).
-        Came back = visited on a second New York day. Green keeps going, red drops off; hover a band for its count.
+        Engaged = tapped or scrolled. Opened a battle = went to the Vote page or a battle page, or voted on the homepage card. Came back = visited on a second New York day. Green keeps going, red drops off.
       </p>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="card flex flex-wrap items-end gap-x-6 gap-y-1 p-4">
+        <div>
+          <div className="text-xs text-zinc-500">Bounce rate (never tapped or scrolled)</div>
+          <div className="text-4xl font-medium tabular-nums">{pct(bounced, vs.length)}</div>
+        </div>
+        <div className="pb-1 text-sm text-zinc-500">
+          {bounced} of {vs.length} visitors · typical for a landing page ≈ 80%
+          {vs.length > 0 && bounced / vs.length < 0.8 ? " · better than typical" : vs.length > 0 ? " · worse than typical" : ""}
+        </div>
+        <p className="w-full text-xs text-zinc-500">
+          Taps and scrolls are logged from the evening of Nov 23, 2026. Before that, a visitor only counts as engaged if they opened another page, saw a Vote card or voted, so older windows overstate bounces.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {tiles.map(([k, v]) => (
           <div key={k} className="card p-3">
             <div className="text-xs text-zinc-500">{k}</div>
@@ -227,15 +265,24 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
 
       {step && <StepPanel vs={vs} step={step} cut={cut} href={href} />}
 
-      <Section title="By source" note="Each step as a share of the step before it.">
+      <Section title="What people tap on the homepage" note={`Share of the ${homeVisitors} visitors who saw the homepage that tapped each item at least once (logged from Nov 23, 2026).`}>
         <Rows
-          head={["Source", "Visitors", "Voted", "Signed up / voters", "Came back", "Avg votes"]}
+          head={["Item", "People", "Of homepage visitors"]}
+          rows={homeClicks.map((c) => [HOME_TARGETS[c.target] ?? c.target, c.people, pct(c.people, homeVisitors)])}
+        />
+      </Section>
+
+      <Section title="By source" note="Bounce, opened and voted are shares of all visitors from that source.">
+        <Rows
+          head={["Source", "Visitors", "Bounce", "Opened", "Voted", "Signed up / voters", "Came back", "Avg votes"]}
           rows={sources.map((s) => {
             const g = vs.filter((v) => v.source === s);
             const gv = g.filter((v) => v.votes > 0);
             return [
               SHORT[s],
               g.length,
+              pct(g.filter((v) => !v.engaged).length, g.length),
+              pct(g.filter((v) => v.engaged && v.opened).length, g.length),
               pct(gv.length, g.length),
               pct(gv.filter((v) => v.signedUp).length, gv.length),
               pct(g.filter((v) => v.days >= 2).length, g.length),
