@@ -11,7 +11,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!isAdmin(u)) notFound();
   const [unread, flagged] = await Promise.all([unreadContactCount(), openReportCount()]);
   return (
-    <div className="space-y-5">
+    // admin-wide: widens <main> past the app's phone-width column on desktop (globals.css), so charts and tables have room.
+    <div className="admin-wide space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-2 text-xl font-medium">Admin</h1>
         <Link href="/admin" className="chip">Metrics</Link>

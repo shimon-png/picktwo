@@ -58,7 +58,7 @@ const SHORT: Record<Source, string> = {
 const STEP_TEST: Record<string, { label: string; test: (v: Visitor) => boolean }> = {
   visitors: { label: "Visitors", test: () => true },
   voted: { label: "Voted", test: (v) => v.votes > 0 },
-  saw: { label: "Saw cards, no vote", test: (v) => v.votes === 0 && v.cards > 0 },
+  saw: { label: "Saw cards, left", test: (v) => v.votes === 0 && v.cards > 0 },
   bounced: { label: "Left before a card", test: (v) => v.votes === 0 && v.cards === 0 },
   signed: { label: "Signed up", test: (v) => v.votes > 0 && v.signedUp },
   nosign: { label: "No sign-up", test: (v) => v.votes > 0 && !v.signedUp },
@@ -130,7 +130,7 @@ function flow(vs: Visitor[]) {
   nodes.push(
     { id: "visitors", col: 1, label: "Visitors", value: vs.length, tone: "grey" },
     { id: "voted", col: 2, label: "Voted", value: voted.length, tone: "green" },
-    { id: "saw", col: 2, label: "Saw cards, no vote", value: sawNoVote.length, tone: "red" },
+    { id: "saw", col: 2, label: "Saw cards, left", value: sawNoVote.length, tone: "red" },
     { id: "bounced", col: 2, label: "Left before a card", value: bounced.length, tone: "red" },
     { id: "signed", col: 3, label: "Signed up", value: signed.length, tone: "green" },
     { id: "nosign", col: 3, label: "No sign-up", value: noSign.length, tone: "red" },

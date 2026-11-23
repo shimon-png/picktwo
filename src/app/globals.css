@@ -329,3 +329,10 @@ html[data-theme="arcade"] .roll-card {
 html[data-theme="arcade"] .roll-bolt { color: #c6ff3d; filter: drop-shadow(0 0 14px rgb(198 255 61 / 0.75)) drop-shadow(0 0 32px rgb(198 255 61 / 0.4)); }
 html[data-theme="arcade"] .roll-card .display { color: #c6ff3d; text-shadow: 0 0 18px rgb(198 255 61 / 0.35); }
 @media (prefers-reduced-motion: reduce) { .roll-bolt { animation: none; } }
+
+/* Admin pages use the full desktop width (Alex, Nov 23 2026: journey chart too small in the 672px column). */
+@media (min-width: 768px) {
+  main:has(.admin-wide) {
+    max-width: 76rem;
+  }
+}
