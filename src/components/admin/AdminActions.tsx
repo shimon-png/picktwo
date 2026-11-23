@@ -127,3 +127,25 @@ export function RecomputeEngagement() {
     </button>
   );
 }
+
+export function TagBattles({ remaining }: { remaining: number }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    setBusy(true);
+    try {
+      const r = await api<{ tagged: number; failed: number; remaining: number; enabled: boolean }>("/api/admin/brain/tag", { method: "POST" });
+      toast(r.enabled ? `Tagged ${r.tagged}${r.failed ? `, ${r.failed} failed` : ""}. ${r.remaining} left.` : "Tagging is off: OPENAI_API_KEY isn't set in Vercel yet.", r.enabled ? "ok" : "error");
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button className="chip !py-1 text-xs" onClick={run} disabled={busy || remaining === 0}>
+      {busy ? "Tagging…" : remaining ? `Tag next 25 of ${remaining} untagged` : "All battles tagged"}
+    </button>
+  );
+}
