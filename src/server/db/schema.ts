@@ -44,7 +44,8 @@ export const reportStatusEnum = pgEnum("report_status", ["OPEN", "ACTIONED", "DI
 
 import type { BattleTarget } from "../services/targeting";
 export type KidAge = "AGE_0_2" | "AGE_3_4" | "AGE_5_8" | "AGE_9_12" | "AGE_13_17";
-export type BattleTags = { kidAge?: KidAge[]; recipient?: string; budget?: string; occasion?: string; target?: BattleTarget };
+import type { BrainTags } from "@/lib/brain-tags";
+export type BattleTags = { kidAge?: KidAge[]; recipient?: string; budget?: string; occasion?: string; target?: BattleTarget; brain?: BrainTags };
 
 // ---------- Users & auth (Auth.js drizzle adapter compatible) ----------
 export const users = pgTable("user", {

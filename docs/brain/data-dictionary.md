@@ -20,6 +20,7 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | Data consent | `user.data_consent`, `consent_event` | launch | |
 | Came back after voting | `vote.returned_after_days` (1–3, New York calendar days; null = not yet) | 2026-11-23 | set live on a new visit (`recordReturn`) and back-filled daily from later votes/visits |
 | Engagement score (Shimon) | `battle.engagement_score` (0–1), `engagement_voters` (real voters with a day to come back), `engagement_returns` (weighted: day 1 = 1, day 2 = 0.6, day 3 = 0.3), `engagement_at` | 2026-11-23 | `services/engagement.ts`; smoothed toward 0.2 with weight 5; seed/flagged votes excluded. Shown on `/admin/brain` |
+| AI tags | `battle.tags.brain`: `theme` (couples, dating, cheating_trust, exes, weddings, family_parenting, friends, money, career, home, fashion_beauty, food_drink, tech, travel, health_fitness, shopping, pets, entertainment, school, other), `stakes` (small / medium / big), `decision` (purchase, relationship, appearance, plan, judgment, other), `a` / `b` (up to 3 traits that picking that side suggests about the voter, e.g. tech_forward, budget_conscious, romantic), `brands`, `model`, `at` | 2026-11-23 | `lib/brain-tags.ts` (taxonomy + validator), `services/tagging.ts` (OpenAI, `TAGGING_MODEL`). Tagged right after posting; older battles via the Brain page button and 40/day in the cron. Never sent to the browser |
 | Follows, blocks, DMs | `follow`, `block`, `direct_message` | 2026-11-22 | |
 
 ## Events
@@ -41,4 +42,4 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 
 ## Derived later (not stored, computed from the above)
 
-Votes per view, skip rate, median time to pick, split closeness, taste groups, lapse (days since last visit vs the person's usual gap), theme / stakes / photo tags (Claude classifies battle content; retroactive).
+Votes per view, skip rate, median time to pick, split closeness, taste groups, lapse (days since last visit vs the person's usual gap), photo colour tags (not built yet), voter taste profiles = sum of the `a`/`b` traits of the sides a person picked (Phase 2).
