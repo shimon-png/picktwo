@@ -181,17 +181,6 @@ export function tierUp(o: { tier: string; postUrl: string }): Built {
   };
 }
 
-export function winback(o: { points: number; days: number; voteUrl: string; examples: { title: string; url: string }[]; fading: boolean }): Built {
-  return {
-    subject: o.fading ? `Your ${o.points} points start fading in ${o.days} days` : "A few people are waiting for your vote",
-    preheader: `${o.examples.length} people are waiting for your vote.`,
-    body: `${h1(o.fading ? "Your points start fading soon" : "We saved you a few battles")}
-${o.fading ? p(`You have <b>${o.points} ⚡</b>. After 30 days away, points start fading — one vote keeps them.`) : ""}
-${o.examples.map((x) => listItem(x.url, x.title)).join("")}<div style="height:10px"></div>${btn(o.voteUrl, "Start voting")}`,
-    text: `${o.fading ? `Your ${o.points} points start fading in ${o.days} days. ` : ""}Vote: ${o.voteUrl}`,
-  };
-}
-
 export function weekly(o: {
   battles: { title: string; url: string; sub: string }[];
   outcomes: { title: string; url: string; sub: string }[];

@@ -38,7 +38,6 @@ export type EmailData = {
   welcome: { name: string };
   first_battle_nudge: { examples: { title: string; slug: string }[] };
   tier_up: { tier: string };
-  winback: { points: number; days: number; fading: boolean; examples: { title: string; slug: string }[] };
   weekly: {
     battles: { title: string; slug: string; sub: string }[];
     outcomes: { title: string; slug: string; sub: string }[];
@@ -98,10 +97,6 @@ async function render<K extends EmailKind>(kind: K, d: EmailData[K]): Promise<T.
     }
     case "tier_up":
       return T.tierUp({ tier: (d as EmailData["tier_up"]).tier, postUrl: link("/post") });
-    case "winback": {
-      const x = d as EmailData["winback"];
-      return T.winback({ ...x, voteUrl: link("/vote"), examples: x.examples.map((b) => ({ title: b.title, url: link(`/b/${b.slug}`) })) });
-    }
     case "weekly": {
       const x = d as EmailData["weekly"];
       return T.weekly({

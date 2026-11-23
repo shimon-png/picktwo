@@ -4,11 +4,11 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, diversify, shuffleFactor, shuffleSeed, type ViewerProfile } from "./ranking";
+import { feedScore, diversify, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, type ViewerProfile } from "./ranking";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 import { matchesTarget } from "./targeting";
 
-export type FeedItem = BattleCard & { score: number; debug?: Record<string, number> };
+export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; debug?: Record<string, number> };
 
 export async function getFeed(viewer: { user: User | null; deviceId: string | null }, opts: { limit?: number; debug?: boolean } = {}) {
   const limit = opts.limit ?? 20;
@@ -85,7 +85,11 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   }
 
   // Random order per viewer (stable for the day) so everyone doesn't see the same sequence.
-  const seed = shuffleSeed(user?.id ?? viewer.deviceId ?? crypto.randomUUID(), now);
+  const viewerKey = user?.id ?? viewer.deviceId ?? crypto.randomUUID();
+  const seed = shuffleSeed(viewerKey, now);
+  // Data brain Phase 3: rank by engagement too, except for a stable holdout group (the comparison for lift).
+  const arm: "engine" | "holdout" = inHoldout(viewerKey, economy.engagementHoldoutPct) ? "holdout" : "engine";
+  const eWeight = arm === "engine" ? economy.engagementWeight : 0;
   const loops = await openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy);
   const scored = rows.map((r) => {
     const boostActive = !!r.b.boostUntil && r.b.boostUntil > now && r.b.boostVotesLeft > 0;
@@ -101,7 +105,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       hoursSincePublish: (now.getTime() - r.b.createdAt.getTime()) / 3600_000,
       priorityFactor: pf,
     });
-    const score = base * shuffleFactor(seed, r.b.id);
+    const score = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
     return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
   scored.sort((a, b) => b.score - a.score);
@@ -109,6 +113,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   const cards = await hydrateCards(picked.map((p) => p.row));
   return cards.map((c, i) => ({
     ...c,
+    arm,
     score: picked[i].score,
     ...(opts.debug ? { debug: { priorityFactor: picked[i].pf, openLoops: picked[i].openLoops } } : {}),
   })) as FeedItem[];

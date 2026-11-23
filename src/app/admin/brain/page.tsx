@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getBrainStats } from "@/server/services/brain";
-import { RecomputeEngagement } from "@/components/admin/AdminActions";
+import { tasteByGroup } from "@/server/services/taste-profiles";
+import { winbackStats } from "@/server/services/winback";
+import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
@@ -51,7 +53,7 @@ const battleLink = (slug: string, title: string) => (
 export default async function BrainPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const sp = await searchParams;
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
-  const s = await getBrainStats(days);
+  const [s, taste, wb] = await Promise.all([getBrainStats(days), tasteByGroup(), winbackStats()]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const tiles: [string, string | number][] = [
@@ -109,12 +111,54 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         />
       </Section>
 
+      <Section
+        title="By theme (AI tags)"
+        note="Each battle is tagged by AI when posted: theme, stakes, and what picking each side suggests about the voter. Real votes are all-time; views are for the selected window."
+      >
+        <div><TagBattles remaining={s.untagged} /></div>
+        <Rows
+          head={["Theme", "Battles", "Real votes", "Vote rate", "Avg score"]}
+          rows={s.byTheme.map((r) => [r.tag.replace(/_/g, " "), r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
+        />
+      </Section>
+
+      <Section
+        title="What groups lean toward (taste profiles)"
+        note={`From picks on AI-tagged battles by ${taste.people} signed-in people with data consent on (${taste.picks} picks). Groups only, shown once they have ${taste.minGroup}+ people. "1.6×" = this trait shows up 1.6 times as often in the group's picks as in everyone's.`}
+      >
+        <Rows
+          head={["Group", "People", "Leans toward"]}
+          rows={taste.groups.map((g) => [
+            g.group,
+            g.people,
+            g.leans.length ? g.leans.map((l) => `${l.trait.replace(/_/g, " ")} ${l.lift.toFixed(1)}×`).join(", ") : "No clear lean yet",
+          ])}
+        />
+      </Section>
+
+      <Section title="By stakes" note="Small (snack, nail colour), medium (event outfit, gadget), big (house, job, proposal).">
+        <Rows
+          head={["Stakes", "Battles", "Real votes", "Vote rate", "Avg score"]}
+          rows={s.byStakes.map((r) => [r.tag, r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
+        />
+      </Section>
+
       <Section title="Text vs photo" note="Views in the Vote deck, and how many turned into a vote by the same person.">
         <Rows head={["Card type", "Views", "Voted", "Vote rate", "Median pick"]} rows={s.byKind.map((k) => [k.kind ?? "?", k.views, k.voted, pct(k.voted, k.views), secs(k.median_ms)])} />
       </Section>
 
       <Section title="Where visits come from" note="UTM source, else the referring site, else direct.">
         <Rows head={["Source", "Visits", "Visitors", "Voted", "Voter rate"]} rows={s.sources.map((r) => [r.source, r.sessions, r.visitors, r.voters, pct(r.voters, r.visitors)])} />
+      </Section>
+
+      <Section
+        title="Win-back emails"
+        note={`${wb.enabled ? "On" : "Off (economy setting winbackEmails = 1 turns it on)"}. ${wb.lapsingNow} people are drifting away right now. ${wb.holdoutPct}% of them get no email so we can compare. Last 30 days:`}
+      >
+        <Rows
+          head={["Group", "People", "Voted within 3 days", "Rate"]}
+          rows={wb.arms.map((r) => [r.arm === "email" ? "Got the email" : "No email (holdout)", r.people, r.back3, pct(r.back3, r.people)])}
+        />
       </Section>
 
       <Section title="Next-day return" note="People first seen that day (New York time) who visited again the next day.">

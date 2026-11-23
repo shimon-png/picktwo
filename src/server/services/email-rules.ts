@@ -14,7 +14,6 @@ export type EmailKind =
   | "welcome" // E8
   | "first_battle_nudge" // E9
   | "tier_up" // E10
-  | "winback" // E11
   | "weekly" // E12
   | "dm_request"; // someone who follows you wants to message you
 
@@ -38,7 +37,6 @@ export const EMAIL_KINDS: Record<EmailKind, KindMeta> = {
   welcome: { group: "always", engagement: false, commercial: false, ignoresQuietHours: true },
   first_battle_nudge: { group: "tips", engagement: true, commercial: true, ignoresQuietHours: false },
   tier_up: { group: "tips", engagement: true, commercial: false, ignoresQuietHours: false },
-  winback: { group: "tips", engagement: true, commercial: true, ignoresQuietHours: false },
   weekly: { group: "weekly", engagement: true, commercial: true, ignoresQuietHours: false },
   dm_request: { group: "messages", engagement: false, commercial: false, ignoresQuietHours: false },
 };
@@ -47,7 +45,7 @@ export const EMAIL_GROUP_LABELS: Record<Exclude<EmailGroup, "always">, { label: 
   battles: { label: "My battles", desc: "Your battle is live, vote milestones, results, close-the-loop reminders" },
   voted: { label: "Battles I voted on", desc: "How they turned out, “you called it”, when your reason helped" },
   weekly: { label: "Weekly roundup", desc: "A few battles picked for you and how your past picks turned out" },
-  tips: { label: "Tips & reminders", desc: "Getting started, reaching a new priority tier, points about to fade" },
+  tips: { label: "Tips & reminders", desc: "Getting started, reaching a new priority tier" },
   messages: { label: "Message requests", desc: "When someone who follows you wants to send you a message" },
 };
 

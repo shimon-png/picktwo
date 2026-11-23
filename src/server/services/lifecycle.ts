@@ -293,36 +293,9 @@ async function firstBattleNudges(now: Date) {
   return n;
 }
 
-/** E11: inactive 23 days (points fade at 30), then once more at 45. */
-async function winbacks(now: Date) {
-  const e = await getEconomy();
-  const day = (d: number) => new Date(now.getTime() - d * 86400_000);
-  const rows = await db
-    .select()
-    .from(users)
-    .where(
-      and(
-        hasEmail,
-        isNotNull(users.onboardedAt),
-        sql`(${users.lastActiveAt} BETWEEN ${day(24).toISOString()} AND ${day(23).toISOString()}) OR (${users.lastActiveAt} BETWEEN ${day(46).toISOString()} AND ${day(45).toISOString()})`,
-      ),
-    )
-    .limit(500);
-  if (!rows.length) return 0;
-  const examples = await openExamples(3);
-  let n = 0;
-  for (const u of rows) {
-    const daysAway = Math.floor((now.getTime() - u.lastActiveAt.getTime()) / 86400_000);
-    const first = daysAway < 30;
-    const fading = first && u.ppBalance > e.decayFloor;
-    const ref = `${first ? "d23" : "d45"}:${u.lastActiveAt.toISOString().slice(0, 10)}`;
-    if ((await deliver(u, "winback", ref, { points: u.ppBalance, days: Math.max(1, e.decayInactiveDays - daysAway), fading, examples }, { now })) === "sent") n++;
-  }
-  return n;
-}
-
 export async function runDailyEmails(now = new Date()) {
-  return { firstBattle: await firstBattleNudges(now), winback: await winbacks(now) };
+  // Win-back emails are Alex's data-brain version (services/winback.ts, H16), run by the daily cron.
+  return { firstBattle: await firstBattleNudges(now) };
 }
 
 /** E5: close-the-loop reminder emails (the in-app reminders run in `sendReminders`). */

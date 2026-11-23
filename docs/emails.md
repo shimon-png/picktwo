@@ -16,11 +16,15 @@ sender `services/mailer.ts`, triggers `services/lifecycle.ts`, templates `src/se
 | `welcome` | Welcome to crowdpick | once, when sign-up finishes | always |
 | `first_battle_nudge` | Stuck between two? (3 live battles) | daily: 3–5 days after sign-up, no battle posted | Tips & reminders |
 | `tier_up` | You're now High / Top priority | hourly: crossed into the tier in the last ~25h (points ledger), once per tier | Tips & reminders |
-| `winback` | Your points start fading / battles waiting | daily: inactive 23 days (decay starts at 30), once more at 45 | Tips & reminders |
 | `weekly` | Your week on crowdpick (picked for you + how your picks turned out) | hourly, sends at `emailWeeklyDay`/`emailWeeklyHour` local time (Sunday 9 am), once per ISO week, skipped if empty | Weekly roundup |
 | `dm_request` | Someone who follows you wants to send you a message (no message text) | when a DM request is sent; skipped if they're in the app | Message requests |
 
 Sign-in codes don't go through the mailer and always send.
+
+**Win-back** is the data brain's version, not part of this system: `services/winback.ts` (Alex, H16) emails people who are
+away clearly longer than their usual gap, with a 20% holdout, off until economy `winbackEmails` = 1. It sends with
+`sendEmail()` directly, so it doesn't get the mailer's unsubscribe link/headers, postal address, quiet hours or caps —
+route it through `deliver()` before turning it on for real users.
 
 ## Guardrails (all in the admin economy config)
 
@@ -28,7 +32,7 @@ Sign-in codes don't go through the mailer and always send.
 - **Caps:** engagement emails (needs votes, voter updates, nudge, tier up, win-back, weekly) at most `emailPerDay` (1) and `emailPerWeek` (4) per person.
 - **Daily budget:** off (`emailDailyBudget` = 0) since Resend Pro (Nov 23 2026). Set a number to cap all non-sign-in emails per UTC day, e.g. if ever back on a plan with a daily limit.
 - **Quiet hours:** nothing between `emailQuietStart` (21) and `emailQuietEnd` (8) local time (time zone from the profile's state/country, default US Eastern). Held emails go out on the hourly run after it ends. Battle-live and welcome are exempt (they follow the person's own action).
-- **Marketing-type emails** (weekly, win-back, first-battle nudge) need `MAIL_POSTAL_ADDRESS` for the footer (CAN-SPAM); without it they're skipped with reason `no_postal_address`.
+- **Marketing-type emails** (weekly, first-battle nudge) need `MAIL_POSTAL_ADDRESS` for the footer (CAN-SPAM); without it they're skipped with reason `no_postal_address`.
 - **Unsubscribe:** every email has "Unsubscribe from these" (signed link → `/email/unsubscribe`, asks first) and one-click `List-Unsubscribe` headers (`POST /api/email/unsubscribe`). Settings → Email has a switch per group.
 
 ## Jobs

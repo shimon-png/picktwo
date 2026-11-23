@@ -99,5 +99,30 @@ export async function getBrainStats(days = 7) {
       ORDER BY gap ${sql.raw(dir)}, count(*) DESC LIMIT 8`);
   const [closest, lopsided] = await Promise.all([splits("ASC"), splits("DESC")]);
 
-  return { days, tiles, byKind, depth, methods, sources, retention, topEngaging, closest, lopsided };
+  // By AI tag: how each theme / stakes level performs (all-time votes, views in the window).
+  const byTag = (key: "theme" | "stakes") =>
+    db.execute<{ tag: string; battles: number; real_votes: number; views: number; voted_views: number; score: number | null }>(sql`
+      SELECT b.tags->'brain'->>${key} AS tag, count(DISTINCT b.id)::int AS battles,
+        COALESCE(sum(rv.n), 0)::int AS real_votes,
+        COALESCE(sum(cv.views), 0)::int AS views, COALESCE(sum(cv.voted), 0)::int AS voted_views,
+        avg(b.engagement_score) FILTER (WHERE b.engagement_voters >= 3)::float AS score
+      FROM battle b
+      LEFT JOIN LATERAL (SELECT count(*) AS n FROM vote v WHERE v.battle_id = b.id AND COALESCE(v.source, '') <> 'seed' AND NOT v.flagged) rv ON true
+      LEFT JOIN LATERAL (
+        SELECT count(*) AS views, count(*) FILTER (WHERE EXISTS (
+          SELECT 1 FROM vote v WHERE v.battle_id = b.id
+            AND ((e.user_id IS NOT NULL AND v.user_id = e.user_id) OR (e.device_id IS NOT NULL AND v.device_id = e.device_id))
+        )) AS voted
+        FROM analytics_event e
+        WHERE e.name = 'card_shown' AND e.props->>'battleId' = b.id AND e.created_at > ${since} AND ${notBot}
+      ) cv ON true
+      WHERE b.tags ? 'brain' AND b.status <> 'DELETED'
+      GROUP BY 1 ORDER BY 3 DESC`);
+  const [byTheme, byStakes, [untagged]] = await Promise.all([
+    byTag("theme"),
+    byTag("stakes"),
+    db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM battle WHERE status <> 'DELETED' AND NOT (tags ? 'brain')`),
+  ]);
+
+  return { byTheme, byStakes, untagged: untagged?.n ?? 0, days, tiles, byKind, depth, methods, sources, retention, topEngaging, closest, lopsided };
 }

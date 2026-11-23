@@ -10,7 +10,7 @@ type Toggle = keyof S;
 const EMAIL_GROUPS = [
   ["voted", "Battles I voted on", "How they turned out, “you called it”, when your reason helped"],
   ["weekly", "Weekly roundup", "A few battles picked for you and how your past picks turned out"],
-  ["tips", "Tips & reminders", "Getting started, reaching a new priority tier, points about to fade"],
+  ["tips", "Tips & reminders", "Getting started, reaching a new priority tier"],
   ["messages", "Message requests", "When someone who follows you wants to send you a message"],
 ] as const;
 

@@ -1,4 +1,6 @@
 import { refreshEngagement } from "@/server/services/engagement";
+import { tagUntagged } from "@/server/services/tagging";
+import { sendWinbacks } from "@/server/services/winback";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 import { runDailyEmails, runHourlyEmails } from "@/server/services/lifecycle";
 
@@ -11,6 +13,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   decay: () => decayPoints(),
   rollups: () => dailyRollup(),
   engagement: () => refreshEngagement(),
+  tagging: () => tagUntagged(60),
+  winback: () => sendWinbacks(),
   // Vercel Pro: every hour. Closes battles on time and sends the time-based emails (docs/emails.md).
   hourly: async () => ({
     closed: await closeDueBattles(),
@@ -23,6 +27,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     decayed: await decayPoints(),
     rollup: await dailyRollup(),
     engagement: await refreshEngagement(),
+    tagging: await tagUntagged(40),
+    winback: await sendWinbacks(),
     emails: await runDailyEmails(),
   }),
 };
