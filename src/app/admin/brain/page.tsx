@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getBrainStats } from "@/server/services/brain";
+import { getBrainStats, type BrainView } from "@/server/services/brain";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
@@ -51,10 +51,26 @@ const battleLink = (slug: string, title: string) => (
   <Link href={`/b/${slug}`} className="line-clamp-2 underline-offset-2 hover:underline">{title}</Link>
 );
 
-export default async function BrainPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
+const nyDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric" });
+
+/** "+12" / "−3" next to a number: change vs the day before. */
+function Delta({ now, prev }: { now: number; prev: number | undefined }) {
+  if (prev === undefined) return <>{now}</>;
+  const d = now - prev;
+  return (
+    <>
+      {now}
+      {d !== 0 && <span className={`ml-1 text-[11px] ${d > 0 ? "text-green" : "text-b"}`}>{d > 0 ? `+${d}` : `−${-d}`}</span>}
+    </>
+  );
+}
+
+export default async function BrainPage({ searchParams }: { searchParams: Promise<{ days?: string; view?: string }> }) {
   const sp = await searchParams;
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
-  const [s, taste, wb, acq] = await Promise.all([getBrainStats(days), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30))]);
+  const view: BrainView = sp.view === "all" ? "all" : "clean";
+  const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
+  const [s, taste, wb, acq] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30))]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const tiles: [string, string | number][] = [
@@ -62,13 +78,13 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     ["Visitors", n("visitors")],
     ["Cards viewed", n("views")],
     ["Deck votes per view", pct(n("deck_votes"), n("views"))],
-    ["Real votes", n("real_votes")],
+    [view === "clean" ? "Real votes" : "Votes (incl. seed)", n("real_votes")],
     ["Median time to pick", secs(t.median_pick_ms)],
     ["Skips", n("skips")],
     ["Hit sign-up wall", n("gates")],
     ["Sign-ups", n("signups")],
     ["Vote changes", n("changed")],
-    ["Real battles posted", n("real_battles")],
+    [view === "clean" ? "Real battles posted" : "Battles posted", n("real_battles")],
     ["Seed votes (all time, excluded)", n("seed_votes_all")],
   ];
 
@@ -76,15 +92,52 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-auto text-[22px]">Brain</h2>
+        {(["clean", "all"] as const).map((v) => (
+          <Link key={v} href={href({ view: v })} className={`chip !py-1 text-xs ${v === view ? "chip-on" : ""}`}>
+            {v === "clean" ? "Clean" : "All data (AI view)"}
+          </Link>
+        ))}
+        <span className="mx-1 h-4 w-px bg-ink/15" aria-hidden />
         {[1, 7, 30].map((d) => (
-          <Link key={d} href={`/admin/brain?days=${d}`} className={`chip !py-1 text-xs ${d === days ? "chip-on" : ""}`}>
+          <Link key={d} href={href({ days: d })} className={`chip !py-1 text-xs ${d === days ? "chip-on" : ""}`}>
             {d === 1 ? "24h" : `${d} days`}
           </Link>
         ))}
       </div>
       <p className="text-xs text-zinc-500">
-        Real data only (no seed votes, flagged votes or bots). Event tracking started Nov 23 2026. Hypotheses and requests live in the repo under docs/brain/.
+        {view === "clean"
+          ? `Clean view: real people only, counting from ${nyDate(s.cleanFrom!)} (New York time). Leaves out seed votes and seed battles, made-up seed accounts, admins and their browsers, and bots. Nothing is deleted; "All data" shows everything. Change the start date with brainCleanFrom in Config.`
+          : "All data: everything we have, including the 5,000 seed votes, seed battles and admin test activity (bots still left out)."}{" "}
+        Hypotheses and requests live in the repo under docs/brain/.
       </p>
+
+      <Section title="Day by day" note="New York days, newest first. The small number is the change from the day before.">
+        <Rows
+          head={["Day", "Visitors", "Visits", "Sign-ups", "Votes", "Voters", "Battles posted"]}
+          rows={s.daily.map((d, i) => {
+            const prev = s.daily[i + 1];
+            return [
+              d.day,
+              <Delta key="a" now={d.visitors} prev={prev?.visitors} />,
+              <Delta key="b" now={d.visits} prev={prev?.visits} />,
+              <Delta key="c" now={d.signups} prev={prev?.signups} />,
+              <Delta key="d" now={d.votes} prev={prev?.votes} />,
+              <Delta key="e" now={d.voters} prev={prev?.voters} />,
+              <Delta key="f" now={d.posts} prev={prev?.posts} />,
+            ];
+          })}
+        />
+      </Section>
+
+      <Section
+        title="Visits by source"
+        note="Each visit's own tags: an X ad click (twclid) or utm_source=x/twitter is the X campaign, a t.co / x.com referrer is X organic. Tip: put utm_source on every campaign link, because apps often hide the referrer."
+      >
+        <Rows
+          head={["Source", "Visitors today", "Yesterday", "Visitors", "Visits", "Top tags"]}
+          rows={s.visitSources.map((r) => [r.label, r.today, r.yesterday, r.visitors, r.visits, <span key="t" className="text-xs text-zinc-500">{r.detail || "—"}</span>])}
+        />
+      </Section>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {tiles.map(([k, v]) => (
@@ -184,7 +237,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         <Rows head={["Card type", "Views", "Voted", "Vote rate", "Median pick"]} rows={s.byKind.map((k) => [k.kind ?? "?", k.views, k.voted, pct(k.voted, k.views), secs(k.median_ms)])} />
       </Section>
 
-      <Section title="Where visits come from" note="UTM source, else the referring site, else direct.">
+      <Section title="Raw source tags" note="utm_source, else the referring site, else direct, and how many of those visitors voted.">
         <Rows head={["Source", "Visits", "Visitors", "Voted", "Voter rate"]} rows={s.sources.map((r) => [r.source, r.sessions, r.visitors, r.voters, pct(r.voters, r.visitors)])} />
       </Section>
 
