@@ -1,3 +1,4 @@
+import { refreshEngagement } from "@/server/services/engagement";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 import { runDailyEmails, runHourlyEmails } from "@/server/services/lifecycle";
 
@@ -9,6 +10,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   reminders: () => sendReminders(),
   decay: () => decayPoints(),
   rollups: () => dailyRollup(),
+  engagement: () => refreshEngagement(),
   // Vercel Pro: every hour. Closes battles on time and sends the time-based emails (docs/emails.md).
   hourly: async () => ({
     closed: await closeDueBattles(),
@@ -20,6 +22,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     reminders: await sendReminders(),
     decayed: await decayPoints(),
     rollup: await dailyRollup(),
+    engagement: await refreshEngagement(),
     emails: await runDailyEmails(),
   }),
 };

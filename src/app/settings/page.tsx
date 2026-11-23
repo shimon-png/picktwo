@@ -6,6 +6,7 @@ import { SettingsPanel } from "@/components/layout/SettingsPanel";
 import { suggestHandle } from "@/server/services/profile";
 import Link from "next/link";
 import { AvatarEditor } from "@/components/layout/AvatarEditor";
+import { TOUR_URL } from "@/lib/tour";
 
 export const metadata = { title: "Settings" };
 
@@ -50,6 +51,13 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         />
       </section>
       {sp.enable !== "chat" && panel}
+      <section className="space-y-2">
+        <h2 className="text-lg font-medium">Tutorial</h2>
+        <p className="text-sm text-zinc-600">The quick tour of how voting works. It only shows on your first visit; replay it any time.</p>
+        <Link href={TOUR_URL} className="btn-outline">
+          Replay tutorial
+        </Link>
+      </section>
       <div className="flex flex-wrap gap-2">
         <form action={logout}>
           <button className="btn-outline">Sign out</button>

@@ -105,3 +105,25 @@ export function AdminSeed() {
     </section>
   );
 }
+
+export function RecomputeEngagement() {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    setBusy(true);
+    try {
+      const r = await api<{ returnsFilled: number; battlesScored: number }>("/api/admin/brain", { method: "POST" });
+      toast(`Scored ${r.battlesScored} battles (${r.returnsFilled} returns found)`);
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button className="chip !py-1 text-xs" onClick={run} disabled={busy}>
+      {busy ? "Recomputing…" : "Recompute scores now"}
+    </button>
+  );
+}
