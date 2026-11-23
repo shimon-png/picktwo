@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getBrainStats } from "@/server/services/brain";
+import { tasteByGroup } from "@/server/services/taste-profiles";
 import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ const battleLink = (slug: string, title: string) => (
 export default async function BrainPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const sp = await searchParams;
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
-  const s = await getBrainStats(days);
+  const [s, taste] = await Promise.all([getBrainStats(days), tasteByGroup()]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const tiles: [string, string | number][] = [
@@ -117,6 +118,20 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         <Rows
           head={["Theme", "Battles", "Real votes", "Vote rate", "Avg score"]}
           rows={s.byTheme.map((r) => [r.tag.replace(/_/g, " "), r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
+        />
+      </Section>
+
+      <Section
+        title="What groups lean toward (taste profiles)"
+        note={`From picks on AI-tagged battles by ${taste.people} signed-in people with data consent on (${taste.picks} picks). Groups only, shown once they have ${taste.minGroup}+ people. "1.6×" = this trait shows up 1.6 times as often in the group's picks as in everyone's.`}
+      >
+        <Rows
+          head={["Group", "People", "Leans toward"]}
+          rows={taste.groups.map((g) => [
+            g.group,
+            g.people,
+            g.leans.length ? g.leans.map((l) => `${l.trait.replace(/_/g, " ")} ${l.lift.toFixed(1)}×`).join(", ") : "No clear lean yet",
+          ])}
         />
       </Section>
 
