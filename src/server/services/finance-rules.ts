@@ -172,7 +172,10 @@ export function sumFocusRows(jsonl: string) {
     }
     const cost = Number(row.BilledCost ?? 0);
     if (!Number.isFinite(cost) || cost === 0) continue;
-    const name = String(row.ServiceName ?? "Other");
+    const provider = row.ServiceProviderName ? String(row.ServiceProviderName) : "";
+    const service = String(row.ServiceName ?? "Other");
+    // Marketplace add-ons (e.g. Neon bought through Vercel) carry their own provider name.
+    const name = provider && !/vercel/i.test(provider) && !service.toLowerCase().includes(provider.toLowerCase()) ? `${provider} · ${service}` : service;
     byService.set(name, (byService.get(name) ?? 0) + cost);
     if (row.ChargeCategory === "Usage" || row.ChargeCategory == null) usage += cost;
     else other += cost;

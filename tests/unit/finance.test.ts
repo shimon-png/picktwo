@@ -45,3 +45,15 @@ describe("finance rules", () => {
     expect(perUnit(10, 4)).toBe(2.5);
   });
 });
+
+describe("vercel marketplace rows", () => {
+  it("prefixes non-Vercel providers so Neon billed via Vercel is recognisable", () => {
+    const f = sumFocusRows(
+      [
+        JSON.stringify({ BilledCost: 3, ServiceName: "Compute", ServiceProviderName: "Neon", ChargeCategory: "Usage" }),
+        JSON.stringify({ BilledCost: 1, ServiceName: "Edge Requests", ServiceProviderName: "Vercel", ChargeCategory: "Usage" }),
+      ].join("\n"),
+    );
+    expect(f.services.map((s) => s.name)).toEqual(["Neon · Compute", "Edge Requests"]);
+  });
+});
