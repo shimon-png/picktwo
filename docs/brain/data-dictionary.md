@@ -42,4 +42,4 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 
 ## Derived later (not stored, computed from the above)
 
-Votes per view, skip rate, median time to pick, split closeness, taste groups, lapse (days since last visit vs the person's usual gap), photo colour tags (not built yet), voter taste profiles = sum of the `a`/`b` traits of the sides a person picked (Phase 2).
+Votes per view, skip rate, median time to pick, split closeness, taste groups, lapse (days since last visit vs the person's usual gap), photo colour tags (not built yet), voter taste profiles = sum of the `a`/`b` traits of the sides a person picked (`services/taste-profiles.ts`, consenting signed-in people only; groups of 20+ on `/admin/brain` with lift vs everyone; `tasteProfile(userId)` is internal for the engine and never shown).
