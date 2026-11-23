@@ -71,10 +71,10 @@ export default async function HomePage() {
           Snap two options, get honest votes in minutes — from friends and parents who’ve been there.
         </p>
         <div className="mx-auto mt-6 flex max-w-sm flex-col gap-2.5 sm:flex-row">
-          <Link href="/signin?callbackUrl=/post" className="btn-primary flex-1 rounded-full py-3.5 text-base shadow-card">
+          <Link href="/signin?callbackUrl=/post" data-track="ask_crowd" className="btn-primary flex-1 rounded-full py-3.5 text-base shadow-card">
             Ask the crowd
           </Link>
-          <Link href="/vote" className="btn-outline flex-1 rounded-full py-3.5 text-base">
+          <Link href="/vote" data-track="start_voting" className="btn-outline flex-1 rounded-full py-3.5 text-base">
             Start voting
           </Link>
         </div>
@@ -86,7 +86,7 @@ export default async function HomePage() {
             <div aria-hidden className="absolute inset-x-6 -top-5 h-24 -rotate-6 rounded-[22px] bg-pink-soft shadow-ring" />
             <div aria-hidden className="absolute inset-x-6 -top-5 h-24 rotate-6 rounded-[22px] bg-accent-900 shadow-ring" />
             <div aria-hidden className="absolute inset-x-0 -top-2.5 h-24 rounded-[22px] bg-surface shadow-ring" />
-            <div className="relative">
+            <div className="relative" data-track="hero_card">
               <HeroRotator battles={heroBattles} />
             </div>
           </div>
@@ -98,7 +98,7 @@ export default async function HomePage() {
         <section className="pb-10">
           <div className="flex items-end justify-between px-4">
             <h2 className="text-[22px]">Deciding right now</h2>
-            <Link href="/vote" className="inline-flex items-center gap-1 text-sm text-accent">
+            <Link href="/vote" data-track="deciding_see_all" className="inline-flex items-center gap-1 text-sm text-accent">
               Vote <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
@@ -168,7 +168,7 @@ export default async function HomePage() {
         <Mark size={40} className="mx-auto" />
         <h2 className="mt-4 text-[26px] leading-tight">Stuck between two?</h2>
         <p className="mx-auto mt-2 max-w-xs text-[15px] text-page/70">Post it in 30 seconds. Most battles get their first votes within minutes.</p>
-        <Link href="/signin?callbackUrl=/post" className="btn mt-6 rounded-full bg-page px-7 py-3.5 text-base text-ink hover:opacity-90">
+        <Link href="/signin?callbackUrl=/post" data-track="bottom_ask" className="btn mt-6 rounded-full bg-page px-7 py-3.5 text-base text-ink hover:opacity-90">
           Ask the crowd — it’s free
         </Link>
       </section>
@@ -199,7 +199,7 @@ function DecidingCard({ b }: { b: BattleCard }) {
   const total = b.votesA + b.votesB;
   const handle = b.authorHandle ? `@${b.authorHandle}` : (b.authorName ?? "someone");
   return (
-    <Link href={`/b/${b.slug}?src=home`} className="block overflow-hidden rounded-[18px] bg-white shadow-card transition active:scale-[0.98]">
+    <Link href={`/b/${b.slug}?src=home`} data-track="deciding_card" className="block overflow-hidden rounded-[18px] bg-white shadow-card transition active:scale-[0.98]">
       <span className="relative grid h-[150px] grid-cols-2 gap-px bg-white">
         <Tile img={b.imageA} label={b.labelA} side="A" />
         <Tile img={b.imageB} label={b.labelB} side="B" />
@@ -228,7 +228,7 @@ function StoryCard({ b }: { b: BattleCard }) {
   const agreed = picked && crowdSide === o.chosen;
   const parentOf = b.authorKidAges[0] ? `parent of a ${kidAgeLabel(b.authorKidAges[0])} y/o` : null;
   return (
-    <Link href={`/b/${b.slug}?src=home`} className="flex h-full flex-col rounded-[18px] bg-white p-3.5 shadow-card">
+    <Link href={`/b/${b.slug}?src=home`} data-track="story_card" className="flex h-full flex-col rounded-[18px] bg-white p-3.5 shadow-card">
       <span className="flex gap-2">
         {(["A", "B"] as const).map((s) => (
           <span key={s} className={cn("relative block h-20 flex-1 overflow-hidden rounded-xl", o.chosen === s ? "ring-2 ring-accent" : "opacity-60")}>
