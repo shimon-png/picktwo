@@ -129,6 +129,28 @@ export const ECONOMY_DEFAULTS = {
   proAt: 20,
   expertAt: 50,
   superExpertAt: 100,
+  /** Lifecycle emails (docs/emails.md). Vote milestones that send an email (0 = unused slot). */
+  emailMilestone1: 1,
+  emailMilestone2: 10,
+  emailMilestone3: 50,
+  emailMilestone4: 100,
+  /** At most one milestone email per battle in this many hours (the highest crossed one wins). */
+  emailMilestoneGapHours: 6,
+  /** Engagement emails (roundup, nudges, voter updates…) per person. */
+  emailPerDay: 1,
+  emailPerWeek: 4,
+  /** Optional ceiling on all emails except sign-in codes, per UTC day. 0 = no ceiling (Resend Pro, Nov 23 2026). */
+  emailDailyBudget: 0,
+  /** Local quiet hours: nothing sends from emailQuietStart:00 until emailQuietEnd:00. */
+  emailQuietStart: 21,
+  emailQuietEnd: 8,
+  /** Skip "real-time" emails if the person used the app in the last N minutes (they already saw it). */
+  emailActiveSkipMinutes: 30,
+  /** "Needs more votes" goes out at the halfway point if a battle has fewer votes than this. */
+  emailNeedsVotesUnder: 5,
+  /** Weekly roundup: local day (0 = Sunday) and hour. */
+  emailWeeklyDay: 0,
+  emailWeeklyHour: 9,
   /** Data brain Phase 3: how much Shimon's engagement score moves the Vote deck order (0 = off). */
   engagementWeight: 2,
   /** Percent of people (by account/device) who keep the old deck order, to measure the engine's lift. */

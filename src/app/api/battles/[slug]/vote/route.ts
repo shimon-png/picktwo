@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { handler, clientIp } from "@/server/api";
+import { emailVoteMilestone } from "@/server/services/lifecycle";
 import { getViewer } from "@/server/viewer";
 import { rateLimit } from "@/server/ratelimit";
 import { voteInput } from "@/lib/validators";
@@ -10,5 +12,7 @@ export const POST = handler<{ slug: string }>(async (req, { params }) => {
   await rateLimit("vote", viewer.user?.id ?? viewer.deviceId ?? "anon");
   await rateLimit("voteIpHour", await clientIp());
   const input = voteInput.parse(await req.json());
-  return castVote(slug, viewer, input);
+  const res = await castVote(slug, viewer, input);
+  if (res.isNew) after(() => emailVoteMilestone(slug));
+  return res;
 });

@@ -1,25 +1,37 @@
 import { appUrl } from "@/lib/utils";
 
-type Mail = { to: string; subject: string; html: string; text: string };
+export type Mail = { to: string; subject: string; html: string; text: string; headers?: Record<string, string> };
 
-export async function sendEmail(mail: Mail, opts: { devLog?: string } = {}) {
+/** Sends via Resend (or logs it in dev). Returns the provider id when sent. Never throws for provider errors. */
+export async function sendEmail(mail: Mail, opts: { devLog?: string } = {}): Promise<{ ok: boolean; id?: string }> {
   const key = process.env.AUTH_RESEND_KEY;
   if (!key) {
     console.log(`\n📧 [email:dev] to=${mail.to} subject="${mail.subject}"\n${opts.devLog ?? mail.text}\n`);
-    return;
+    return { ok: true, id: "dev" };
   }
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: process.env.EMAIL_FROM || "crowdpick <onboarding@resend.dev>",
-      to: mail.to,
-      subject: mail.subject,
-      html: mail.html,
-      text: mail.text,
-    }),
-  });
-  if (!res.ok) console.error("[email] Resend error", res.status, await res.text());
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || "crowdpick <onboarding@resend.dev>",
+        to: mail.to,
+        subject: mail.subject,
+        html: mail.html,
+        text: mail.text,
+        ...(mail.headers ? { headers: mail.headers } : {}),
+      }),
+    });
+    if (!res.ok) {
+      console.error("[email] Resend error", res.status, await res.text());
+      return { ok: false };
+    }
+    const data = (await res.json().catch(() => ({}))) as { id?: string };
+    return { ok: true, id: data.id };
+  } catch (e) {
+    console.error("[email] send failed", e);
+    return { ok: false };
+  }
 }
 
 const shell = (body: string) => `<!doctype html><html><body style="margin:0;background:#F4F5F8;font-family:Inter,Arial,sans-serif">
@@ -50,30 +62,6 @@ export function signinCodeEmail(code: string, minutes: number) {
   };
 }
 
-export function reportBackEmail(opts: {
-  title: string;
-  slug: string;
-  labelA: string;
-  labelB: string;
-  votesA: number;
-  votesB: number;
-  reminder: number;
-}) {
-  const base = appUrl(`/b/${opts.slug}/report?from=email`);
-  const total = opts.votesA + opts.votesB;
-  const subject =
-    opts.reminder === 0 ? `Voting closed: "${opts.title}"` : `Which did you pick? Close the loop on "${opts.title}"`;
-  return {
-    subject,
-    html: shell(`<p style="font-size:16px"><b>${escapeHtml(opts.title)}</b> got ${total} vote${total === 1 ? "" : "s"}.</p>
-<p style="font-size:15px">Which did you choose? Closing the loop earns you <b>+10 ⚡ priority</b> so your next question gets answered faster.</p>
-${btn(`${base}&c=A`, `I picked ${escapeHtml(opts.labelA)}`, "#2F5FF0")}
-${btn(`${base}&c=B`, `I picked ${escapeHtml(opts.labelB)}`, "#E8384F")}
-${btn(`${base}&c=NEITHER`, "Neither", "#71717a")}`),
-    text: `${opts.title} — which did you pick? ${base}`,
-  };
-}
-
 export function winbackEmail(picks: { title: string; url: string; votes: number }[]) {
   const rows = picks
     .map(
@@ -89,6 +77,6 @@ export function winbackEmail(picks: { title: string; url: string; votes: number 
   };
 }
 
-function escapeHtml(s: string) {
+export function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
