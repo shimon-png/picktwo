@@ -78,8 +78,8 @@ export const users = pgTable("user", {
   marketingEmail: boolean("marketing_email").notNull().default(false),
   notifyEmail: boolean("notify_email").notNull().default(true),
   bannedAt: ts("banned_at"),
-  /** Who can start a direct message with this user: EVERYONE, FOLLOWING (people they follow) or NOBODY. */
-  dmPolicy: text("dm_policy").$type<"EVERYONE" | "FOLLOWING" | "NOBODY">().notNull().default("EVERYONE"),
+  /** Direct messages on/off (Settings). Off by default: you can't send DMs or accept message requests until you turn it on. */
+  chatEnabled: boolean("chat_enabled").notNull().default(false),
   /** Listed in "Voted like you" (to same-side voters) and the taste-twin ranking. Opt-out in Settings. */
   showInVoteMatches: boolean("show_in_vote_matches").notNull().default(true),
   referredById: text("referred_by_id"),
@@ -366,6 +366,10 @@ export const conversations = pgTable(
     id: id(),
     userA: text("user_a").notNull().references(() => users.id, { onDelete: "cascade" }),
     userB: text("user_b").notNull().references(() => users.id, { onDelete: "cascade" }),
+    /** PENDING = a message request the other person hasn't accepted; ACCEPTED = normal chat; DECLINED = request turned down. */
+    status: text("status").$type<"PENDING" | "ACCEPTED" | "DECLINED">().notNull().default("PENDING"),
+    /** Who sent the request (started the conversation). */
+    requestedBy: text("requested_by").references(() => users.id, { onDelete: "cascade" }),
     lastMessageAt: now("last_message_at"),
     createdAt: now("created_at"),
   },

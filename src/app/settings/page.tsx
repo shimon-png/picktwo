@@ -9,9 +9,15 @@ import { AvatarEditor } from "@/components/layout/AvatarEditor";
 
 export const metadata = { title: "Settings" };
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ enable?: string; returnTo?: string }> }) {
+  const sp = await searchParams;
+  // "Turn on messages" round trip: /settings?enable=chat&returnTo=/messages/maya brings you back after switching it on.
+  const returnTo = sp.returnTo && sp.returnTo.startsWith("/") && !sp.returnTo.startsWith("//") ? sp.returnTo : null;
   const user = await getCurrentUser();
   if (!user) redirect("/signin?callbackUrl=/settings");
+  const panel = (
+    <SettingsPanel initial={{ notifyEmail: user.notifyEmail, marketingEmail: user.marketingEmail, dataConsent: user.dataConsent, showInVoteMatches: user.showInVoteMatches, chatEnabled: user.chatEnabled }} focusChat={sp.enable === "chat"} returnTo={returnTo} />
+  );
   async function logout() {
     "use server";
     await signOut({ redirectTo: "/" });
@@ -19,6 +25,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-8">
       <h1 className=" text-2xl font-medium">Settings</h1>
+      {sp.enable === "chat" && panel}
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Profile</h2>
         <AvatarEditor image={user.image} name={user.name || user.handle || "?"} />
@@ -42,7 +49,7 @@ export default async function SettingsPage() {
           }}
         />
       </section>
-      <SettingsPanel initial={{ notifyEmail: user.notifyEmail, marketingEmail: user.marketingEmail, dataConsent: user.dataConsent, showInVoteMatches: user.showInVoteMatches, dmPolicy: user.dmPolicy }} />
+      {sp.enable !== "chat" && panel}
       <div className="flex flex-wrap gap-2">
         <form action={logout}>
           <button className="btn-outline">Sign out</button>

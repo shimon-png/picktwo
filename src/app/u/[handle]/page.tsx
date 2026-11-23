@@ -104,7 +104,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ handle
           {!isMe && me && (
             <div className="mt-3 flex flex-wrap gap-2">
               <FollowButton userId={u.id} initial={!!iFollow} followsMe={followsMe} />
-              {u.email && <MessageButton handle={u.handle!} />}
+              {u.email && iFollow && <MessageButton handle={u.handle!} />}
             </div>
           )}
           {!me && (

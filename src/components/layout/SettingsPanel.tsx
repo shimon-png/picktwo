@@ -1,29 +1,27 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api, toast } from "@/lib/client";
 
-type DmPolicy = "EVERYONE" | "FOLLOWING" | "NOBODY";
-type S = { notifyEmail: boolean; marketingEmail: boolean; dataConsent: boolean; showInVoteMatches: boolean; dmPolicy: DmPolicy };
-type Toggle = "notifyEmail" | "marketingEmail" | "dataConsent" | "showInVoteMatches";
+type S = { notifyEmail: boolean; marketingEmail: boolean; dataConsent: boolean; showInVoteMatches: boolean; chatEnabled: boolean };
+type Toggle = keyof S;
 
-export function SettingsPanel({ initial }: { initial: S }) {
+export function SettingsPanel({ initial, focusChat = false, returnTo = null }: { initial: S; focusChat?: boolean; returnTo?: string | null }) {
+  const router = useRouter();
   const [s, setS] = useState(initial);
-  async function setPolicy(dmPolicy: DmPolicy) {
-    const prev = s;
-    setS({ ...s, dmPolicy });
-    try {
-      await api("/api/me/profile", { body: { kind: "settings", dmPolicy } });
-      toast("Saved", "ok");
-    } catch (e) {
-      setS(prev);
-      toast((e as Error).message, "error");
-    }
-  }
   async function toggle(k: Toggle) {
     const next = { ...s, [k]: !s[k] };
     setS(next);
     try {
       await api("/api/me/profile", { body: { kind: "settings", [k]: next[k] } });
+      // Turned messages on from a DM flow: go straight back to it.
+      if (k === "chatEnabled" && next.chatEnabled && returnTo) {
+        toast("Messages turned on", "ok");
+        router.push(returnTo);
+        router.refresh();
+        return;
+      }
       toast("Saved", "ok");
     } catch (e) {
       setS(s);
@@ -48,8 +46,26 @@ export function SettingsPanel({ initial }: { initial: S }) {
       <input type="checkbox" role="switch" className="mt-1 size-5 accent-zinc-900" checked={s[k]} onChange={() => toggle(k)} />
     </label>
   );
+  const messages = (
+    <section id="messages" className={focusChat ? "scroll-mt-20 rounded-[16px] p-4 ring-2 ring-accent" : "scroll-mt-20"}>
+      <h2 className="text-lg font-medium">{focusChat && !s.chatEnabled ? "Turn on messages to continue" : "Messages"}</h2>
+      <div className="divide-y divide-zinc-200">
+        <Row
+          k="chatEnabled"
+          label="Direct messages"
+          desc="Off by default. When on, you can send a DM to people you follow, and accept message requests from people who follow you, one at a time. Nobody can message you without your OK."
+        />
+      </div>
+      {focusChat && s.chatEnabled && returnTo && (
+        <Link href={returnTo} className="btn-primary mt-2">
+          Continue
+        </Link>
+      )}
+    </section>
+  );
   return (
     <>
+      {messages}
       <section>
         <h2 className="text-lg font-medium">Notifications</h2>
         <div className="divide-y divide-zinc-200">
@@ -65,30 +81,6 @@ export function SettingsPanel({ initial }: { initial: S }) {
             label="Show me in “Voted like you”"
             desc="People who picked the same side on a battle can see you voted like them, and you appear in their taste twins. Turning this off also hides those lists from you."
           />
-          <div className="py-3">
-            <span className="block font-medium">Who can message me</span>
-            <span className="block text-sm text-zinc-500">People you’ve already messaged can always reply. You can block anyone from a conversation.</span>
-            <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label="Who can message me">
-              {(
-                [
-                  ["EVERYONE", "Everyone"],
-                  ["FOLLOWING", "People I follow"],
-                  ["NOBODY", "No one"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="radio"
-                  aria-checked={s.dmPolicy === id}
-                  className={s.dmPolicy === id ? "chip chip-on" : "chip"}
-                  onClick={() => setPolicy(id)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
           <Row k="dataConsent" label="Help improve recommendations" desc="Let crowdpick use your battles, votes and outcomes, anonymised, to improve recommendations. Applies to all your battles. We never sell your identity." />
         </div>
         <div className="mt-3 flex flex-wrap gap-2">

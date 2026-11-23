@@ -97,7 +97,7 @@ async function Boards({ viewer, viewerId }: { viewer: Viewer; viewerId: string |
                 rank={i + 1}
                 viewerId={viewerId}
                 detail={`${p.pct}% agree · ${p.shared} in common`}
-                extra={<MessageButton handle={p.handle} small />}
+                extra={p.iFollow ? <MessageButton handle={p.handle} small /> : undefined}
               />
             ))}
           </div>

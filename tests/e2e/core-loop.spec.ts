@@ -278,29 +278,46 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await expect(a.getByRole("link", { name: handle("twin_c"), exact: true })).toHaveCount(0);
   await snap(a, "11-like-you");
 
-  // A messages B from B's profile; B sees the unread badge and replies.
+  // DMs: off by default, follow first, the first message is a request the receiver accepts.
   await a.goto(`/u/${handle("twin_b")}`);
-  await a.getByRole("link", { name: "Message", exact: true }).click();
+  await expect(a.getByRole("link", { name: "Send DM", exact: true })).toHaveCount(0); // not following yet
+  expect((await a.request.post("/api/messages", { data: { to: handle("twin_b"), body: "hi" } })).status()).toBe(403);
+  await a.getByRole("button", { name: /^Follow/ }).first().click();
+  await a.getByRole("link", { name: "Send DM", exact: true }).click();
+  await a.waitForURL(new RegExp(`/messages/${handle("twin_b")}`));
+  // A's messages are off: round trip through Settings and back.
+  await a.getByRole("link", { name: "Turn on messages" }).click();
+  await a.waitForURL(/\/settings\?enable=chat/);
+  await expect(a.getByRole("heading", { name: "Turn on messages to continue" })).toBeVisible();
+  await a.getByRole("switch", { name: /Direct messages/ }).check();
+  await a.waitForURL(new RegExp(`/messages/${handle("twin_b")}$`));
   await a.getByLabel(`Message @${handle("twin_b")}`).fill("Hey, we always agree!");
   await a.getByRole("button", { name: "Send" }).click();
-  // The draft clears only once the server has saved the message.
-  await expect(a.getByLabel(`Message @${handle("twin_b")}`)).toHaveValue("", { timeout: 15_000 });
-  await expect(a.getByText("Hey, we always agree!")).toBeVisible();
+  await expect(a.getByText(/Request sent\. You can send more once/)).toBeVisible({ timeout: 15_000 });
+  await snap(a, "12-request-sent");
+
+  // B gets the alert; messages are off, so B is asked first, then accepts the request.
   await b.goto("/vote");
   await expect(b.getByRole("link", { name: /Messages, 1 unread/ })).toBeVisible();
   await b.goto("/messages");
+  await expect(b.getByText(/1 person who follows you wants/)).toBeVisible();
+  await b.getByRole("link", { name: "Yes, turn on messages" }).click();
+  await b.getByRole("switch", { name: /Direct messages/ }).check();
+  await b.waitForURL(/\/messages$/);
   await b.getByRole("link", { name: new RegExp(handle("twin_a")) }).click();
+  await expect(b.getByText(/who follows you, wants to send you a message/)).toBeVisible();
+  await expect(b.getByText("Hey, we always agree!")).toHaveCount(0); // hidden until accepted
+  await snap(b, "13-request-received");
+  await b.getByRole("button", { name: "Accept" }).click();
   await expect(b.getByText("Hey, we always agree!")).toBeVisible();
   await b.getByLabel(`Message @${handle("twin_a")}`).fill("Ha, great minds");
   await b.getByRole("button", { name: "Send" }).click();
   await expect(b.getByLabel(`Message @${handle("twin_a")}`)).toHaveValue("", { timeout: 15_000 });
   await expect(a.getByText("Ha, great minds")).toBeVisible({ timeout: 12_000 }); // A's thread polls
-  await snap(a, "12-thread");
+  await snap(a, "14-chat");
 
-  // C only accepts messages from nobody: A can't start a conversation.
-  await c.request.post("/api/me/profile", { data: { kind: "settings", dmPolicy: "NOBODY" } });
-  const denied = await a.request.post("/api/messages", { data: { to: handle("twin_c"), body: "hi" } });
-  expect(denied.status()).toBe(403);
+  // C: A doesn't follow C, so no request can be sent.
+  expect((await a.request.post("/api/messages", { data: { to: handle("twin_c"), body: "hi" } })).status()).toBe(403);
 
   // B blocks A from the conversation menu: A can no longer send, and they disappear from each other's lists.
   b.once("dialog", (d) => d.accept());
