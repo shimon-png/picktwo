@@ -1,3 +1,5 @@
+import { after } from "next/server";
+import { tagBattle } from "./tagging";
 import { and, desc, eq, inArray, isNotNull, lt, sql, notInArray, or } from "drizzle-orm";
 import { db, type DbOrTx } from "../db";
 import {
@@ -136,6 +138,13 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
     },
     { userId: user.id },
   );
+  // Data brain: AI tags (theme, stakes, traits) after the response is sent; never slows or blocks posting.
+  const newId = result.battle.id;
+  try {
+    after(() => tagBattle(newId));
+  } catch {
+    void tagBattle(newId); // outside a request (scripts, tests)
+  }
   if (screen.verdict === "review") await recordAutoHold(result.battle.id, result.battle.title, result.battle.slug, screen.reasons);
   const openLoops = await countOpenLoops(user.id, economy);
   return { inReview: screen.verdict === "review", slug: result.battle.slug, bonus: user.id === actor.id ? result.bonus : 0, openLoops, postedAs: user.id === actor.id ? null : user.handle };
@@ -314,7 +323,8 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     slug: b.slug,
     title: b.title,
     context: b.context,
-    tags: b.tags,
+    // Brain tags are internal analysis data, never sent to the browser.
+    tags: (({ brain: _brain, ...pub }) => pub)(b.tags ?? {}),
     visibility: b.visibility,
     status: b.status,
     isOpen,

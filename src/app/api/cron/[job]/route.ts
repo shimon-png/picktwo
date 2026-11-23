@@ -1,4 +1,5 @@
 import { refreshEngagement } from "@/server/services/engagement";
+import { tagUntagged } from "@/server/services/tagging";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   decay: () => decayPoints(),
   rollups: () => dailyRollup(),
   engagement: () => refreshEngagement(),
+  tagging: () => tagUntagged(60),
   // Runs everything — used by the single daily cron on Vercel Hobby plans.
   daily: async () => ({
     closed: await closeDueBattles(),
@@ -17,6 +19,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     decayed: await decayPoints(),
     rollup: await dailyRollup(),
     engagement: await refreshEngagement(),
+    tagging: await tagUntagged(40),
   }),
 };
 

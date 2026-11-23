@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getBrainStats } from "@/server/services/brain";
-import { RecomputeEngagement } from "@/components/admin/AdminActions";
+import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
@@ -106,6 +106,24 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
             Number(b.returns).toFixed(1),
             `${b.kind}${b.seed ? " · seed" : ""}`,
           ])}
+        />
+      </Section>
+
+      <Section
+        title="By theme (AI tags)"
+        note="Each battle is tagged by AI when posted: theme, stakes, and what picking each side suggests about the voter. Real votes are all-time; views are for the selected window."
+      >
+        <div><TagBattles remaining={s.untagged} /></div>
+        <Rows
+          head={["Theme", "Battles", "Real votes", "Vote rate", "Avg score"]}
+          rows={s.byTheme.map((r) => [r.tag.replace(/_/g, " "), r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
+        />
+      </Section>
+
+      <Section title="By stakes" note="Small (snack, nail colour), medium (event outfit, gadget), big (house, job, proposal).">
+        <Rows
+          head={["Stakes", "Battles", "Real votes", "Vote rate", "Avg score"]}
+          rows={s.byStakes.map((r) => [r.tag, r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
         />
       </Section>
 
