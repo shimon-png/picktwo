@@ -4,7 +4,10 @@ import { blocks, conversations, directMessages, follows, users, type User } from
 import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { track } from "../analytics";
-import { canSendDm, DM_DENIED_MESSAGE, DM_MAX_LENGTH, pairKey, type DmPolicy } from "./dm-rules";
+import { notify } from "./notifications";
+import { DM_MAX_LENGTH, canType, dmState, pairKey, sendDeniedMessage, type DmState } from "./dm-rules";
+
+/** Rules and the user-facing flow are documented in `dm-rules.ts`. */
 
 export type ThreadPerson = { id: string; handle: string; name: string | null; image: string | null };
 export type DmView = { id: string; mine: boolean; body: string; createdAt: string };
@@ -28,73 +31,99 @@ async function isBlockedEitherWay(a: string, b: string) {
   return !!row;
 }
 
-/** Whether `sender` can message `recipient` right now (blocks, bans, the recipient's "who can message me" setting). */
-export async function dmPermission(sender: User, recipient: User | null) {
-  if (!recipient) return canSendDm({ ...EMPTY, self: false, recipientExists: false });
-  const convo = await conversationFor(sender.id, recipient.id);
-  const [blocked, [follow], [wrote]] = await Promise.all([
-    isBlockedEitherWay(sender.id, recipient.id),
-    db.select({ x: follows.followerId }).from(follows).where(and(eq(follows.followerId, recipient.id), eq(follows.followingId, sender.id))),
-    convo
-      ? db.select({ id: directMessages.id }).from(directMessages).where(and(eq(directMessages.conversationId, convo.id), eq(directMessages.senderId, recipient.id))).limit(1)
-      : Promise.resolve([]),
+/** The viewer's state with `other` (see `dmState`), plus the conversation row if there is one. */
+async function resolve(me: User, other: User | null) {
+  if (!other || !other.handle) return { state: { kind: "unavailable", reason: "not_found" } as DmState, convo: null };
+  const [convo, blocked, [follow]] = await Promise.all([
+    conversationFor(me.id, other.id),
+    isBlockedEitherWay(me.id, other.id),
+    db.select({ x: follows.followerId }).from(follows).where(and(eq(follows.followerId, me.id), eq(follows.followingId, other.id))),
   ]);
-  return canSendDm({
-    self: sender.id === recipient.id,
-    senderBanned: !!sender.bannedAt,
-    recipientExists: true,
-    recipientBanned: !!recipient.bannedAt,
-    recipientReachable: !!recipient.email && !!recipient.handle,
+  const state = dmState({
+    self: me.id === other.id,
+    meBanned: !!me.bannedAt,
+    otherBanned: !!other.bannedAt,
+    otherReachable: !!other.email,
     blocked,
-    recipientPolicy: (recipient.dmPolicy ?? "EVERYONE") as DmPolicy,
-    recipientFollowsSender: !!follow,
-    recipientWroteFirst: !!wrote,
+    meChatOn: me.chatEnabled,
+    otherChatOn: other.chatEnabled,
+    iFollow: !!follow,
+    convo: convo ? { status: convo.status, requestedByMe: convo.requestedBy === me.id } : null,
   });
+  return { state, convo };
 }
-const EMPTY = {
-  senderBanned: false,
-  recipientBanned: false,
-  recipientReachable: false,
-  blocked: false,
-  recipientPolicy: "EVERYONE" as DmPolicy,
-  recipientFollowsSender: false,
-  recipientWroteFirst: false,
-};
 
-export async function sendMessage(sender: User, toHandle: string, rawBody: string): Promise<DmView> {
+/** Whether the viewer may see "Send DM" for this person (they follow them and it isn't blocked/unavailable). */
+export async function dmEntryState(me: User, other: User) {
+  return (await resolve(me, other)).state;
+}
+
+export async function sendMessage(me: User, toHandle: string, rawBody: string): Promise<{ message: DmView; requested: boolean }> {
   const body = rawBody.trim();
   if (!body) throw new AppError("VALIDATION", "Write a message first");
   if (body.length > DM_MAX_LENGTH) throw new AppError("VALIDATION", `Messages can be up to ${DM_MAX_LENGTH} characters`);
   assertCleanText(body);
-  const recipient = await findUserByHandle(toHandle);
-  const ok = await dmPermission(sender, recipient);
-  if (!ok.ok) throw new AppError(ok.reason === "not_found" ? "NOT_FOUND" : "FORBIDDEN", DM_DENIED_MESSAGE[ok.reason]);
-  const [a, b] = pairKey(sender.id, recipient!.id);
+  const other = await findUserByHandle(toHandle);
+  const { state } = await resolve(me, other);
+  if (!canType(state)) throw new AppError(state.kind === "unavailable" && state.reason === "not_found" ? "NOT_FOUND" : "FORBIDDEN", sendDeniedMessage(state, other?.handle ?? toHandle));
+  const [a, b] = pairKey(me.id, other!.id);
   const now = new Date();
+  const requested = state.kind === "can_request";
   const msg = await db.transaction(async (tx) => {
-    const [c] = await tx
-      .insert(conversations)
-      .values({ userA: a, userB: b, lastMessageAt: now })
-      .onConflictDoUpdate({ target: [conversations.userA, conversations.userB], set: { lastMessageAt: now } })
-      .returning({ id: conversations.id });
-    const [m] = await tx.insert(directMessages).values({ conversationId: c.id, senderId: sender.id, body, createdAt: now }).returning();
+    let convoId: string;
+    if (requested) {
+      const [c] = await tx
+        .insert(conversations)
+        .values({ userA: a, userB: b, status: "PENDING", requestedBy: me.id, lastMessageAt: now })
+        .onConflictDoNothing({ target: [conversations.userA, conversations.userB] })
+        .returning({ id: conversations.id });
+      if (!c) throw new AppError("CONFLICT", "You already have a conversation with this person. Refresh and try again.");
+      convoId = c.id;
+      await notify(tx, other!.id, "DM_REQUEST", { handle: me.handle, name: me.name });
+    } else {
+      const [c] = await tx
+        .update(conversations)
+        .set({ lastMessageAt: now })
+        .where(and(eq(conversations.userA, a), eq(conversations.userB, b)))
+        .returning({ id: conversations.id });
+      convoId = c.id;
+    }
+    const [m] = await tx.insert(directMessages).values({ conversationId: convoId, senderId: me.id, body, createdAt: now }).returning();
     return m;
   });
-  track("dm_sent", { length: body.length }, { userId: sender.id });
-  return { id: msg.id, mine: true, body: msg.body, createdAt: msg.createdAt.toISOString() };
+  track(requested ? "dm_requested" : "dm_sent", { length: body.length }, { userId: me.id });
+  return { message: { id: msg.id, mine: true, body: msg.body, createdAt: msg.createdAt.toISOString() }, requested };
 }
 
-export type ConversationRow = {
+/** Accept or decline a message request from `fromHandle`. Needs your messages turned on. */
+export async function respondToRequest(me: User, fromHandle: string, accept: boolean) {
+  const other = await findUserByHandle(fromHandle);
+  const { state, convo } = await resolve(me, other);
+  if (state.kind === "enable_chat") throw new AppError("FORBIDDEN", "Turn on messages in Settings first");
+  if ((state.kind !== "request_received" && state.kind !== "declined") || !convo) throw new AppError("CONFLICT", "There's no message request to answer");
+  await db.transaction(async (tx) => {
+    await tx.update(conversations).set({ status: accept ? "ACCEPTED" : "DECLINED" }).where(eq(conversations.id, convo.id));
+    if (accept) await notify(tx, other!.id, "DM_ACCEPTED", { handle: me.handle, name: me.name });
+  });
+  track(accept ? "dm_request_accepted" : "dm_request_declined", {}, { userId: me.id });
+  return { status: accept ? "ACCEPTED" : "DECLINED" };
+}
+
+export type InboxRow = {
   id: string;
   other: ThreadPerson;
+  /** chat = accepted; request = they want to message you; sent = your request is waiting. */
+  kind: "chat" | "request" | "sent";
   last: { body: string; mine: boolean; createdAt: string } | null;
   unread: number;
 };
 
-/** The user's conversations, newest first. Conversations with people they've blocked are left out. */
-export async function listConversations(user: User, limit = 100): Promise<ConversationRow[]> {
+/** Your chats and message requests, newest first. Blocked people, declined requests and banned users are left out. */
+export async function listInbox(user: User, limit = 100): Promise<InboxRow[]> {
   const rows = await db.execute<{
     id: string;
+    status: "PENDING" | "ACCEPTED" | "DECLINED";
+    requested_by: string | null;
     other_id: string;
     handle: string | null;
     name: string | null;
@@ -104,7 +133,7 @@ export async function listConversations(user: User, limit = 100): Promise<Conver
     last_at: string | null;
     unread: number;
   }>(sql`
-    SELECT c.id, u.id AS other_id, u.handle, u.name, u.image,
+    SELECT c.id, c.status, c.requested_by, u.id AS other_id, u.handle, u.name, u.image,
       lm.body AS last_body, lm.sender_id AS last_sender, lm.created_at AS last_at,
       (SELECT count(*)::int FROM direct_message m WHERE m.conversation_id = c.id AND m.sender_id <> ${user.id} AND m.read_at IS NULL) AS unread
     FROM conversation c
@@ -112,47 +141,55 @@ export async function listConversations(user: User, limit = 100): Promise<Conver
     LEFT JOIN LATERAL (SELECT body, sender_id, created_at FROM direct_message m WHERE m.conversation_id = c.id ORDER BY created_at DESC LIMIT 1) lm ON true
     WHERE (c.user_a = ${user.id} OR c.user_b = ${user.id})
       AND u.banned_at IS NULL AND u.handle IS NOT NULL
+      AND NOT (c.status = 'DECLINED' AND c.requested_by <> ${user.id})
       AND NOT EXISTS (SELECT 1 FROM block bl WHERE bl.blocker_id = ${user.id} AND bl.blocked_id = u.id)
     ORDER BY c.last_message_at DESC
     LIMIT ${limit}`);
-  return rows.map((r) => ({
-    id: r.id,
-    other: { id: r.other_id, handle: r.handle!, name: r.name, image: r.image },
-    last: r.last_body ? { body: r.last_body, mine: r.last_sender === user.id, createdAt: new Date(r.last_at!).toISOString() } : null,
-    unread: r.unread,
-  }));
+  return rows.map((r) => {
+    const kind: InboxRow["kind"] = r.status === "ACCEPTED" ? "chat" : r.requested_by === user.id ? "sent" : "request";
+    return {
+      id: r.id,
+      other: { id: r.other_id, handle: r.handle!, name: r.name, image: r.image },
+      kind,
+      // A request's text stays hidden from the receiver until they accept.
+      last: r.last_body && kind !== "request" ? { body: r.last_body, mine: r.last_sender === user.id, createdAt: new Date(r.last_at!).toISOString() } : null,
+      unread: kind === "chat" ? r.unread : 0,
+    };
+  });
 }
 
-/** Unread messages across all conversations (for the header badge). Messages from people you blocked don't count. */
+/** Header badge: unread messages in your chats + message requests waiting for you. Blocked senders don't count. */
 export async function unreadMessageCount(userId: string): Promise<number> {
   const [r] = await db.execute<{ n: number }>(sql`
-    SELECT count(*)::int AS n FROM direct_message m
-    JOIN conversation c ON c.id = m.conversation_id
-    WHERE (c.user_a = ${userId} OR c.user_b = ${userId}) AND m.sender_id <> ${userId} AND m.read_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM block bl WHERE bl.blocker_id = ${userId} AND bl.blocked_id = m.sender_id)`);
+    SELECT
+      (SELECT count(*)::int FROM direct_message m JOIN conversation c ON c.id = m.conversation_id
+        WHERE c.status = 'ACCEPTED' AND (c.user_a = ${userId} OR c.user_b = ${userId}) AND m.sender_id <> ${userId} AND m.read_at IS NULL
+          AND NOT EXISTS (SELECT 1 FROM block bl WHERE bl.blocker_id = ${userId} AND bl.blocked_id = m.sender_id))
+      + (SELECT count(*)::int FROM conversation c
+        WHERE c.status = 'PENDING' AND c.requested_by <> ${userId} AND (c.user_a = ${userId} OR c.user_b = ${userId})
+          AND NOT EXISTS (SELECT 1 FROM block bl WHERE bl.blocker_id = ${userId} AND bl.blocked_id = c.requested_by)) AS n`);
   return r?.n ?? 0;
 }
 
 export type Thread = {
   other: ThreadPerson;
+  state: DmState;
+  /** Messages you're allowed to see (a request's text is hidden from the receiver until accepted). */
   messages: DmView[];
-  canSend: boolean;
-  /** Why the composer is disabled (blocked, their setting, …). */
-  notice: string | null;
   iBlocked: boolean;
 };
 
-/** One conversation with `otherHandle`: messages (oldest first, optionally only newer than `after`) and whether you can reply. Marks theirs read. */
+/** One conversation with `otherHandle`. Marks visible messages from them as read. */
 export async function getThread(user: User, otherHandle: string, opts: { after?: string; limit?: number } = {}): Promise<Thread> {
   const other = await findUserByHandle(otherHandle);
   if (!other || !other.handle || other.bannedAt || other.id === user.id) throw new AppError("NOT_FOUND", "Conversation not found");
-  const [convo, permission, [iBlockedRow]] = await Promise.all([
-    conversationFor(user.id, other.id),
-    dmPermission(user, other),
+  const [{ state, convo }, [iBlockedRow]] = await Promise.all([
+    resolve(user, other),
     db.select({ x: blocks.blockerId }).from(blocks).where(and(eq(blocks.blockerId, user.id), eq(blocks.blockedId, other.id))),
   ]);
+  const visible = !!convo && (convo.status === "ACCEPTED" || convo.requestedBy === user.id);
   let messages: DmView[] = [];
-  if (convo) {
+  if (convo && visible) {
     const after = opts.after ? new Date(opts.after) : null;
     const rows = await db
       .select()
@@ -166,16 +203,10 @@ export async function getThread(user: User, otherHandle: string, opts: { after?:
       .set({ readAt: new Date() })
       .where(and(eq(directMessages.conversationId, convo.id), ne(directMessages.senderId, user.id), isNull(directMessages.readAt)));
   }
-  return {
-    other: { id: other.id, handle: other.handle, name: other.name, image: other.image },
-    messages,
-    canSend: permission.ok,
-    notice: permission.ok ? null : !!iBlockedRow ? "You blocked this person. Unblock them to send a message." : DM_DENIED_MESSAGE[permission.reason],
-    iBlocked: !!iBlockedRow,
-  };
+  return { other: { id: other.id, handle: other.handle, name: other.name, image: other.image }, state, messages, iBlocked: !!iBlockedRow };
 }
 
-/** Text of a message the user received, for attaching to a report. */
+/** Text of a message the user received in an accepted chat, for attaching to a report. */
 export async function receivedMessageText(user: User, messageId: string) {
   const [m] = await db
     .select({ body: directMessages.body, senderId: directMessages.senderId, a: conversations.userA, b: conversations.userB })
@@ -185,4 +216,3 @@ export async function receivedMessageText(user: User, messageId: string) {
   if (!m || m.senderId === user.id || (m.a !== user.id && m.b !== user.id)) return null;
   return { body: m.body, senderId: m.senderId };
 }
-

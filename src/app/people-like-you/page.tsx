@@ -55,7 +55,7 @@ export default async function PeopleLikeYouPage() {
                       <b className="font-medium text-ink">{p.pct}% agree</b> · {p.shared} battles in common
                     </span>
                   }
-                  extra={<MessageButton handle={p.handle} small />}
+                  extra={p.iFollow ? <MessageButton handle={p.handle} small /> : undefined}
                 />
               ),
             }))}

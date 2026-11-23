@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 /* eslint-disable @next/next/no-img-element */
-import { Bell, CheckCircle2, ChevronDown, Clock, Heart, ThumbsUp, UserPlus, Users, Zap } from "lucide-react";
+import { Bell, CheckCircle2, MessageCircle, ChevronDown, Clock, Heart, ThumbsUp, UserPlus, Users, Zap } from "lucide-react";
 import { getCurrentUser } from "@/server/viewer";
 import { listNotifications } from "@/server/services/notifications";
 import { followBackInfo } from "@/server/services/social";
@@ -36,6 +36,10 @@ function render(type: string, p: P): { icon: React.ReactNode; text: React.ReactN
       return { icon: <Heart className="size-5 text-b" />, text: <>The poster found your reason helpful. <b>+{String(p.points)} ⚡</b></> };
     case "FOLLOW":
       return { icon: <UserPlus className="size-5 text-a" />, text: <><b>{String(p.name || `@${p.handle}`)}</b> followed you</>, href: p.handle ? `/u/${p.handle}` : undefined };
+    case "DM_REQUEST":
+      return { icon: <MessageCircle className="size-5 text-a" />, text: <><b>{String(p.name || `@${p.handle}`)}</b>, who follows you, wants to send you a message</>, href: p.handle ? `/messages/${p.handle}` : "/messages" };
+    case "DM_ACCEPTED":
+      return { icon: <MessageCircle className="size-5 text-ok" />, text: <><b>{String(p.name || `@${p.handle}`)}</b> accepted your message request</>, href: p.handle ? `/messages/${p.handle}` : "/messages" };
     default:
       return { icon: <Zap className="size-5 text-pp" />, text: <>{type}</> };
   }

@@ -9,5 +9,5 @@ export const POST = handler(async (req) => {
   await rateLimit("messageMinute", user.id);
   await rateLimit("messageDay", user.id);
   const input = messageInput.parse(await req.json());
-  return { message: await sendMessage(user, input.to, input.body) };
+  return sendMessage(user, input.to, input.body);
 });

@@ -20,5 +20,5 @@ export default async function ThreadPage({ params }: { params: Promise<{ handle:
     if (e instanceof AppError && e.code === "NOT_FOUND") notFound();
     throw e;
   }
-  return <Thread key={t.other.id} other={t.other} initial={t.messages} canSend={t.canSend} notice={t.notice} iBlocked={t.iBlocked} />;
+  return <Thread key={t.other.id} other={t.other} initial={t.messages} state={t.state} iBlocked={t.iBlocked} />;
 }

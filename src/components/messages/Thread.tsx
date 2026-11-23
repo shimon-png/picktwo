@@ -7,6 +7,7 @@ import { api, toast } from "@/lib/client";
 import { cn, timeAgo } from "@/lib/utils";
 import { Avatar } from "@/components/ui/Avatar";
 import type { DmView, ThreadPerson } from "@/server/services/messages";
+import type { DmState } from "@/server/services/dm-rules";
 
 const REPORT_REASONS = [
   ["harassment", "Harassment or hate"],
@@ -19,22 +20,19 @@ const REPORT_REASONS = [
 export function Thread({
   other,
   initial,
-  canSend: canSendInitial,
-  notice: noticeInitial,
+  state: stateInitial,
   iBlocked: iBlockedInitial,
 }: {
   other: ThreadPerson;
   initial: DmView[];
-  canSend: boolean;
-  notice: string | null;
+  state: DmState;
   iBlocked: boolean;
 }) {
   const router = useRouter();
   const [msgs, setMsgs] = useState(initial);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [canSend, setCanSend] = useState(canSendInitial);
-  const [notice, setNotice] = useState(noticeInitial);
+  const [state, setState] = useState(stateInitial);
   const [menu, setMenu] = useState(false);
   const [iBlocked, setIBlocked] = useState(iBlockedInitial);
   const [reporting, setReporting] = useState<string | null>(null);
@@ -48,12 +46,9 @@ export function Thread({
   const poll = useCallback(async () => {
     if (document.visibilityState !== "visible") return;
     try {
-      const r = await api<{ messages: DmView[]; canSend: boolean; notice: string | null }>(
-        `/api/messages/${other.handle}${last ? `?after=${encodeURIComponent(last)}` : ""}`,
-      );
+      const r = await api<{ messages: DmView[]; state: DmState }>(`/api/messages/${other.handle}${last ? `?after=${encodeURIComponent(last)}` : ""}`);
       if (r.messages.length) setMsgs((m) => [...m, ...r.messages.filter((x) => !m.some((y) => y.id === x.id))]);
-      setCanSend(r.canSend);
-      setNotice(r.notice);
+      setState(r.state);
     } catch {}
   }, [other.handle, last]);
 
@@ -68,9 +63,44 @@ export function Thread({
     if (!body || busy) return;
     setBusy(true);
     try {
-      const r = await api<{ message: DmView }>("/api/messages", { body: { to: other.handle, body } });
+      const r = await api<{ message: DmView; requested: boolean }>("/api/messages", { body: { to: other.handle, body } });
       setMsgs((m) => [...m, r.message]);
       setDraft("");
+      if (r.requested) {
+        setState({ kind: "request_sent" });
+        toast(`Request sent to @${other.handle}`, "ok");
+      }
+    } catch (err) {
+      toast((err as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function respond(accept: boolean) {
+    setBusy(true);
+    try {
+      await api(`/api/messages/${other.handle}/respond`, { body: { accept } });
+      if (accept) {
+        toast("Request accepted", "ok");
+        await poll();
+      } else {
+        toast("Request declined");
+        router.push("/messages");
+        router.refresh();
+      }
+    } catch (err) {
+      toast((err as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function follow() {
+    setBusy(true);
+    try {
+      await api(`/api/follow/${other.id}`, { method: "POST" });
+      await poll();
     } catch (err) {
       toast((err as Error).message, "error");
     } finally {
@@ -126,7 +156,7 @@ export function Thread({
           </button>
           {menu && (
             <div className="card absolute right-0 top-full z-30 mt-1 w-56 p-1.5 shadow-lift" role="menu">
-              {theirs.length > 0 && (
+              {theirs.length > 0 && (state.kind === "chat" || state.kind === "other_off") && (
                 <button
                   role="menuitem"
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface"
@@ -147,11 +177,12 @@ export function Thread({
       </div>
 
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-4" aria-live="polite">
-        {msgs.length === 0 && (
+        {msgs.length === 0 && state.kind === "can_request" && (
           <p className="mx-auto mt-10 max-w-xs text-center text-sm text-zinc-500">
-            Say hi to {other.name || `@${other.handle}`}. Keep it kind — people can block and report messages.
+            Your first message goes to {other.name || `@${other.handle}`} as a request. They’ll see that you want to message them and can accept it.
           </p>
         )}
+        <StatePanel state={state} other={other} busy={busy} onRespond={respond} onFollow={follow} />
         {msgs.map((m) => (
           <div key={m.id} className={cn("group flex flex-col", m.mine ? "items-end" : "items-start")}>
             <div
@@ -188,13 +219,13 @@ export function Thread({
         <div ref={end} />
       </div>
 
-      {canSend ? (
+      {state.kind === "can_request" || state.kind === "chat" ? (
         <form onSubmit={send} className="flex items-end gap-2 border-t border-ink/10 px-3 py-2.5">
           <textarea
             className="input max-h-32 min-h-[44px] flex-1 resize-none !rounded-2xl !py-2.5"
             rows={1}
             maxLength={1000}
-            placeholder="Message…"
+            placeholder={state.kind === "can_request" ? "Write your message request…" : "Message…"}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -210,8 +241,99 @@ export function Thread({
           </button>
         </form>
       ) : (
-        <p className="border-t border-ink/10 px-4 py-3 text-center text-sm text-zinc-500">{notice ?? "You can't reply to this conversation."}</p>
+        <p className="border-t border-ink/10 px-4 py-3 text-center text-sm text-zinc-500">{iBlocked ? "You blocked this person. Unblock them to send a message." : footerNote(state, other.handle)}</p>
       )}
     </div>
   );
+}
+
+const settingsHref = (handle: string) => `/settings?enable=chat&returnTo=${encodeURIComponent(`/messages/${handle}`)}`;
+
+function footerNote(state: DmState, handle: string) {
+  switch (state.kind) {
+    case "request_sent":
+      return `Request sent. You can send more once @${handle} accepts.`;
+    case "request_received":
+    case "declined":
+      return "Accept the request to read it and reply.";
+    case "enable_chat":
+      return "Messages are off for you.";
+    case "follow_first":
+      return `Follow @${handle} to send a DM.`;
+    case "other_off":
+      return `@${handle} has turned off messages.`;
+    case "unavailable":
+      return state.reason === "blocked" ? "You can’t message this person." : state.reason === "unreachable" ? "This person can’t receive messages." : "This conversation isn’t available.";
+    default:
+      return "";
+  }
+}
+
+/** The card in the middle of the thread for every state that needs a decision. */
+function StatePanel({
+  state,
+  other,
+  busy,
+  onRespond,
+  onFollow,
+}: {
+  state: DmState;
+  other: ThreadPerson;
+  busy: boolean;
+  onRespond: (accept: boolean) => void;
+  onFollow: () => void;
+}) {
+  const who = other.name || `@${other.handle}`;
+  const card = "card mx-auto mt-6 max-w-sm space-y-3 p-5 text-center";
+  if (state.kind === "enable_chat") {
+    const what =
+      state.then === "send" ? `send ${who} a DM` : state.then === "accept" ? `see ${who}’s message request` : `keep chatting with ${who}`;
+    return (
+      <div className={card}>
+        <p className="text-[15px]">
+          {state.then === "accept" ? (
+            <>
+              <b className="font-medium">{who}</b>, who follows you, wants to send you a message. Do you want to receive messages?
+            </>
+          ) : (
+            <>Turn on messages to {what}.</>
+          )}
+        </p>
+        <Link href={settingsHref(other.handle)} className="btn-primary w-full">
+          {state.then === "accept" ? "Yes, turn on messages" : "Turn on messages"}
+        </Link>
+        <p className="text-xs text-zinc-500">Messages are off by default. You’ll come right back here.</p>
+      </div>
+    );
+  }
+  if (state.kind === "request_received" || state.kind === "declined")
+    return (
+      <div className={card}>
+        <p className="text-[15px]">
+          <b className="font-medium">{who}</b>, who follows you, wants to send you a message.
+        </p>
+        {state.kind === "declined" && <p className="text-sm text-zinc-500">You declined this request.</p>}
+        <p className="text-sm text-zinc-500">You’ll see it once you accept. They won’t be told if you decline.</p>
+        <div className="flex gap-2">
+          <button className="btn-primary flex-1" disabled={busy} onClick={() => onRespond(true)}>
+            Accept
+          </button>
+          {state.kind === "request_received" && (
+            <button className="btn-outline flex-1" disabled={busy} onClick={() => onRespond(false)}>
+              Decline
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  if (state.kind === "follow_first")
+    return (
+      <div className={card}>
+        <p className="text-[15px]">You can send a DM to people you follow.</p>
+        <button className="btn-primary w-full" disabled={busy} onClick={onFollow}>
+          Follow @{other.handle}
+        </button>
+      </div>
+    );
+  return null;
 }
