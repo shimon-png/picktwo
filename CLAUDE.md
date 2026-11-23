@@ -10,6 +10,7 @@ PickTwo is a standalone, mobile-first Next.js app deployed on Vercel. The produc
 4. Pure math (priority, ranking, reputation, reminders) lives in `services/priority.ts`, `services/ranking.ts`, `services/reputation.ts` and has unit tests — keep it pure.
 5. Battles close lazily on read (`getBattleRow`) as well as by cron. Never rely on cron for correctness.
 6. Raw `sql` templates: pass dates as ISO strings, not `Date` objects (postgres.js limitation).
+   Migration `when` timestamps in `drizzle/meta/_journal.json` must keep increasing: drizzle skips any migration older than the newest applied one, silently (0030 was skipped in production and broke sign-in; 0031 repairs it). `tests/unit/migrations.test.ts` checks this — when renumbering after a merge, bump `when` past the previous entry.
 7. Children's safety: kid info is age ranges only — never names, birthdates or face photos.
 
 ## Design system ("Prompt · Red & Blue", Nov 2026)
