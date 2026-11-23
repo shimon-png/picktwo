@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { listContactMessages, topicLabel, type ContactStatus } from "@/server/services/contact";
+import { contactCounts, listContactMessages, topicLabel, type ContactStatus } from "@/server/services/contact";
 import { MessageActions } from "@/components/admin/AdminActions";
 import { timeAgo } from "@/lib/utils";
 
@@ -12,15 +12,35 @@ const TABS: [ContactStatus | "ALL", string][] = [
 export default async function AdminMessages({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const { status: raw } = await searchParams;
   const status = (TABS.find(([k]) => k === raw)?.[0] ?? "NEW") as ContactStatus | "ALL";
-  const rows = await listContactMessages(status);
+  const [rows, counts] = await Promise.all([listContactMessages(status), contactCounts()]);
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5">
-        {TABS.map(([k, label]) => (
-          <Link key={k} href={`/admin/messages?status=${k}`} className={`chip !py-1 text-xs ${k === status ? "chip-on" : ""}`}>
-            {label}
-          </Link>
-        ))}
+      <div className="flex gap-2.5 pt-1.5">
+        {TABS.map(([k, label]) => {
+          const n = counts[k];
+          return (
+            <Link key={k} href={`/admin/messages?status=${k}`} className={`chip relative !py-1 text-xs ${k === status ? "chip-on" : ""}`}>
+              {label}
+              {k === "NEW" ? (
+                n > 0 && (
+                  <span
+                    aria-label={`${n} new`}
+                    className="absolute -right-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white"
+                  >
+                    {n > 99 ? "99+" : n}
+                  </span>
+                )
+              ) : (
+                <span
+                  aria-label={`${n} messages`}
+                  className="absolute -right-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-zinc-500 px-1 text-[10px] font-medium leading-none text-white"
+                >
+                  {n > 99 ? "99+" : n}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </div>
       {!rows.length ? (
         <p className="text-zinc-500">{status === "NEW" ? "No new messages 🎉" : "Nothing here yet."}</p>

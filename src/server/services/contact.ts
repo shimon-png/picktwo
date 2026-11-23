@@ -67,6 +67,18 @@ export async function unreadContactCount() {
   return n;
 }
 
+/** Message counts per status in one grouped query (for the inbox tab badges). */
+export async function contactCounts() {
+  const rows = await db
+    .select({ status: contactMessages.status, n: sql<number>`count(*)::int` })
+    .from(contactMessages)
+    .groupBy(contactMessages.status);
+  const by = (st: string) => rows.find((r) => r.status === st)?.n ?? 0;
+  const NEW = by("NEW");
+  const HANDLED = by("HANDLED");
+  return { NEW, HANDLED, ALL: rows.reduce((a, r) => a + r.n, 0) };
+}
+
 export async function setContactStatus(id: string, status: ContactStatus, adminId: string) {
   const [row] = await db
     .update(contactMessages)
