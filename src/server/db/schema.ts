@@ -82,6 +82,8 @@ export const users = pgTable("user", {
   chatEnabled: boolean("chat_enabled").notNull().default(false),
   /** Listed in "Voted like you" (to same-side voters) and the taste-twin ranking. Opt-out in Settings. */
   showInVoteMatches: boolean("show_in_vote_matches").notNull().default(true),
+  /** When the account first finished (or closed) the Vote tutorial; set = never auto-show it again (replay from Settings / You). */
+  tourSeenAt: ts("tour_seen_at"),
   referredById: text("referred_by_id"),
   createdAt: now("created_at"),
 });
