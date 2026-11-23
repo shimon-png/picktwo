@@ -15,8 +15,10 @@ import { RollCard } from "./RollCard";
 import { isRollMilestone, ROLL_KEY } from "@/lib/streak";
 import { PhotoFlag } from "./PhotoFlag";
 import { ResultBars } from "./ResultBars";
+import { cardKind, contentHash, currentSessionId, logEvent } from "@/lib/events";
 
 type Side = "A" | "B";
+type PickMethod = "tap" | "swipe" | "key";
 const other = (s: Side): Side => (s === "A" ? "B" : "A");
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
 
@@ -80,8 +82,29 @@ export function SwipeDeck({
   const card = queue[0];
   const peek = queue[1];
 
+  // Data brain: every card that reaches the top of the deck, in order (docs/brain/data-dictionary.md).
+  const deckPos = useRef(0);
+  const lastKinds = useRef<string[]>([]);
   useEffect(() => {
     shownAt.current = Date.now();
+    if (!card) return;
+    const kind = cardKind(card.imageA, card.imageB);
+    logEvent("card_shown", {
+      battleId: card.id,
+      pos: ++deckPos.current,
+      kind,
+      prevKinds: lastKinds.current.join(","),
+      votesShown: card.votesA + card.votesB,
+      ageHours: Math.round((Date.now() - Date.parse(card.createdAt)) / 36e5),
+      hasContext: !!card.context,
+      titleLen: card.title.length,
+      authorTier: card.authorTier,
+      cv: contentHash([card.title, card.context, card.labelA, card.labelB, card.descA, card.descB, card.imageA, card.imageB]),
+      signedIn,
+      surface: "deck",
+    });
+    lastKinds.current = [...lastKinds.current, kind].slice(-3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card?.id]);
 
   // Drop any window listeners from an unfinished drag if the deck unmounts.
@@ -127,8 +150,12 @@ export function SwipeDeck({
   }, []);
 
   const gated = !signedIn && guestLeft !== null && guestLeft <= 0;
+  useEffect(() => {
+    if (gated) logEvent("signup_gate_shown", { pos: deckPos.current, battleId: card?.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gated]);
 
-  async function vote(side: Side): Promise<boolean> {
+  async function vote(side: Side, method: PickMethod): Promise<boolean> {
     if (!card || fly || gated) return false;
     if (voted === side) return true;
     const prev = voted;
@@ -141,7 +168,7 @@ export function SwipeDeck({
     if (!prev) wink();
     try {
       const r = await api<VoteRes>(`/api/battles/${card.slug}/vote`, {
-        body: { side, source: "feed", ...(prev ? {} : { dwellMs }) },
+        body: { side, source: "feed", ...(prev ? {} : { dwellMs }), meta: { method, pos: deckPos.current, sessionId: currentSessionId() ?? undefined } },
       });
       if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
       setResult(r.results);
@@ -234,10 +261,10 @@ export function SwipeDeck({
 
   // Every pick (tap, swipe-away, ← / →): the pick fills the card, its scores show for
   // RESULT_MS, then the next battle.
-  async function pick(side: Side, dir: -1 | 1 = side === "A" ? -1 : 1) {
+  async function pick(side: Side, method: PickMethod, dir: -1 | 1 = side === "A" ? -1 : 1) {
     if (!card || voted || fly || roll) return;
     const started = Date.now();
-    const ok = await vote(side);
+    const ok = await vote(side, method);
     if (!ok) {
       setThrown(null);
       return;
@@ -262,7 +289,7 @@ export function SwipeDeck({
     buzz(18);
     setThrown({ side, dir });
     setGrab(null);
-    pick(other(side), dir);
+    pick(other(side), "swipe", dir);
   }
 
   function skip() {
@@ -282,8 +309,8 @@ export function SwipeDeck({
     const on = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || document.querySelector("[data-flag-sheet]")) return;
-      if (e.key === "ArrowLeft") pick("A");
-      else if (e.key === "ArrowRight") pick("B");
+      if (e.key === "ArrowLeft") pick("A", "key");
+      else if (e.key === "ArrowRight") pick("B", "key");
       else if (e.key === "ArrowDown") skip();
     };
     window.addEventListener("keydown", on);
@@ -451,7 +478,7 @@ export function SwipeDeck({
                 }}
                 onClick={() => {
                   if (justDragged.current) return;
-                  if (!thrown) pick(s);
+                  if (!thrown) pick(s, "tap");
                 }}
               >
                 <OptionFace

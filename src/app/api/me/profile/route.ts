@@ -7,7 +7,7 @@ import { profileInput } from "@/lib/validators";
 import { AppError } from "@/server/errors";
 import { assertCleanText } from "@/server/moderation";
 import { POLICY_VERSION } from "@/lib/constants";
-import { track } from "@/server/analytics";
+import { track, trackProfileChanges } from "@/server/analytics";
 import { z } from "zod";
 import { normalizeLocation } from "@/server/services/geo";
 import { lookupZip } from "@/server/services/zip";
@@ -44,6 +44,17 @@ export const POST = handler(async (req) => {
   // No location picked yet: fill it in from the ZIP.
   const place = loc.country ? loc : { country: zip.country, region: zip.region, city: zip.city };
   const first = !user.onboardedAt;
+  const demo = {
+    kidsStatus: p.kidsStatus ?? (p.kidAges.length ? "YES" : null),
+    kidAges: p.kidsStatus && p.kidsStatus !== "YES" ? [] : p.kidAges,
+    country: place.country,
+    region: place.region,
+    city: place.city,
+    zipCode: zip.code,
+    sex: p.sex,
+    ageRange: p.ageRange,
+    interests: p.interests,
+  };
   await db
     .update(users)
     .set({
@@ -64,6 +75,7 @@ export const POST = handler(async (req) => {
       onboardedAt: user.onboardedAt ?? new Date(),
     })
     .where(eq(users.id, user.id));
+  trackProfileChanges(user.id, user, demo, first ? "onboarding" : "settings");
   if (first) {
     await db.insert(consentEvents).values([
       { userId: user.id, type: "terms", value: true, version: POLICY_VERSION },

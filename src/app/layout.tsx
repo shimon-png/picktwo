@@ -19,6 +19,7 @@ import { getEconomy } from "@/server/services/config";
 import { Nav, ChromeOnly, ContentShell, HeaderLogo, YouButton } from "@/components/layout/Nav";
 import { PriorityPill } from "@/components/priority/PriorityPill";
 import { Toaster } from "@/components/ui/Toaster";
+import { Telemetry } from "@/components/layout/Telemetry";
 import { appUrl } from "@/lib/utils";
 
 export const metadata: Metadata = {
@@ -53,6 +54,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="min-h-dvh font-sans">
         <ThemePreview />
+        <Telemetry />
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
           Skip to content
         </a>

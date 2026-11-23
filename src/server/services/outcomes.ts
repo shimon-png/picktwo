@@ -83,7 +83,16 @@ export async function reportOutcome(
 
   track(
     "outcome_reported",
-    { battleId: b.id, chosen: input.chosen, thumb, hoursAfterDeadline: (now.getTime() - b.deadline.getTime()) / 3600_000 },
+    {
+      battleId: b.id,
+      chosen: input.chosen,
+      thumb,
+      hoursAfterDeadline: (now.getTime() - b.deadline.getTime()) / 3600_000,
+      withNote: !!input.note,
+      crowdSide: b.votesA === b.votesB ? "tie" : b.votesA > b.votesB ? "A" : "B",
+      votesA: b.votesA,
+      votesB: b.votesB,
+    },
     { userId: user.id },
   );
   return { ...result, edited: false };

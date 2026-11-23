@@ -75,6 +75,34 @@ export const voteInput = z.object({
   reason: z.string().trim().max(140).optional(),
   dwellMs: z.number().int().min(0).max(3_600_000).optional(),
   source: z.enum(["link", "feed", "profile", "home", "discover", "search"]).optional(),
+  /** Data-brain context (docs/brain/data-dictionary.md): how the pick was made and where in the deck. */
+  meta: z
+    .object({
+      method: z.enum(["tap", "swipe", "key", "button"]).optional(),
+      pos: z.number().int().min(0).max(100_000).optional(),
+      sessionId: z.string().regex(/^[A-Za-z0-9_-]{6,40}$/).optional(),
+    })
+    .optional(),
+});
+
+/** Event names the browser may log through POST /api/events. Keep docs/brain/data-dictionary.md in sync. */
+export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown"] as const;
+export type ClientEventName = (typeof CLIENT_EVENTS)[number];
+const safeId = z.string().regex(/^[A-Za-z0-9_-]{6,40}$/);
+export const clientEventsInput = z.object({
+  events: z
+    .array(
+      z.object({
+        id: safeId,
+        name: z.enum(CLIENT_EVENTS),
+        at: z.number().int().min(0).max(4_102_444_800_000),
+        sessionId: safeId,
+        seq: z.number().int().min(0).max(10_000_000),
+        props: z.record(z.unknown()).refine((p) => JSON.stringify(p).length <= 2000, "props too large"),
+      }),
+    )
+    .min(1)
+    .max(50),
 });
 
 export const reasonInput = z.object({ reason: z.string().trim().max(140) });
