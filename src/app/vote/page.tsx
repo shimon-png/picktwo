@@ -24,7 +24,7 @@ export default async function VotePage() {
       guestLeft={guestLeft}
       guestLimit={economy.guestVoteLimit}
       />
-      <Tutorial signedIn={!!viewer.user} />
+      <Tutorial signedIn={!!viewer.user} accountSeen={!!viewer.user?.tourSeenAt} />
     </>
   );
 }

@@ -23,7 +23,7 @@ function steps(signedIn: boolean): Step[] {
     { target: "nav-post", title: "Post", body: "Can’t decide? Add two options with photos or links and ask the crowd." },
     { target: "nav-discover", title: "Discover", body: "Top battles, the biggest experts and most active voters. Search for battles or people to follow." },
     ...(signedIn
-      ? [{ target: "nav-you", title: "You", body: "Tap your photo for your ⚡, battles, followers, updates, settings, and the Tutorial button to replay this tour any time." }]
+      ? [{ target: "nav-you", title: "You", body: "Tap your photo for your ⚡, battles, followers, updates and settings. You can replay this tour any time from Settings." }]
       : []),
     { title: "You’re all set", body: "Start swiping. Tap anywhere to finish." },
   ];
@@ -41,7 +41,11 @@ function findTarget(name?: string): HTMLElement | null {
 
 const PAD = 6;
 
-export function Tutorial({ signedIn }: { signedIn: boolean }) {
+function markAccountSeen() {
+  fetch("/api/me/tour", { method: "POST" }).catch(() => {});
+}
+
+export function Tutorial({ signedIn, accountSeen = false }: { signedIn: boolean; accountSeen?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [i, setI] = useState(0);
@@ -49,7 +53,8 @@ export function Tutorial({ signedIn }: { signedIn: boolean }) {
   const [vh, setVh] = useState(0);
   const all = useMemo(() => steps(signedIn), [signedIn]);
 
-  // Start on first visit, or when asked to replay via ?tour=1.
+  // Start only the first time ever: per account when signed in (so a new device doesn't bring it back),
+  // per device for guests. `?tour=1` (Settings / You → Tutorial) always replays it.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const replay = params.get("tour") === "1";
@@ -58,14 +63,21 @@ export function Tutorial({ signedIn }: { signedIn: boolean }) {
       seen = !!localStorage.getItem(TOUR_KEY);
     } catch {}
     if (replay) router.replace(window.location.pathname, { scroll: false });
-    if (!replay && seen) return;
+    if (!replay) {
+      if (signedIn && accountSeen) return;
+      if (seen) {
+        // Saw it as a guest on this device before signing up: remember that on the account too.
+        if (signedIn) markAccountSeen();
+        return;
+      }
+    }
     // Give the deck a moment to render its card.
     const t = setTimeout(() => {
       setI(0);
       setOpen(true);
     }, 350);
     return () => clearTimeout(t);
-  }, [router]);
+  }, [router, signedIn, accountSeen]);
 
   // Skip steps whose element isn't on screen (e.g. empty deck).
   const visibleIndex = useCallback(
@@ -82,7 +94,8 @@ export function Tutorial({ signedIn }: { signedIn: boolean }) {
     try {
       localStorage.setItem(TOUR_KEY, new Date().toISOString());
     } catch {}
-  }, []);
+    if (signedIn && !accountSeen) markAccountSeen();
+  }, [signedIn, accountSeen]);
 
   const go = useCallback(
     (from: number) => {
