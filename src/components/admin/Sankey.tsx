@@ -12,7 +12,29 @@ const FILL: Record<SankeyNode["tone"], string> = {
   blue: "var(--color-a, #2f5ff0)",
 };
 
-export function Sankey({ nodes, links, height = 480 }: { nodes: SankeyNode[]; links: SankeyLink[]; height?: number }) {
+export function Sankey({
+  nodes,
+  links,
+  height = 480,
+  hrefFor,
+  selected,
+}: {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
+  height?: number;
+  /** Makes nodes (and bands, which open their target node) clickable. */
+  hrefFor?: (id: string) => string;
+  selected?: string | null;
+}) {
+  const wrap = (id: string, key: string | number, el: React.ReactNode) =>
+    hrefFor ? (
+      <a key={key} href={hrefFor(id)} className="cursor-pointer">
+        {el}
+      </a>
+    ) : (
+      <g key={key}>{el}</g>
+    );
+  const dim = (id: string) => (selected && selected !== id ? 0.55 : 1);
   const W = 1000, NODE_W = 12, GAP = 34, PAD_T = 12;
   const cols = Math.max(...nodes.map((n) => n.col)) + 1;
   const colX = (c: number) => 8 + (c * (W - 230)) / Math.max(1, cols - 1);
@@ -40,26 +62,31 @@ export function Sankey({ nodes, links, height = 480 }: { nodes: SankeyNode[]; li
           a.outY += w;
           b.inY += w;
           const mx = (x0 + x1) / 2;
-          return (
+          return wrap(
+            l.to,
+            i,
             <path
-              key={i}
               d={`M${x0},${y0} C${mx},${y0} ${mx},${y1} ${x1},${y1}`}
               fill="none"
               stroke={FILL[l.tone]}
-              strokeOpacity={0.28}
+              strokeOpacity={selected === l.to ? 0.5 : 0.28}
               strokeWidth={w}
             >
-              <title>{`${l.value} people`}</title>
-            </path>
+              <title>{`${l.value} people · click to see them`}</title>
+            </path>,
           );
         })}
       {nodes
         .filter((n) => pos.has(n.id))
         .map((n) => {
           const p = pos.get(n.id)!;
-          return (
-            <g key={n.id}>
-              <rect x={p.x} y={p.y} width={NODE_W} height={p.h} fill={FILL[n.tone]} rx={2} />
+          return wrap(
+            n.id,
+            n.id,
+            <g opacity={dim(n.id)}>
+              {/* wide invisible hit area so the label is clickable too */}
+              <rect x={p.x - 4} y={p.y - 4} width={210} height={Math.max(p.h, 30) + 8} fill="transparent" />
+              <rect x={p.x} y={p.y} width={NODE_W} height={p.h} fill={FILL[n.tone]} rx={2} stroke={selected === n.id ? "currentColor" : "none"} strokeWidth={3} />
               <text
                 x={p.x + NODE_W + 6}
                 y={p.y + Math.min(p.h / 2, 18) + 7}
@@ -72,7 +99,8 @@ export function Sankey({ nodes, links, height = 480 }: { nodes: SankeyNode[]; li
                 <tspan fontWeight={600}>{n.label}</tspan>
                 <tspan opacity={0.7}> {n.value}</tspan>
               </text>
-            </g>
+              <title>{`${n.label}: ${n.value} · click to see who`}</title>
+            </g>,
           );
         })}
     </svg>

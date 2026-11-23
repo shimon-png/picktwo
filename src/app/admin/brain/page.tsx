@@ -166,7 +166,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
               <details key={`${j.handle}-${j.signedUpAt}`} className="py-2">
                 <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
                   <span className="font-medium">@{j.handle ?? "?"}</span>
-                  <span className="text-xs text-zinc-500">{nyTime(j.signedUpAt)}</span>
+                  <span className="text-xs text-zinc-500">{j.signedUpAt ? nyTime(j.signedUpAt) : "guest"}</span>
                   <span className={`chip !py-0.5 text-[11px] ${j.source.startsWith("x_") ? "chip-on" : ""}`}>{j.sourceLabel}</span>
                   <span className="text-xs text-zinc-500">
                     {[j.sex, j.ageRange, j.zip3 && `ZIP ${j.zip3}xx`].filter(Boolean).join(" · ") || "no profile"}

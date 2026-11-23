@@ -1,26 +1,41 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { brainScope, type BrainView } from "./brain";
+import { AGE_RANGES, SEX_OPTIONS } from "@/lib/constants";
 import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 
 /**
  * Customer journey for /admin/journey (Alex, Nov 23 2026): one row per visitor (an account, or a browser not linked
  * to one) in the window, using the Brain's Clean / All data scope. Source = their first visit in the window.
  */
-export type Visitor = { who: string; source: Source; votes: number; days: number; signedUp: boolean; posted: boolean; cards: number };
+export type Visitor = {
+  who: string;
+  source: Source;
+  votes: number;
+  days: number;
+  signedUp: boolean;
+  posted: boolean;
+  cards: number;
+  /** Account fields (null for guests). Never email; ZIP cut to 3 digits. */
+  handle: string | null;
+  sex: string | null;
+  ageRange: string | null;
+  zip3: string | null;
+  lastSeen: string;
+};
 
 export async function journeyData(view: BrainView, days: number) {
   const scope = await brainScope(view, days);
   const { since, ev, vt } = scope;
   const TZ = "America/New_York";
-  const rows = await db.execute<{ who: string; props: Record<string, unknown> | null; votes: number; days: number; signed: boolean; posted: boolean; cards: number }>(sql`
+  const rows = await db.execute<{ who: string; props: Record<string, unknown> | null; votes: number; days: number; signed: boolean; posted: boolean; cards: number; handle: string | null; sex: string | null; age_range: string | null; zip_code: string | null; last_seen: string }>(sql`
     WITH s AS (
       SELECT COALESCE(e.user_id, d.user_id, e.device_id) AS who, e.props, e.created_at
       FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
       WHERE e.name = 'session_start' AND e.created_at > ${since} AND ${ev}
     ),
     f AS (SELECT DISTINCT ON (who) who, props FROM s WHERE who IS NOT NULL ORDER BY who, created_at),
-    dd AS (SELECT who, count(DISTINCT (created_at AT TIME ZONE ${TZ})::date)::int AS days FROM s GROUP BY who),
+    dd AS (SELECT who, count(DISTINCT (created_at AT TIME ZONE ${TZ})::date)::int AS days, max(created_at)::text AS last_seen FROM s GROUP BY who),
     vv AS (
       SELECT COALESCE(v.user_id, dv.user_id, v.device_id) AS who, count(*)::int AS n
       FROM vote v LEFT JOIN device dv ON dv.id = v.device_id
@@ -31,7 +46,7 @@ export async function journeyData(view: BrainView, days: number) {
       FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
       WHERE e.name = 'card_shown' AND e.created_at > ${since} AND ${ev} GROUP BY 1
     )
-    SELECT f.who, f.props, COALESCE(vv.n, 0) AS votes, COALESCE(dd.days, 1) AS days, COALESCE(cc.n, 0) AS cards,
+    SELECT f.who, f.props, COALESCE(vv.n, 0) AS votes, COALESCE(dd.days, 1) AS days, COALESCE(cc.n, 0) AS cards, dd.last_seen, u.handle, u.sex, u.age_range, u.zip_code,
       (u.onboarded_at IS NOT NULL AND u.onboarded_at > ${since} AND u.email IS NOT NULL) AS signed,
       EXISTS (SELECT 1 FROM battle b WHERE b.author_id = f.who AND b.created_at > ${since}) AS posted
     FROM f LEFT JOIN vv USING (who) LEFT JOIN dd USING (who) LEFT JOIN cc USING (who)
@@ -45,6 +60,11 @@ export async function journeyData(view: BrainView, days: number) {
     signedUp: r.signed,
     posted: r.posted,
     cards: r.cards,
+    handle: r.handle,
+    sex: SEX_OPTIONS.find((o) => o.id === r.sex)?.label ?? null,
+    ageRange: AGE_RANGES.find((o) => o.id === r.age_range)?.label ?? null,
+    zip3: r.zip_code ? r.zip_code.slice(0, 3) : null,
+    lastSeen: r.last_seen,
   }));
 
   // What people vote on, split by whether they came back on another day: card type and AI theme.
