@@ -167,6 +167,8 @@ export const ECONOMY_DEFAULTS = {
   winbackCooldownDays: 14,
   /** Most win-back emails sent in one daily run. */
   winbackDailyMax: 200,
+  /** Brain "Clean" view counts real activity from this New York day on (YYYYMMDD). The "All data" view ignores it. */
+  brainCleanFrom: 20261123,
   /** Admin "Sign-ups by source": engaged = voted on this many different days (or posted a battle)… */
   engagedMinVoteDays: 3,
   /** …within this many days of signing up. */
