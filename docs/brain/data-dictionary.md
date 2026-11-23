@@ -36,6 +36,8 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | `skip` | server | launch | `battleId` |
 | `battle_viewed` | server, battle page | launch | `battleId`, `source` |
 | `battle_published` | server | launch; content snapshot from 2026-11-23 | `battleId`, `visibility`, `hours` (deadline length), `title`, `context`, `options[]` (label, description, imageUrl, url), `target`, `inReview`, `postedBy` (admin post-as) |
+| `winback_sent` | server, daily cron (Phase 4, only when economy `winbackEmails` = 1) | 2026-11-23 | `idleDays`, `usualGap` (median days between the person's active days, null if < 3), `threshold`, `battleIds` (the 3 picks). Email links carry `utm_source=winback`, so returns show in `session_start` |
+| `winback_holdout` | server, same run, lapsing person in the `winbackHoldoutPct` holdout (no email) | 2026-11-23 | `idleDays`, `usualGap`, `threshold` |
 | `outcome_reported` | server | launch; extras from 2026-11-23 | `battleId`, `chosen`, `thumb`, `hoursAfterDeadline`, `withNote`, `crowdSide`, `votesA`, `votesB` |
 | `profile_changed` | server, any save that changes demographics | 2026-11-23 | `via` (onboarding / settings / quick_profile), `changes` {field: {from, to}} |
 | `onboarding_completed`, `follow`, `dm_sent`, `report_submitted`, `reason_helpful`, `boost_used`, `option_link_clicked`, `landing_viewed`, `upload_blocked` | server | launch | see code |

@@ -133,6 +133,18 @@ export const ECONOMY_DEFAULTS = {
   engagementWeight: 2,
   /** Percent of people (by account/device) who keep the old deck order, to measure the engine's lift. */
   engagementHoldoutPct: 10,
+  /** Data brain Phase 4: win-back emails to people drifting away. 0 = off (default), 1 = on. */
+  winbackEmails: 0,
+  /** Percent of lapsing people who get no email (stable per account), to measure whether the emails bring people back. */
+  winbackHoldoutPct: 20,
+  /** Lapsing = away ≥ twice your usual gap between active days, at least this many days… */
+  winbackMinIdleDays: 3,
+  /** …and at most this many (people gone longer are left alone). */
+  winbackMaxIdleDays: 30,
+  /** At most one win-back per person in this many days. */
+  winbackCooldownDays: 14,
+  /** Most win-back emails sent in one daily run. */
+  winbackDailyMax: 200,
 } as const;
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 

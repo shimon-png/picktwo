@@ -74,6 +74,21 @@ ${btn(`${base}&c=NEITHER`, "Neither", "#71717a")}`),
   };
 }
 
+export function winbackEmail(picks: { title: string; url: string; votes: number }[]) {
+  const rows = picks
+    .map(
+      (p) => `<a href="${p.url}" style="display:block;text-decoration:none;color:#1A1F2E;border:1px solid #e4e4e7;border-radius:12px;padding:12px 14px;margin:8px 0">
+<div style="font-size:15px;font-weight:600">${escapeHtml(p.title)}</div>
+<div style="color:#71717a;font-size:13px;margin-top:4px">${p.votes} vote${p.votes === 1 ? "" : "s"} so far · tap to pick</div></a>`,
+    )
+    .join("");
+  return {
+    subject: picks.length > 1 ? `${picks.length} questions people need your pick on` : "Someone needs your pick",
+    html: shell(`<p style="font-size:16px">People are stuck on these and your vote could settle it:</p>${rows}`),
+    text: `People are stuck on these and your vote could settle it:\n\n${picks.map((p) => `${p.title}\n${p.url}`).join("\n\n")}`,
+  };
+}
+
 function escapeHtml(s: string) {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
