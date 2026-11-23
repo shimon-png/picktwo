@@ -459,6 +459,9 @@ export const emailCodes = pgTable("email_code", {
   email: text("email").primaryKey(),
   codeHash: text("code_hash").notNull(),
   expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+  /** The code sent just before this one stays valid until it expires (people often type the first email's code). */
+  prevCodeHash: text("prev_code_hash"),
+  prevExpiresAt: timestamp("prev_expires_at", { mode: "date", withTimezone: true }),
   attempts: integer("attempts").notNull().default(0),
   createdAt: now("created_at"),
 });

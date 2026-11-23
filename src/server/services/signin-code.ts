@@ -21,7 +21,17 @@ function sameHash(a: string, b: string) {
 export async function requestSigninCode(rawEmail: string): Promise<{ devCode?: string }> {
   const email = normalizeEmail(rawEmail);
   const code = newCode();
-  const row = { codeHash: hashCode(email, code), expiresAt: new Date(Date.now() + CODE_TTL_MIN * 60_000), attempts: 0, createdAt: new Date() };
+  // Keep the previous code working until it expires: a second request (or "Send a new code") shouldn't break the first email.
+  const [old] = await db.select().from(emailCodes).where(eq(emailCodes.email, email));
+  const keepOld = old && old.expiresAt > new Date();
+  const row = {
+    codeHash: hashCode(email, code),
+    expiresAt: new Date(Date.now() + CODE_TTL_MIN * 60_000),
+    prevCodeHash: keepOld ? old.codeHash : null,
+    prevExpiresAt: keepOld ? old.expiresAt : null,
+    attempts: 0,
+    createdAt: new Date(),
+  };
   await db
     .insert(emailCodes)
     .values({ email, ...row })
@@ -44,7 +54,9 @@ export async function verifySigninCode(rawEmail: string, code: string): Promise<
     return { error: "expired" };
   }
   if (row.attempts >= CODE_MAX_ATTEMPTS) return { error: "too_many" };
-  if (!sameHash(row.codeHash, hashCode(email, code))) {
+  const h = hashCode(email, code);
+  const prevOk = !!row.prevCodeHash && !!row.prevExpiresAt && row.prevExpiresAt > new Date() && sameHash(row.prevCodeHash, h);
+  if (!sameHash(row.codeHash, h) && !prevOk) {
     await db.update(emailCodes).set({ attempts: row.attempts + 1 }).where(eq(emailCodes.email, email));
     return { error: row.attempts + 1 >= CODE_MAX_ATTEMPTS ? "too_many" : "invalid" };
   }
