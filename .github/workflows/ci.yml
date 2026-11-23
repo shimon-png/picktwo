@@ -26,6 +26,8 @@ jobs:
       # Every e2e user signs in from the same IP; relax rate limits for the test run only.
       E2E_RELAX_RATE_LIMITS: "true"
       NEXT_TELEMETRY_DISABLED: "1"
+      # No X pixel in tests: no third-party script, no fake sign-up conversions in the ad account.
+      NEXT_PUBLIC_X_PIXEL_ID: ""
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

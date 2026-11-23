@@ -7,6 +7,10 @@ _Last updated: November 2026_
 - Optional profile context: your country/region, interests, and the **age ranges** of your kids. We never ask for children's names, birthdays or photos.
 - What you do: battles you post, votes, reasons, outcomes, and basic usage analytics.
 - A random device identifier cookie so you can vote without an account.
+- Where your visit came from (for example the website or ad campaign that linked you here), so we know which campaigns work.
+
+## Advertising measurement
+We use the X (Twitter) pixel to measure our ads on X. It tells X when someone visits crowdpick.ai and when a new account is created, so X can report how many sign-ups an ad brought. We don't send X your name, email, votes or anything you post. You can limit this with your browser's tracking protection or X's own ad settings.
 
 ## How we use it
 - To run crowdpick.ai: show battles to relevant voters, calculate results, priority points and reputation.

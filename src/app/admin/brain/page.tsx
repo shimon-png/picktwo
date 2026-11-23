@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getBrainStats } from "@/server/services/brain";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
+import { signupSources } from "@/server/services/acquisition";
 import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +54,7 @@ const battleLink = (slug: string, title: string) => (
 export default async function BrainPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
   const sp = await searchParams;
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
-  const [s, taste, wb] = await Promise.all([getBrainStats(days), tasteByGroup(), winbackStats()]);
+  const [s, taste, wb, acq] = await Promise.all([getBrainStats(days), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30))]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const tiles: [string, string | number][] = [
@@ -93,6 +94,42 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           </div>
         ))}
       </div>
+
+      <Section
+        title={`Sign-ups by source · last ${acq.days} days`}
+        note={`Where each new account first came from (their first visit, incl. visits before signing up). X campaign = an X ad click (twclid) or utm_source=x/twitter; X organic = a link from t.co / x.com. Engaged = voted on ${acq.minVoteDays}+ different days, or posted a battle, within ${acq.windowDays} days of signing up. "Engaged (full ${acq.windowDays}d)" only counts people who signed up at least ${acq.windowDays} days ago, so sources are compared fairly. The X pixel fires a sign-up conversion for every new account.`}
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {(
+            [
+              ["Sign-ups", acq.total.signups],
+              ["Engaged so far", `${acq.total.engaged} (${pct(acq.total.engaged, acq.total.signups)})`],
+              [`Engaged users (all, 30d)`, acq.overall.engaged30],
+              ["Active voters (7d)", acq.overall.active7],
+              ["Accounts (all time)", acq.overall.accounts],
+            ] as const
+          ).map(([k, v]) => (
+            <div key={k} className="rounded-lg bg-surface p-2.5">
+              <div className="text-xs text-zinc-500">{k}</div>
+              <div className="text-xl font-medium">{v}</div>
+            </div>
+          ))}
+        </div>
+        <Rows
+          head={["Source", "Sign-ups", "Share", "Engaged", "Engaged %", `Engaged (full ${acq.windowDays}d)`, "Avg votes", "Posted", "Active 7d"]}
+          rows={acq.rows.map((r) => [
+            <span key={r.source} className={r.source === "x_campaign" ? "font-medium" : undefined}>{r.label}</span>,
+            r.signups,
+            pct(r.signups, acq.total.signups),
+            r.engaged,
+            pct(r.engaged, r.signups),
+            r.matured ? `${pct(r.engagedMatured, r.matured)} of ${r.matured}` : "—",
+            r.avgVotes.toFixed(1),
+            `${Math.round(r.postedPct * 100)}%`,
+            r.active7,
+          ])}
+        />
+      </Section>
 
       <Section
         title="Engagement score (Shimon)"

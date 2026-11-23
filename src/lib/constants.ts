@@ -167,6 +167,10 @@ export const ECONOMY_DEFAULTS = {
   winbackCooldownDays: 14,
   /** Most win-back emails sent in one daily run. */
   winbackDailyMax: 200,
+  /** Admin "Sign-ups by source": engaged = voted on this many different days (or posted a battle)… */
+  engagedMinVoteDays: 3,
+  /** …within this many days of signing up. */
+  engagedWindowDays: 14,
 } as const;
 export type Economy = { -readonly [K in keyof typeof ECONOMY_DEFAULTS]: number };
 
