@@ -547,6 +547,8 @@ export type BattleCard = {
   expert: { a: number; b: number; total: number } | null;
   kidAgeTags: string[];
   outcome: { chosen: string; thumb: string | null; note: string | null } | null;
+  /** Data brain: which deck ranking produced this card (engine vs holdout), when it came from the feed. */
+  arm?: "engine" | "holdout";
 };
 
 export async function battleCards(where: ReturnType<typeof and>, limit = 20): Promise<BattleCard[]> {

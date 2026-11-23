@@ -29,7 +29,7 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | --- | --- | --- | --- |
 | `session_start` | browser, first event of a visit (after 30 min idle, or any page load with ad tags) | 2026-11-23 | `utm_source/medium/campaign/content/term/id`, ad click ids (`fbclid`, `gclid`, `ttclid`, `msclkid`, …), `landing`, `referrer`, `referrerHost`, `first` (first-ever visit's attribution on this browser, `isFirstVisit`), `standalone` (home-screen app), `vw`/`vh`, `tz`, `lang`, `ua` |
 | `page_view` | browser, every route | 2026-11-23 | `path` |
-| `card_shown` | browser, each card that reaches the top of the Vote deck | 2026-11-23 | `battleId`, `pos` (1 = first card of this deck load), `kind` (text/photo/mixed), `prevKinds` (up to 3 previous kinds), `votesShown`, `ageHours`, `hasContext`, `titleLen`, `authorTier`, `cv` (content fingerprint), `signedIn`, `surface` |
+| `card_shown` | browser, each card that reaches the top of the Vote deck | 2026-11-23 | `battleId`, `pos` (1 = first card of this deck load), `kind` (text/photo/mixed), `prevKinds` (up to 3 previous kinds), `votesShown`, `ageHours`, `hasContext`, `titleLen`, `authorTier`, `cv` (content fingerprint), `signedIn`, `surface`, `arm` (`engine` = deck ranked with engagement score, `holdout` = old order; from 2026-11-23) |
 | `signup_gate_shown` | browser, guest hits the free-vote limit | 2026-11-23 | `pos`, `battleId` |
 | `vote_cast` | server, first vote on a battle | launch; `side`, `method`, `pos`, `sessionId` from 2026-11-23 | `battleId`, `side`, `source`, `dwellMs`, `withReason`, `points`, `anon`, `method` (tap/swipe/key), `pos`, `sessionId` |
 | `vote_changed` | server, side changed | 2026-11-23 | `battleId`, `from`, `to`, `method`, `pos`, `sessionId` |

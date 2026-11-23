@@ -102,6 +102,7 @@ export function SwipeDeck({
       cv: contentHash([card.title, card.context, card.labelA, card.labelB, card.descA, card.descB, card.imageA, card.imageB]),
       signedIn,
       surface: "deck",
+      arm: card.arm ?? null,
     });
     lastKinds.current = [...lastKinds.current, kind].slice(-3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
