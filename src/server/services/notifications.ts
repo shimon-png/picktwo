@@ -10,7 +10,9 @@ export type NotificationType =
   | "CALLED_IT"
   | "HELPFUL"
   | "FOLLOW"
-  | "POINTS";
+  | "POINTS"
+  | "DM_REQUEST"
+  | "DM_ACCEPTED";
 
 export async function notify(tx: DbOrTx, userId: string, type: NotificationType, payload: Record<string, unknown>) {
   await tx.insert(notifications).values({ userId, type, payload });

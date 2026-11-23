@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { agreementPct, rankTwins, similarityScore } from "@/server/services/taste";
-import { canSendDm, pairKey, type DmCheck } from "@/server/services/dm-rules";
+import { canType, dmState, pairKey, sendDeniedMessage, type DmFacts } from "@/server/services/dm-rules";
 
 describe("taste similarity", () => {
   it("agreement percentage", () => {
@@ -25,31 +25,49 @@ describe("taste similarity", () => {
   });
 });
 
-describe("direct message rules", () => {
-  const base: DmCheck = {
-    senderBanned: false, recipientExists: true, recipientBanned: false, recipientReachable: true,
-    blocked: false, recipientPolicy: "EVERYONE", recipientFollowsSender: false, recipientWroteFirst: false, self: false,
+describe("direct message rules (requests, follow + messages-on)", () => {
+  const base: DmFacts = {
+    self: false, meBanned: false, otherBanned: false, otherReachable: true, blocked: false,
+    meChatOn: true, otherChatOn: true, iFollow: true, convo: null,
   };
   it("pair key is order independent", () => {
     expect(pairKey("b", "a")).toEqual(["a", "b"]);
-    expect(pairKey("a", "b")).toEqual(["a", "b"]);
   });
-  it("allows by default", () => expect(canSendDm(base)).toEqual({ ok: true }));
-  it("blocks win over everything", () => {
-    expect(canSendDm({ ...base, blocked: true, recipientWroteFirst: true })).toEqual({ ok: false, reason: "blocked" });
+  it("you need to follow them to start", () => {
+    expect(dmState({ ...base, iFollow: false })).toEqual({ kind: "follow_first" });
+    expect(dmState(base)).toEqual({ kind: "can_request" });
   });
-  it("respects the recipient's policy for new conversations", () => {
-    expect(canSendDm({ ...base, recipientPolicy: "NOBODY" })).toEqual({ ok: false, reason: "policy" });
-    expect(canSendDm({ ...base, recipientPolicy: "FOLLOWING" })).toEqual({ ok: false, reason: "policy" });
-    expect(canSendDm({ ...base, recipientPolicy: "FOLLOWING", recipientFollowsSender: true })).toEqual({ ok: true });
+  it("your messages must be on to send; you're sent to Settings first", () => {
+    expect(dmState({ ...base, meChatOn: false })).toEqual({ kind: "enable_chat", then: "send" });
   });
-  it("replies are allowed whatever the policy", () => {
-    expect(canSendDm({ ...base, recipientPolicy: "NOBODY", recipientWroteFirst: true })).toEqual({ ok: true });
+  it("a request doesn't need the other person to have messages on yet", () => {
+    expect(dmState({ ...base, otherChatOn: false })).toEqual({ kind: "can_request" });
   });
-  it("can't message yourself, banned or unreachable accounts", () => {
-    expect(canSendDm({ ...base, self: true }).ok).toBe(false);
-    expect(canSendDm({ ...base, senderBanned: true }).ok).toBe(false);
-    expect(canSendDm({ ...base, recipientBanned: true }).ok).toBe(false);
-    expect(canSendDm({ ...base, recipientReachable: false })).toEqual({ ok: false, reason: "unreachable" });
+  it("after sending, you wait (also after a decline, which isn't revealed)", () => {
+    expect(dmState({ ...base, convo: { status: "PENDING", requestedByMe: true } })).toEqual({ kind: "request_sent" });
+    expect(dmState({ ...base, convo: { status: "DECLINED", requestedByMe: true } })).toEqual({ kind: "request_sent" });
+  });
+  it("the receiver must turn messages on, then accepts one request at a time", () => {
+    const req = { status: "PENDING" as const, requestedByMe: false };
+    expect(dmState({ ...base, meChatOn: false, convo: req })).toEqual({ kind: "enable_chat", then: "accept" });
+    expect(dmState({ ...base, iFollow: false, convo: req })).toEqual({ kind: "request_received" });
+    expect(dmState({ ...base, convo: { status: "DECLINED", requestedByMe: false } })).toEqual({ kind: "declined" });
+  });
+  it("accepted = chat while both have messages on", () => {
+    const ok = { status: "ACCEPTED" as const, requestedByMe: true };
+    expect(dmState({ ...base, convo: ok })).toEqual({ kind: "chat" });
+    expect(dmState({ ...base, otherChatOn: false, convo: ok })).toEqual({ kind: "other_off" });
+    expect(dmState({ ...base, meChatOn: false, convo: ok })).toEqual({ kind: "enable_chat", then: "chat" });
+  });
+  it("blocks, bans and seed profiles stop everything", () => {
+    expect(dmState({ ...base, blocked: true, convo: { status: "ACCEPTED", requestedByMe: true } }).kind).toBe("unavailable");
+    expect(dmState({ ...base, otherReachable: false })).toEqual({ kind: "unavailable", reason: "unreachable" });
+    expect(dmState({ ...base, self: true }).kind).toBe("unavailable");
+  });
+  it("only can_request and chat can type", () => {
+    expect(canType({ kind: "can_request" })).toBe(true);
+    expect(canType({ kind: "chat" })).toBe(true);
+    expect(canType({ kind: "request_sent" })).toBe(false);
+    expect(sendDeniedMessage({ kind: "follow_first" }, "maya")).toMatch(/Follow @maya/);
   });
 });

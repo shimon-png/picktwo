@@ -56,7 +56,7 @@ export default async function LikeYouPage({ params }: { params: Promise<{ slug: 
                     p={p}
                     viewerId={user.id}
                     detail={p.pct !== null ? <span><b className="font-medium text-ink">{p.pct}% taste match</b> · {p.shared} in common</span> : "New to you"}
-                    extra={<MessageButton handle={p.handle} small />}
+                    extra={p.iFollow ? <MessageButton handle={p.handle} small /> : undefined}
                   />
                   {p.reason && <p className="px-3 text-[13px] italic text-zinc-600">“{p.reason}”</p>}
                 </div>
