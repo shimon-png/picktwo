@@ -201,8 +201,15 @@
     {
       "idx": 28,
       "version": "7",
-      "when": 1795401089753,
-      "tag": "0028_email_log",
+      "when": 1795463905091,
+      "tag": "0028_engagement_score",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795463906000,
+      "tag": "0029_tour_seen",
       "breakpoints": true
     }
   ]
