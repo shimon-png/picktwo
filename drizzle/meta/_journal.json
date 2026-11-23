@@ -197,6 +197,13 @@
       "when": 1795398219946,
       "tag": "0027_chat_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795463905091,
+      "tag": "0028_engagement_score",
+      "breakpoints": true
     }
   ]
 }

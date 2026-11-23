@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { analyticsEvents } from "./db/schema";
+import { recordReturn } from "./services/engagement";
 import { isBotUserAgent, profileDiff, type ProfileFields } from "@/lib/analytics-rules";
 
 export function track(name: string, props: Record<string, unknown> = {}, ids: { userId?: string | null; deviceId?: string | null } = {}) {
@@ -41,6 +42,8 @@ export async function logClientEvents(events: ClientEvent[], ctx: { userId: stri
   } catch (e) {
     console.error("[analytics] client events", e);
   }
+  // A new visit may be a voter coming back: credit Shimon's engagement score live.
+  if (!bot && events.some((e) => e.name === "session_start")) await recordReturn({ userId: ctx.userId, deviceId: ctx.deviceId });
 }
 
 /**

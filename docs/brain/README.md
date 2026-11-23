@@ -10,6 +10,7 @@ Plan (Nov 22 2026): https://claude.ai/artifact/VK6Ymz4JmubjruAQVyzQ2d
 | [findings/](./findings/) | One note per answered request: answer, numbers, query, date |
 | [data-dictionary.md](./data-dictionary.md) | Every variable/event: meaning, where it lives, since when |
 | [checks.md](./checks.md) | Integrity checks and their latest results |
+| `/admin/brain` (live app) | Standing numbers: visits, views, votes per view, text vs photo, sources, next-day return, deck depth, pick method, 50/50 vs one-sided, Shimon's engagement score |
 
 ## How to use it
 
