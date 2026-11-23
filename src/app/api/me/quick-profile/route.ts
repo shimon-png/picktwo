@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { after } from "next/server";
 import { emailWelcome } from "@/server/services/lifecycle";
+import { markSignupConversion } from "@/server/conversions";
 import { handler } from "@/server/api";
 import { requireUser } from "@/server/viewer";
 import { rateLimit } from "@/server/ratelimit";
@@ -23,7 +24,10 @@ export const POST = handler(async (req) => {
   const p = input.parse(await req.json());
   const first = !u.onboardedAt;
   await saveQuickProfile(u, p);
-  if (first) after(() => emailWelcome(u.id));
+  if (first) {
+    await markSignupConversion();
+    after(() => emailWelcome(u.id));
+  }
   return { ok: true };
 });
 

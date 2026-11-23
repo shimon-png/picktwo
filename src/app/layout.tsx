@@ -19,6 +19,7 @@ import { getEconomy } from "@/server/services/config";
 import { Nav, ChromeOnly, ContentShell, HeaderLogo, YouButton } from "@/components/layout/Nav";
 import { PriorityPill } from "@/components/priority/PriorityPill";
 import { Toaster } from "@/components/ui/Toaster";
+import { XPixel } from "@/components/analytics/XPixel";
 import { Telemetry } from "@/components/layout/Telemetry";
 import { appUrl } from "@/lib/utils";
 
@@ -88,6 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </ContentShell>
         <Nav />
         <Toaster />
+        <XPixel />
       </body>
     </html>
   );

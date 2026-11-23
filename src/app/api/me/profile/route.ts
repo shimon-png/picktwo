@@ -11,6 +11,7 @@ import { track, trackProfileChanges } from "@/server/analytics";
 import { z } from "zod";
 import { after } from "next/server";
 import { emailWelcome } from "@/server/services/lifecycle";
+import { markSignupConversion } from "@/server/conversions";
 import { setEmailGroup } from "@/server/services/mailer";
 import { normalizeLocation } from "@/server/services/geo";
 import { lookupZip } from "@/server/services/zip";
@@ -90,6 +91,7 @@ export const POST = handler(async (req) => {
       { userId: user.id, type: "data_training", value: p.dataConsent, version: POLICY_VERSION },
     ]);
     track("onboarding_completed", { kidAges: p.kidAges.length, dataConsent: p.dataConsent }, { userId: user.id });
+    await markSignupConversion();
     after(() => emailWelcome(user.id));
   } else if (p.dataConsent !== user.dataConsent) {
     await db.insert(consentEvents).values({ userId: user.id, type: "data_training", value: p.dataConsent, version: POLICY_VERSION });
