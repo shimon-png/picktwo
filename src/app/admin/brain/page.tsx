@@ -73,11 +73,15 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const [s, taste, wb, acq] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30))]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
+  const viewedTotal = s.byKind.reduce((a, k) => a + k.views, 0);
+  const viewedVoted = s.byKind.reduce((a, k) => a + k.voted, 0);
   const tiles: [string, string | number][] = [
     ["Visits", n("sessions")],
     ["Visitors", n("visitors")],
     ["Cards viewed", n("views")],
-    ["Deck votes per view", pct(n("deck_votes"), n("views"))],
+    // Share of logged card views that the same person voted on. (Not deck votes ÷ views: votes from browsers
+    // still running the old app, which logs no views, made that go over 100%.)
+    ["Cards viewed → voted", pct(viewedVoted, viewedTotal)],
     [view === "clean" ? "Real votes" : "Votes (incl. seed)", n("real_votes")],
     ["Median time to pick", secs(t.median_pick_ms)],
     ["Skips", n("skips")],
