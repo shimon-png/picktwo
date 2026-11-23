@@ -324,6 +324,7 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     title: b.title,
     context: b.context,
     // Brain tags are internal analysis data, never sent to the browser.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     tags: (({ brain: _brain, ...pub }) => pub)(b.tags ?? {}),
     visibility: b.visibility,
     status: b.status,

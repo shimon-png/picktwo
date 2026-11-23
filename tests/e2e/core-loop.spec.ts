@@ -282,7 +282,13 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await a.goto(`/u/${handle("twin_b")}`);
   await expect(a.getByRole("link", { name: "Send DM", exact: true })).toHaveCount(0); // not following yet
   expect((await a.request.post("/api/messages", { data: { to: handle("twin_b"), body: "hi" } })).status()).toBe(403);
-  await a.getByRole("button", { name: /^Follow/ }).first().click();
+  // The profile streams in behind a loading skeleton, so a click can land before React hydrates and do nothing.
+  // Click until the follow sticks (aria-pressed), then the server re-render shows "Send DM".
+  await expect(async () => {
+    const follow = a.getByRole("button", { name: /^Follow/ }).first();
+    if ((await follow.getAttribute("aria-pressed")) !== "true") await follow.click();
+    await expect(a.getByRole("link", { name: "Send DM", exact: true })).toBeVisible({ timeout: 4000 });
+  }).toPass({ timeout: 30_000 });
   await a.getByRole("link", { name: "Send DM", exact: true }).click();
   await a.waitForURL(new RegExp(`/messages/${handle("twin_b")}`));
   // A's messages are off: round trip through Settings and back.
