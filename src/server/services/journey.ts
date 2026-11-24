@@ -30,7 +30,7 @@ export type Visitor = {
 
 export async function journeyData(view: BrainView, days: number) {
   const scope = await brainScope(view, days);
-  const { since, ev, vt } = scope;
+  const { since, ev, vt, us } = scope;
   const TZ = "America/New_York";
   const rows = await db.execute<{ who: string; props: Record<string, unknown> | null; votes: number; days: number; signed: boolean; posted: boolean; cards: number; engaged: boolean; opened: boolean; handle: string | null; sex: string | null; age_range: string | null; zip_code: string | null; last_seen: string }>(sql`
     WITH s AS (
@@ -61,7 +61,7 @@ export async function journeyData(view: BrainView, days: number) {
     SELECT f.who, f.props, COALESCE(vv.n, 0) AS votes, COALESCE(dd.days, 1) AS days, COALESCE(cc.n, 0) AS cards, dd.last_seen,
       (COALESCE(pv.engaged, false) OR COALESCE(pv.views, 0) > 1 OR COALESCE(cc.n, 0) > 0 OR COALESCE(vv.n, 0) > 0) AS engaged,
       (COALESCE(pv.opened, false) OR COALESCE(cc.n, 0) > 0 OR COALESCE(vv.n, 0) > 0) AS opened, u.handle, u.sex, u.age_range, u.zip_code,
-      (u.onboarded_at IS NOT NULL AND u.onboarded_at > ${since} AND u.email IS NOT NULL) AS signed,
+      (u.id IS NOT NULL AND u.onboarded_at > ${since} AND ${us}) AS signed,
       EXISTS (SELECT 1 FROM battle b WHERE b.author_id = f.who AND b.created_at > ${since}) AS posted
     FROM f LEFT JOIN vv USING (who) LEFT JOIN dd USING (who) LEFT JOIN cc USING (who) LEFT JOIN pv USING (who)
     LEFT JOIN "user" u ON u.id = f.who
