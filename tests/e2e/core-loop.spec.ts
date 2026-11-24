@@ -118,8 +118,9 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await v2.goto(url);
   await v2.waitForTimeout(1700);
   await v2.getByRole("button", { name: "Vote for Paint easel" }).click();
-  // One-tap reason chip earns the reason bonus
-  await v2.getByRole("button", { name: "Just feels right" }).click();
+  // A typed reason earns the reason bonus (no suggested chips since Nov 25)
+  await v2.getByLabel("Reason for your vote").fill("She paints every single day already");
+  await v2.getByRole("button", { name: "Add" }).click();
   await expect(v2.getByText(/for adding a reason/)).toBeVisible();
   await expect(v2.getByText(/3\s*votes/)).toBeVisible();
 

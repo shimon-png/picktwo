@@ -29,13 +29,6 @@ export const TONE_CLASSES: Record<Tone, { soft: string; solid: string }> = {
 };
 export const AVATAR_TONES: Tone[] = ["pink", "teal", "green", "violet"];
 
-/**
- * One-tap reason chips shown after a vote. A chip counts as a valid reason for the reason bonus
- * even though it is shorter than `reasonMinChars`.
- */
-export const REASON_CHIPS = ["Looks better", "More practical", "Just feels right"] as const;
-export const isReasonChip = (reason: string) => (REASON_CHIPS as readonly string[]).includes(reason.trim());
-
 export type CategoryId = (typeof CATEGORIES)[number]["id"];
 export const CATEGORY_IDS = CATEGORIES.map((c) => c.id) as [CategoryId, ...CategoryId[]];
 export const categoryById = (id: string) => CATEGORIES.find((c) => c.id === id) ?? CATEGORIES[6];
