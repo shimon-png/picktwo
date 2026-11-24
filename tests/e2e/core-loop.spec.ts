@@ -172,6 +172,24 @@ test("homepage: anonymous one-tap vote", async ({ browser }) => {
   await expect(p.getByText(/Counted\. \d+ (people|person) weighed in/)).toBeVisible();
 });
 
+test("homepage hero: votes count toward the free votes, then sign-up (Alex, Nov 24)", async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const p = await ctx.newPage();
+  await p.goto("/");
+  const hero = p.locator('[data-track="hero_card"]');
+  const seen = new Set<string>();
+  for (let i = 0; i < 5; i++) {
+    const title = (await hero.locator("h2").first().innerText()).trim();
+    expect(seen.has(title)).toBe(false); // no repeats
+    seen.add(title);
+    await hero.getByRole("button", { name: /^Vote for/ }).first().click();
+    await expect(hero.getByText(/Counted\. \d+ (people|person) weighed in/)).toBeVisible();
+    await expect(hero.locator("h2").first()).not.toHaveText(title, { timeout: 8000 });
+  }
+  await hero.getByRole("button", { name: /^Vote for/ }).first().click();
+  await expect(p.getByRole("dialog", { name: "Sign up to keep voting" })).toBeVisible();
+});
+
 test("non-admin cannot post as another user", async ({ browser }) => {
   const p = await newUser(browser, "notadmin");
   const res = await p.request.post("/api/battles", {

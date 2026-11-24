@@ -2,15 +2,15 @@
 import Link from "next/link";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { useRef, useState } from "react";
-import { api, toast } from "@/lib/client";
+import { api, ApiError, toast } from "@/lib/client";
 import { kidAgeLabel } from "@/lib/constants";
-import { pct, timeLeft } from "@/lib/utils";
+import { timeLeft } from "@/lib/utils";
 import type { BattleCard } from "@/server/services/battles";
 import { Avatar } from "@/components/ui/Avatar";
 import { OptionFace } from "./OptionFace";
 
 /** Homepage live battle: one tap votes anonymously (device cookie) and reveals the split. */
-export function HeroBattle({ b, onVoted }: { b: BattleCard; onVoted?: () => void }) {
+export function HeroBattle({ b, onVoted, onGate, gated = false }: { b: BattleCard; onVoted?: () => void; onGate?: () => void; gated?: boolean }) {
   const [picked, setPicked] = useState<"A" | "B" | null>(null);
   const [res, setRes] = useState<{ a: number; b: number; total: number } | null>(null);
   const shownAt = useRef(Date.now());
@@ -19,16 +19,20 @@ export function HeroBattle({ b, onVoted }: { b: BattleCard; onVoted?: () => void
 
   async function vote(side: "A" | "B") {
     if (picked) return;
+    // Free votes used up: go straight to sign-up instead of a vote that would be refused.
+    if (gated) return onGate?.();
     setPicked(side);
-    onVoted?.();
-    setRes(pct(b.votesA + (side === "A" ? 1 : 0), b.votesB + (side === "B" ? 1 : 0)));
     try {
       const r = await api<{ results: { a: number; b: number; total: number } }>(`/api/battles/${b.slug}/vote`, {
         body: { side, dwellMs: Date.now() - shownAt.current, source: "home" },
       });
       setRes(r.results);
+      onVoted?.();
     } catch (e) {
-      toast((e as Error).message, "error");
+      setPicked(null);
+      setRes(null);
+      if (e instanceof ApiError && e.code === "SIGNUP_REQUIRED") onGate?.();
+      else toast((e as Error).message, "error");
     }
   }
 
