@@ -8,7 +8,7 @@ import { feedScore, diversify, shuffleFactor, shuffleSeed, engagementFactor, inH
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 import { matchesTarget } from "./targeting";
 
-export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; debug?: Record<string, number> };
+export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; featured?: boolean; debug?: Record<string, number> };
 
 export async function getFeed(viewer: { user: User | null; deviceId: string | null }, opts: { limit?: number; debug?: boolean } = {}) {
   const limit = opts.limit ?? 20;
@@ -108,13 +108,16 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     const score = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
     return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
-  scored.sort((a, b) => b.score - a.score);
+  // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet.
+  const feat = (x: (typeof scored)[number]) => (x.row.b.tags?.featured ? 1 : 0);
+  scored.sort((a, b) => feat(b) - feat(a) || b.score - a.score);
   const picked = diversify(scored, limit);
   const cards = await hydrateCards(picked.map((p) => p.row));
   return cards.map((c, i) => ({
     ...c,
     arm,
     score: picked[i].score,
+    ...(picked[i].row.b.tags?.featured ? { featured: true } : {}),
     ...(opts.debug ? { debug: { priorityFactor: picked[i].pf, openLoops: picked[i].openLoops } } : {}),
   })) as FeedItem[];
 }

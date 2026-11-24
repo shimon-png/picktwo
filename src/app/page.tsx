@@ -47,8 +47,11 @@ export default async function HomePage() {
   const live = feed[0];
   // "Deciding now" shows the top of the ranked feed; the hero cycles through every other live battle the visitor
   // hasn't voted on, in random order, with no repeats (Alex, Nov 24). Votes there count toward the free votes.
-  const deciding = feed.slice(0, feed.length > 16 ? 8 : 1);
-  const heroBattles = shuffle(feed.length > 16 ? feed.slice(8) : feed);
+  // A featured battle (battle.tags.featured) is always the first hero card, and isn't repeated in "Deciding now".
+  const featured = feed.filter((b) => b.featured);
+  const rest = feed.filter((b) => !b.featured);
+  const deciding = rest.slice(0, rest.length > 16 ? 8 : 1);
+  const heroBattles = [...featured, ...shuffle(rest.length > 16 ? rest.slice(8) : rest)];
 
   return (
     <div className="-mx-4 -mt-2 overflow-x-clip">
