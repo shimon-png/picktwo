@@ -348,7 +348,7 @@ export function SwipeDeck({
           <h1 className="text-xl">You’re all caught up</h1>
           {signedIn && <p className="text-zinc-600">+{session.points} ⚡ this session.</p>}
           {tierLine && <p className="text-sm text-zinc-500">{tierLine}</p>}
-          <Link href="/post" className="btn-primary mt-3">
+          <Link href="/post" className="btn-cta mt-3">
             Post a battle
           </Link>
         </div>

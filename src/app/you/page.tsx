@@ -181,7 +181,7 @@ export default async function YouPage() {
         {mine.length === 0 ? (
           <div className="card p-5 text-center">
             <p className="text-sm text-zinc-600">Stuck between two options? Post a battle and get answers in minutes.</p>
-            <Link href="/post" className="btn-primary mt-3">
+            <Link href="/post" className="btn-cta mt-3">
               Post a battle
             </Link>
           </div>

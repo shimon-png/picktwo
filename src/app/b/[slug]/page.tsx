@@ -46,7 +46,7 @@ export default async function BattlePage({ params, searchParams }: Props) {
           <h1 className=" text-xl font-medium">🔒 Friends only</h1>
           <p className="text-zinc-600">{e.message}</p>
           {!viewer.user && (
-            <Link className="btn-primary" href={`/signin?callbackUrl=/b/${slug}`}>
+            <Link className="btn-cta" href={`/signin?callbackUrl=/b/${slug}`}>
               Sign in
             </Link>
           )}

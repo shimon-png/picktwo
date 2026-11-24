@@ -71,10 +71,10 @@ export default async function HomePage() {
           Snap two options, get honest votes in minutes — from friends and parents who’ve been there.
         </p>
         <div className="mx-auto mt-6 flex max-w-sm flex-col gap-2.5 sm:flex-row">
-          <Link href="/signin?callbackUrl=/post" data-track="ask_crowd" className="btn-primary flex-1 rounded-full py-3.5 text-base shadow-card">
+          <Link href="/signin?callbackUrl=/post" data-track="ask_crowd" className="btn-cta flex-1 rounded-full py-3.5 text-base shadow-card">
             Ask the crowd
           </Link>
-          <Link href="/vote" data-track="start_voting" className="btn-outline flex-1 rounded-full py-3.5 text-base">
+          <Link href="/vote" data-track="start_voting" className="btn-cta flex-1 rounded-full py-3.5 text-base">
             Start voting
           </Link>
         </div>
@@ -168,7 +168,7 @@ export default async function HomePage() {
         <Mark size={40} className="mx-auto" />
         <h2 className="mt-4 text-[26px] leading-tight">Stuck between two?</h2>
         <p className="mx-auto mt-2 max-w-xs text-[15px] text-page/70">Post it in 30 seconds. Most battles get their first votes within minutes.</p>
-        <Link href="/signin?callbackUrl=/post" data-track="bottom_ask" className="btn mt-6 rounded-full bg-page px-7 py-3.5 text-base text-ink hover:opacity-90">
+        <Link href="/signin?callbackUrl=/post" data-track="bottom_ask" className="btn-cta mt-6 rounded-full px-7 py-3.5 text-base">
           Ask the crowd — it’s free
         </Link>
       </section>

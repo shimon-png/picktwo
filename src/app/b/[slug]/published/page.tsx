@@ -44,7 +44,7 @@ export default async function PublishedPage({ params }: { params: Promise<{ slug
         <p className="text-[15px] text-zinc-600">
           Our photo check wants a person to take a quick look before it goes public. That usually happens within a day, and you don’t need to do anything.
         </p>
-        <Link href="/vote" className="btn-primary w-full">
+        <Link href="/vote" className="btn-cta w-full">
           Vote while I wait
         </Link>
         <Link href={`/b/${slug}`} className="btn-ghost w-full">

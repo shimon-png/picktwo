@@ -6,7 +6,7 @@ export default function NotFound() {
       <div className="text-4xl">🤷</div>
       <h1 className=" text-xl font-medium">Not found</h1>
       <p className="text-zinc-600">This battle may have been deleted or never existed.</p>
-      <Link href="/vote" className="btn-primary">Vote on something else</Link>
+      <Link href="/vote" className="btn-cta">Vote on something else</Link>
     </div>
   );
 }

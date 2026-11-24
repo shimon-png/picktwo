@@ -143,7 +143,7 @@ export function ComposeForm({
       </div>
       <p className="mt-2 text-xs text-zinc-500">No photos where a child’s face is visible.</p>
 
-      <button className="btn-primary mt-3 w-full shrink-0 py-3" disabled={!ready} onClick={openReview}>
+      <button className="btn-cta mt-3 w-full shrink-0 py-3" disabled={!ready} onClick={openReview}>
         Continue <ArrowRight className="size-4" aria-hidden />
       </button>
 
@@ -342,7 +342,7 @@ export function ComposeForm({
 
             </div>
             <div className="border-t border-ink/10 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-              <button className="btn-primary w-full py-3" disabled={busy || zipTargets.checking || zipTargets.invalid.length > 0} onClick={publish}>
+              <button className="btn-cta w-full py-3" disabled={busy || zipTargets.checking || zipTargets.invalid.length > 0} onClick={publish}>
                 {busy ? "Publishing…" : "Publish & share"}
               </button>
             </div>
