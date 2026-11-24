@@ -6,6 +6,7 @@ import { signupSources } from "@/server/services/acquisition";
 import { brainChecks } from "@/server/services/brain-checks";
 import { signupJourneys } from "@/server/services/signup-journeys";
 import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
+import type { BrainListKind } from "@/server/services/brain-lists";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
@@ -98,22 +99,25 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     signupSourcesTotal: acq.days === days ? acq.total.signups : undefined,
   });
   const failed = checks.filter((c) => !c.ok);
-  const tiles: [string, string | number][] = [
-    ["Visits", n("sessions")],
-    ["Visitors (people)", n("visitors")],
+  // Third item = the list behind the number (/admin/brain/list/[kind]); everything with one is clickable.
+  const tiles: [string, string | number, BrainListKind?][] = [
+    ["Visits", n("sessions"), "visitors"],
+    ["Visitors (people)", n("visitors"), "visitors"],
     ["Deck cards shown", n("views")],
     // Share of cards seen (person × battle) that the same person voted on.
     ["Cards seen → voted", pct(viewedVoted, viewedTotal)],
-    [view === "clean" ? "Votes by real people" : "Votes (incl. seed)", n("real_votes")],
-    ["People who voted", n("voters")],
+    [view === "clean" ? "Votes by real people" : "Votes (incl. seed)", n("real_votes"), "votes"],
+    ["People who voted", n("voters"), "voters"],
     ["Median time to pick", secs(t.median_pick_ms)],
     ["Skips", n("skips")],
-    ["Hit sign-up wall", n("gates")],
-    ["Sign-ups", n("signups")],
+    ["Hit sign-up wall", n("gates"), "gates"],
+    ["Sign-ups", n("signups"), "signups"],
     ["Vote changes", n("changed")],
-    [view === "clean" ? "Battles posted by real people" : "Battles posted", n("real_battles")],
+    [view === "clean" ? "Battles posted by real people" : "Battles posted", n("real_battles"), "battles"],
     ["Seed votes (all time, excluded)", n("seed_votes_all")],
   ];
+  const listHref = (kind: BrainListKind, day?: string) =>
+    `/admin/brain/list/${kind}?days=${days}${view === "all" ? "&view=all" : ""}${day ? `&day=${day}` : ""}`;
 
   return (
     <div className="space-y-5">
@@ -157,19 +161,27 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         )}
       </div>
 
-      <Section title="Day by day" note="New York days, newest first. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both.">
+      <Section title="Day by day" note="New York days, newest first. Tap any number to see who or what is behind it. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both.">
         <Rows
           head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Battles posted"]}
           rows={s.daily.map((d, i) => {
             const prev = s.daily[i + 1];
+            const cell = (kind: BrainListKind, now: number, before: number | undefined) =>
+              now > 0 ? (
+                <Link key={kind + now} href={listHref(kind, d.day)} className="underline decoration-ink/20 underline-offset-2 hover:decoration-accent">
+                  <Delta now={now} prev={before} />
+                </Link>
+              ) : (
+                <Delta key={kind} now={now} prev={before} />
+              );
             return [
               d.day,
-              <Delta key="a" now={d.visitors} prev={prev?.visitors} />,
-              <Delta key="b" now={d.visits} prev={prev?.visits} />,
-              <Delta key="c" now={d.signups} prev={prev?.signups} />,
-              <Delta key="d" now={d.votes} prev={prev?.votes} />,
-              <Delta key="e" now={d.voters} prev={prev?.voters} />,
-              <Delta key="f" now={d.posts} prev={prev?.posts} />,
+              cell("visitors", d.visitors, prev?.visitors),
+              cell("visitors", d.visits, prev?.visits),
+              cell("signups", d.signups, prev?.signups),
+              cell("votes", d.votes, prev?.votes),
+              cell("voters", d.voters, prev?.voters),
+              cell("battles", d.posts, prev?.posts),
             ];
           })}
         />
@@ -186,12 +198,19 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
       </Section>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {tiles.map(([k, v]) => (
-          <div key={k} className="card p-3">
-            <div className="text-xs text-zinc-500">{k}</div>
-            <div className="text-2xl font-medium">{v}</div>
-          </div>
-        ))}
+        {tiles.map(([k, v, list]) =>
+          list ? (
+            <Link key={k} href={listHref(list)} className="card block p-3 transition hover:ring-1 hover:ring-accent">
+              <div className="text-xs text-zinc-500">{k} ›</div>
+              <div className="text-2xl font-medium">{v}</div>
+            </Link>
+          ) : (
+            <div key={k} className="card p-3">
+              <div className="text-xs text-zinc-500">{k}</div>
+              <div className="text-2xl font-medium">{v}</div>
+            </div>
+          ),
+        )}
       </div>
 
       <Section
@@ -217,7 +236,10 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
                 </summary>
                 <div className="mt-2 space-y-1 pl-1 text-xs">
                   <p className="text-zinc-500">
-                    First visit tag: {j.sourceTag || "none"} · follows {j.follows} · last seen {j.lastSeen ? nyTime(j.lastSeen) : "—"}
+                    First visit tag: {j.sourceTag || "none"} · follows {j.follows} · last seen {j.lastSeen ? nyTime(j.lastSeen) : "—"} ·{" "}
+                    <Link href={`/admin/journey/person/${encodeURIComponent(j.who)}`} className="text-accent underline-offset-2 hover:underline">
+                      Full journey ›
+                    </Link>
                   </p>
                   {j.votes.length === 0 ? (
                     <p className="text-zinc-500">No votes.</p>

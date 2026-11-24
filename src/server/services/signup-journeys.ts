@@ -8,6 +8,8 @@ import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules"
 
 export type JourneyVote = { at: string; title: string; slug: string; picked: string; after: boolean; method: string | null };
 export type Journey = {
+  /** User id, or the guest's device id: the key for /admin/journey/person/[who]. */
+  who: string;
   handle: string | null;
   /** null for a guest (no account). */
   signedUpAt: string | null;
@@ -84,6 +86,7 @@ async function buildJourney(u: UserRow | null, deviceId: string | null): Promise
   const first = (p?.first && typeof p.first === "object" ? p.first : p) as Record<string, unknown> | null;
   const source = classifySource(p);
   return {
+    who: u?.id ?? deviceId ?? "",
     handle: u?.handle ?? null,
     signedUpAt: signed,
     guest: !u,
