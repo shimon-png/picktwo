@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AGE_RANGES } from "@/lib/constants";
 import { journeyData, median, type Visitor } from "@/server/services/journey";
 import type { BrainView } from "@/server/services/brain";
 import { Sankey, type SankeyLink, type SankeyNode } from "@/components/admin/Sankey";
@@ -78,14 +79,45 @@ function stepOf(id: string | undefined): { label: string; test: (v: Visitor) => 
   return STEP_TEST[id] ?? null;
 }
 
-/** Demographic cuts for the selected step; each value can narrow the people list (?by=…&val=…). */
-const CUTS: { key: string; title: string; get: (v: Visitor) => string }[] = [
-  { key: "source", title: "Source", get: (v) => SHORT[v.source] },
-  { key: "account", title: "Account", get: (v) => (v.signedUp ? "Signed up" : v.handle ? "Account, not new" : "Guest") },
-  { key: "sex", title: "Sex", get: (v) => v.sex ?? "Unknown" },
-  { key: "age", title: "Age", get: (v) => v.ageRange ?? "Unknown" },
-  { key: "zip", title: "ZIP area", get: (v) => (v.zip3 ? `${v.zip3}xx` : "Unknown") },
+/**
+ * Demographic cuts for the selected step; each value can narrow the people list (?by=…&val=…).
+ * Bars are shown in a fixed logical order (Alex, Nov 24), not by count: `order` lists the known
+ * values top to bottom (age: oldest on top), anything else sorts by `cmp`, and "Unknown" is always last.
+ * `top` keeps only the most common values (by count) before ordering, for long lists like ZIPs.
+ */
+type Cut = { key: string; title: string; get: (v: Visitor) => string; order?: string[]; cmp?: (a: string, b: string) => number; top?: number };
+const CUTS: Cut[] = [
+  { key: "source", title: "Source", get: (v) => SHORT[v.source], order: Object.values(SHORT) },
+  {
+    key: "account",
+    title: "Account",
+    get: (v) => (v.signedUp ? "Signed up" : v.handle ? "Account, not new" : "Guest"),
+    order: ["Signed up", "Account, not new", "Guest"],
+  },
+  { key: "sex", title: "Sex", get: (v) => v.sex ?? "Unknown", order: ["Female", "Male", "Prefer not to say"] },
+  { key: "age", title: "Age", get: (v) => v.ageRange ?? "Unknown", order: AGE_RANGES.map((a) => a.label).reverse() },
+  {
+    key: "zip",
+    title: "ZIP area",
+    get: (v) => (v.zip3 ? `${v.zip3}xx` : "Unknown"),
+    cmp: (a, b) => parseInt(a, 10) - parseInt(b, 10) || a.localeCompare(b),
+    top: 8,
+  },
 ];
+
+/** Count each value of a cut and return the rows in the cut's logical order. */
+function orderedRows(c: Cut, values: string[]): [string, number][] {
+  const m = new Map<string, number>();
+  for (const v of values) m.set(v, (m.get(v) ?? 0) + 1);
+  let rows = [...m.entries()];
+  if (c.top && rows.length > c.top) rows = rows.sort((a, b) => b[1] - a[1]).slice(0, c.top);
+  const rank = (val: string) => {
+    if (val === "Unknown") return Number.MAX_SAFE_INTEGER;
+    const i = c.order?.indexOf(val) ?? -1;
+    return i === -1 ? (c.order?.length ?? 0) : i;
+  };
+  return rows.sort(([a], [b]) => rank(a) - rank(b) || (c.cmp ? c.cmp(a, b) : a.localeCompare(b)));
+}
 
 const nyTime = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -351,9 +383,7 @@ function StepPanel({
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {CUTS.map((c) => {
-          const m = new Map<string, number>();
-          for (const v of inStep) m.set(c.get(v), (m.get(c.get(v)) ?? 0) + 1);
-          const rows = [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+          const rows = orderedRows(c, inStep.map(c.get));
           return (
             <Bars
               key={c.key}
