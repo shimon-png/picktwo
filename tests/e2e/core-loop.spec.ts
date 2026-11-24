@@ -283,10 +283,17 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await expect(a.getByRole("link", { name: "Send DM", exact: true })).toHaveCount(0); // not following yet
   expect((await a.request.post("/api/messages", { data: { to: handle("twin_b"), body: "hi" } })).status()).toBe(403);
   // The profile streams in behind a loading skeleton, so a click can land before React hydrates and do nothing.
-  // Click until the follow sticks (aria-pressed), then the server re-render shows "Send DM".
+  // Click until the follow sticks (aria-pressed), then the server re-render shows "Send DM". The client-side
+  // router.refresh() after a follow can race the streamed profile and keep the old render, so once the follow has
+  // stuck, reload to get the server's answer instead of waiting on a refresh that already happened.
   await expect(async () => {
     const follow = a.getByRole("button", { name: /^Follow/ }).first();
-    if ((await follow.getAttribute("aria-pressed")) !== "true") await follow.click();
+    if ((await follow.getAttribute("aria-pressed")) !== "true") {
+      await follow.click();
+      await expect(follow).toHaveAttribute("aria-pressed", "true", { timeout: 4000 });
+    } else {
+      await a.reload();
+    }
     await expect(a.getByRole("link", { name: "Send DM", exact: true })).toBeVisible({ timeout: 4000 });
   }).toPass({ timeout: 30_000 });
   await a.getByRole("link", { name: "Send DM", exact: true }).click();
