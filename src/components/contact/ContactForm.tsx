@@ -33,7 +33,7 @@ export function ContactForm({ initial }: { initial: { name: string; email: strin
         <CheckCircle2 className="mx-auto size-10 text-green" aria-hidden />
         <h2 className="text-lg font-medium">Thanks, we got your message</h2>
         <p className="text-sm text-zinc-600">We read every message and will reply to {f.email} if a reply is needed.</p>
-        <Link href="/vote" className="btn-primary mt-2 inline-flex">Back to voting</Link>
+        <Link href="/vote" className="btn-cta mt-2 inline-flex">Back to voting</Link>
       </div>
     );
 

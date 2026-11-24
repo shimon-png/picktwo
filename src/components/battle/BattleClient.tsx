@@ -300,7 +300,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
         <div className="card space-y-3 p-4 text-center">
           <p className="text-[15px]">See how your vote compares with parents like you — and get your own questions answered.</p>
           <div className="flex justify-center gap-2">
-            <Link href={`/signin?callbackUrl=/b/${v.slug}`} className="btn-primary">
+            <Link href={`/signin?callbackUrl=/b/${v.slug}`} className="btn-cta">
               Create free account
             </Link>
             <Link href="/post" className="btn-outline">

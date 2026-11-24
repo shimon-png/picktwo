@@ -53,6 +53,9 @@
   --color-page: oklch(0.982 0.004 75);
   --color-surface: oklch(0.96 0.006 75);
   --color-ink: oklch(0.18 0 0);
+  /* Call-to-action green (sign up, vote, ask the crowd): the same lime in every theme. */
+  --color-cta: #c6ff3d;
+  --color-cta-ink: #120e26;
 
   /* Neutral ramp (remaps zinc-*), warm */
   --color-zinc-50: oklch(0.985 0.003 75);
@@ -125,6 +128,10 @@ body {
 }
 @utility btn-primary {
   @apply btn bg-ink text-white shadow-button hover:bg-zinc-800;
+}
+/* Bright green call to action: sign up, vote, ask the crowd. Same in every theme. */
+@utility btn-cta {
+  @apply btn bg-cta font-semibold text-cta-ink shadow-button hover:brightness-105;
 }
 @utility btn-accent-outline {
   @apply btn border border-accent text-accent hover:bg-accent/12;

@@ -143,7 +143,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
-          <button className="btn-primary w-full py-3" disabled={busy || !email.trim()}>
+          <button className="btn-cta w-full py-3" disabled={busy || !email.trim()}>
             {busy ? "Sending…" : "Email me a code"}
           </button>
           <p className="text-center text-xs text-zinc-400">
@@ -184,7 +184,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
             />
           </div>
-          <button className="btn-primary w-full py-3" disabled={busy || code.length !== 6}>
+          <button className="btn-cta w-full py-3" disabled={busy || code.length !== 6}>
             {busy ? "Checking…" : "Verify"}
           </button>
           <div className="flex justify-between text-sm">
@@ -234,7 +234,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
             </div>
             <p className="mt-1 text-xs text-zinc-500">3–20 letters, numbers or underscores. You can change it later.</p>
           </div>
-          <button className="btn-primary w-full py-3" disabled={!HANDLE_RE.test(handle)}>
+          <button className="btn-cta w-full py-3" disabled={!HANDLE_RE.test(handle)}>
             Continue
           </button>
         </form>
@@ -274,7 +274,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
             />
             <ZipHint check={zipCheck} />
           </div>
-          <button className="btn-primary w-full py-3" disabled={busy || !sex || !ageRange || !zipOk}>
+          <button className="btn-cta w-full py-3" disabled={busy || !sex || !ageRange || !zipOk}>
             {busy ? "Finishing…" : finishLabel}
           </button>
           <button type="button" className="w-full text-sm text-zinc-500" onClick={() => setStep("username")}>
