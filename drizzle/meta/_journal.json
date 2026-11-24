@@ -253,6 +253,13 @@
       "when": 1795541029871,
       "tag": "0035_featured_nvidia_ceo",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795548322675,
+      "tag": "0036_guest_vote_limit_15",
+      "breakpoints": true
     }
   ]
 }

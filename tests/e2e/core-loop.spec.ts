@@ -1,5 +1,26 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules";
+import { ECONOMY_DEFAULTS } from "../../src/lib/constants";
+
+/** Free votes before the sign-up gate, and group B's dialog repeat (default config). */
+const FREE = ECONOMY_DEFAULTS.guestVoteLimit;
+const EVERY = ECONOMY_DEFAULTS.softGateEvery;
+
+/** Casts `n` new votes through the API as this page's visitor (refetching the feed as it runs out); returns the responses. */
+async function apiVotes(page: Page, n: number) {
+  const out: { slug: string; status: number; body: { softGate?: boolean; gatePrompt?: boolean } | null }[] = [];
+  while (out.length < n) {
+    const items = (await page.request.get("/api/feed?limit=20").then((r) => r.json())).items as { slug: string }[];
+    const fresh = items.filter((it) => !out.some((o) => o.slug === it.slug));
+    if (!fresh.length) break;
+    for (const it of fresh.slice(0, n - out.length)) {
+      const r = await page.request.post(`/api/battles/${it.slug}/vote`, { data: { side: "A" } });
+      out.push({ slug: it.slug, status: r.status(), body: r.ok() ? await r.json() : null });
+      if (!r.ok()) return out;
+    }
+  }
+  return out;
+}
 
 // Requires DEV_LOGIN=true and no AUTH_RESEND_KEY on the server, so the sign-in code is shown on screen.
 const stamp = Date.now().toString(36);
@@ -192,10 +213,14 @@ test("homepage: anonymous one-tap vote", async ({ browser }) => {
 test("homepage hero: votes count toward the free votes, then sign-up (Alex, Nov 24)", async ({ browser, baseURL }) => {
   const ctx = await guestIn(browser, baseURL, "control");
   const p = await ctx.newPage();
+  await p.goto("/vote");
+  // Use most of the free votes elsewhere, then the last two on the homepage hero.
+  const used = await apiVotes(p, FREE - 2);
+  test.skip(used.length < FREE - 2, "not enough open battles");
   await p.goto("/");
   const hero = p.locator('[data-track="hero_card"]');
   const seen = new Set<string>();
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 2; i++) {
     const title = (await hero.locator("h2").first().innerText()).trim();
     expect(seen.has(title)).toBe(false); // no repeats
     seen.add(title);
@@ -207,28 +232,23 @@ test("homepage hero: votes count toward the free votes, then sign-up (Alex, Nov 
   await expect(p.getByRole("dialog", { name: "Sign up to keep voting" })).toBeVisible();
 });
 
-test("sign-up gate test, group B: a closable dialog every 5 votes, voting never blocked", async ({ browser, baseURL }) => {
+test("sign-up gate test, group B: a closable dialog after the free votes and every few after, never blocked", async ({ browser, baseURL }) => {
   const ctx = await guestIn(browser, baseURL, "soft");
   const page = await ctx.newPage();
   await page.goto("/vote");
-  const feed = (await page.request.get("/api/feed?limit=20").then((r) => r.json())).items as { slug: string }[];
-  test.skip(feed.length < 12, "needs at least 12 open battles");
-  const prompts: number[] = [];
-  for (let i = 0; i < 11; i++) {
-    const r = await page.request.post(`/api/battles/${feed[i].slug}/vote`, { data: { side: "A" } });
-    expect(r.ok()).toBe(true); // never the 401 wall
-    const body = await r.json();
-    expect(body.softGate).toBe(true);
-    if (body.gatePrompt) prompts.push(i + 1);
+  const n = FREE + EVERY + 1;
+  const votes = await apiVotes(page, n);
+  test.skip(votes.length < n, "not enough open battles");
+  for (const v of votes) {
+    expect(v.status).toBe(200); // never the 401 wall
+    expect(v.body?.softGate).toBe(true);
   }
-  expect(prompts).toEqual([5, 10]);
-  // In the deck: past the free votes there's no wall; the 15th vote opens the closable dialog.
+  expect(votes.flatMap((v, i) => (v.body?.gatePrompt ? [i + 1] : []))).toEqual([FREE, FREE + EVERY]);
+  // In the deck: past the free votes there's no wall; the next prompt vote opens the closable dialog.
   await page.reload();
   await expect(page.getByRole("region", { name: "Sign up to keep voting" })).toHaveCount(0);
-  for (let i = 0; i < 4; i++) {
-    const r = await page.request.post(`/api/battles/${feed[11 + i]?.slug}/vote`, { data: { side: "A" } });
-    if (!r.ok()) test.skip(true, "not enough open battles");
-  }
+  const more = await apiVotes(page, EVERY - 2);
+  test.skip(more.length < EVERY - 2, "not enough open battles");
   await page.reload();
   await expect(page.getByText("Keep voting, or sign up to save your picks.")).toBeVisible();
   await expect(async () => {
@@ -264,15 +284,14 @@ test("contact form: terms link → form → thank-you", async ({ page }) => {
   await expect(page.getByText("Thanks, we got your message")).toBeVisible();
 });
 
-test("guest gate: 5 free votes, then sign up with an emailed code (needs DEV_LOGIN, no Resend key)", async ({ browser, baseURL }) => {
+test("guest gate: free votes, then sign up with an emailed code (needs DEV_LOGIN, no Resend key)", async ({ browser, baseURL }) => {
   const ctx = await guestIn(browser, baseURL, "control");
   const page = await ctx.newPage();
   await page.goto("/vote");
-  const feed = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];
-  test.skip(feed.length < 7, "needs at least 7 open battles");
-  for (const it of feed.slice(0, 5)) expect((await page.request.post(`/api/battles/${it.slug}/vote`, { data: { side: "A" } })).ok()).toBe(true);
-  const sixth = await page.request.post(`/api/battles/${feed[5].slug}/vote`, { data: { side: "A" } });
-  expect(sixth.status()).toBe(401);
+  const votes = await apiVotes(page, FREE + 1);
+  test.skip(votes.length < FREE + 1, "not enough open battles");
+  expect(votes.slice(0, FREE).every((v) => v.status === 200)).toBe(true);
+  expect(votes[FREE].status).toBe(401); // one past the free votes: the wall
   await page.reload();
   const gate = page.getByRole("region", { name: "Sign up to keep voting" });
   await expect(gate.getByText("Step 1 of 4")).toBeVisible();
@@ -291,9 +310,9 @@ test("guest gate: 5 free votes, then sign up with an emailed code (needs DEV_LOG
   await gate.getByRole("button", { name: "Finish and keep voting" }).click();
   await page.waitForURL(/\/vote/);
   await expect(page.getByText(/to High priority|Top priority/)).toBeVisible();
-  // Guest votes carried over: none of the 5 battles come back.
+  // Guest votes carried over: none of the voted battles come back.
   const after = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];
-  const votedSlugs = new Set(feed.slice(0, 5).map((f) => f.slug));
+  const votedSlugs = new Set(votes.slice(0, FREE).map((v) => v.slug));
   expect(after.some((a) => votedSlugs.has(a.slug))).toBe(false);
 });
 
