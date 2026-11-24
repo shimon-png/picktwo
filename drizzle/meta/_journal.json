@@ -232,6 +232,13 @@
       "when": 1795500000000,
       "tag": "0032_seed_batch_2",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795500001000,
+      "tag": "0033_seed_batch_2_same_people",
+      "breakpoints": true
     }
   ]
 }
