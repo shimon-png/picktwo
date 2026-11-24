@@ -26,7 +26,7 @@ async function nyMidnight(yyyymmdd: number): Promise<string> {
 }
 
 /** Admin accounts and the browsers linked to them (their test votes and visits stay out of the clean view). */
-async function adminIds() {
+export async function adminIds() {
   const rows = await db.select().from(users).where(or(eq(users.role, "ADMIN"), isNotNull(users.email)));
   const ids = rows.filter((u) => isAdmin(u)).map((u) => u.id);
   const devs = ids.length

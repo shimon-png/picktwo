@@ -10,7 +10,19 @@ import { Avatar } from "@/components/ui/Avatar";
 import { OptionFace } from "./OptionFace";
 
 /** Homepage live battle: one tap votes anonymously (device cookie) and reveals the split. */
-export function HeroBattle({ b, onVoted, onGate, gated = false }: { b: BattleCard; onVoted?: () => void; onGate?: () => void; gated?: boolean }) {
+type HeroVoteRes = { results: { a: number; b: number; total: number }; softGate?: boolean; gatePrompt?: boolean };
+
+export function HeroBattle({
+  b,
+  onVoted,
+  onGate,
+  gated = false,
+}: {
+  b: BattleCard;
+  onVoted?: (r: HeroVoteRes) => void;
+  onGate?: () => void;
+  gated?: boolean;
+}) {
   const [picked, setPicked] = useState<"A" | "B" | null>(null);
   const [res, setRes] = useState<{ a: number; b: number; total: number } | null>(null);
   const shownAt = useRef(Date.now());
@@ -23,11 +35,11 @@ export function HeroBattle({ b, onVoted, onGate, gated = false }: { b: BattleCar
     if (gated) return onGate?.();
     setPicked(side);
     try {
-      const r = await api<{ results: { a: number; b: number; total: number } }>(`/api/battles/${b.slug}/vote`, {
+      const r = await api<HeroVoteRes>(`/api/battles/${b.slug}/vote`, {
         body: { side, dwellMs: Date.now() - shownAt.current, source: "home" },
       });
       setRes(r.results);
-      onVoted?.();
+      onVoted?.(r);
     } catch (e) {
       setPicked(null);
       setRes(null);

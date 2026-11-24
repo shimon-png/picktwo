@@ -1,7 +1,24 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
+import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules";
 
 // Requires DEV_LOGIN=true and no AUTH_RESEND_KEY on the server, so the sign-in code is shown on screen.
 const stamp = Date.now().toString(36);
+
+/**
+ * A fresh signed-out browser pinned to a sign-up gate test group: its device cookie is chosen so the (deterministic)
+ * assignment lands in `arm`. Assumes the default gateTestPct of 50.
+ */
+let guests = 0;
+const salt = Math.random().toString(36).slice(2, 8);
+async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm) {
+  const n = ++guests; // a new browser every call
+  let id = "";
+  for (let i = 0; !id || pickArm(id, 50) !== arm; i++) id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
+  const ctx = await browser.newContext();
+  await ctx.addCookies([{ name: "pt_vid", value: id, url: baseURL ?? "http://localhost:3000" }]);
+  await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
+  return ctx;
+}
 
 async function login(page: Page, email: string) {
   await page.goto("/signin");
@@ -172,8 +189,8 @@ test("homepage: anonymous one-tap vote", async ({ browser }) => {
   await expect(p.getByText(/Counted\. \d+ (people|person) weighed in/)).toBeVisible();
 });
 
-test("homepage hero: votes count toward the free votes, then sign-up (Alex, Nov 24)", async ({ browser }) => {
-  const ctx = await browser.newContext();
+test("homepage hero: votes count toward the free votes, then sign-up (Alex, Nov 24)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control");
   const p = await ctx.newPage();
   await p.goto("/");
   const hero = p.locator('[data-track="hero_card"]');
@@ -188,6 +205,38 @@ test("homepage hero: votes count toward the free votes, then sign-up (Alex, Nov 
   }
   await hero.getByRole("button", { name: /^Vote for/ }).first().click();
   await expect(p.getByRole("dialog", { name: "Sign up to keep voting" })).toBeVisible();
+});
+
+test("sign-up gate test, group B: a closable dialog every 5 votes, voting never blocked", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "soft");
+  const page = await ctx.newPage();
+  await page.goto("/vote");
+  const feed = (await page.request.get("/api/feed?limit=20").then((r) => r.json())).items as { slug: string }[];
+  test.skip(feed.length < 12, "needs at least 12 open battles");
+  const prompts: number[] = [];
+  for (let i = 0; i < 11; i++) {
+    const r = await page.request.post(`/api/battles/${feed[i].slug}/vote`, { data: { side: "A" } });
+    expect(r.ok()).toBe(true); // never the 401 wall
+    const body = await r.json();
+    expect(body.softGate).toBe(true);
+    if (body.gatePrompt) prompts.push(i + 1);
+  }
+  expect(prompts).toEqual([5, 10]);
+  // In the deck: past the free votes there's no wall; the 15th vote opens the closable dialog.
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Sign up to keep voting" })).toHaveCount(0);
+  for (let i = 0; i < 4; i++) {
+    const r = await page.request.post(`/api/battles/${feed[11 + i]?.slug}/vote`, { data: { side: "A" } });
+    if (!r.ok()) test.skip(true, "not enough open battles");
+  }
+  await page.reload();
+  await expect(page.getByText("Keep voting, or sign up to save your picks.")).toBeVisible();
+  await expect(async () => {
+    await page.getByRole("button", { name: /^Vote for/ }).first().click();
+    await expect(page.getByRole("dialog", { name: "Sign up, or keep voting" })).toBeVisible({ timeout: 3000 });
+  }).toPass({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Not now, keep voting" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
 test("non-admin cannot post as another user", async ({ browser }) => {
@@ -215,9 +264,8 @@ test("contact form: terms link → form → thank-you", async ({ page }) => {
   await expect(page.getByText("Thanks, we got your message")).toBeVisible();
 });
 
-test("guest gate: 5 free votes, then sign up with an emailed code (needs DEV_LOGIN, no Resend key)", async ({ browser }) => {
-  const ctx = await browser.newContext();
-  await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
+test("guest gate: 5 free votes, then sign up with an emailed code (needs DEV_LOGIN, no Resend key)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control");
   const page = await ctx.newPage();
   await page.goto("/vote");
   const feed = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];

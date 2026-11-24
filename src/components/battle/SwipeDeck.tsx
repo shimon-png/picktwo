@@ -20,7 +20,7 @@ import { cardKind, contentHash, currentSessionId, logEvent } from "@/lib/events"
 type Side = "A" | "B";
 type PickMethod = "tap" | "swipe" | "key";
 const other = (s: Side): Side => (s === "A" ? "B" : "A");
-type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null };
+type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null; softGate?: boolean; gatePrompt?: boolean };
 
 /**
  * Two ways to pick (Alex, Nov 21 2026): tap the photo you want, or swipe away the one you don't.
@@ -47,6 +47,7 @@ export function SwipeDeck({
   tiers,
   guestLeft: initialGuestLeft,
   guestLimit,
+  softGate: initialSoft = false,
 }: {
   initial: BattleCard[];
   signedIn: boolean;
@@ -55,9 +56,13 @@ export function SwipeDeck({
   /** Free votes left for a signed-out visitor (null when signed in). */
   guestLeft: number | null;
   guestLimit: number;
+  /** Sign-up gate test, group B: past the free votes they keep voting and get a closable dialog instead of a wall. */
+  softGate?: boolean;
 }) {
   const [queue, setQueue] = useState(initial);
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
+  const [soft, setSoft] = useState(initialSoft);
+  const [prompt, setPrompt] = useState(false);
   const [voted, setVoted] = useState<Side | null>(null);
   const [result, setResult] = useState<{ a: number; b: number; total: number } | null>(null);
   const [fly, setFly] = useState<-1 | 1 | 0>(0);
@@ -150,11 +155,7 @@ export function SwipeDeck({
     }, FLY_MS);
   }, []);
 
-  const gated = !signedIn && guestLeft !== null && guestLeft <= 0;
-  useEffect(() => {
-    if (gated) logEvent("signup_gate_shown", { pos: deckPos.current, battleId: card?.id });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gated]);
+  const gated = !signedIn && !soft && guestLeft !== null && guestLeft <= 0;
 
   async function vote(side: Side, method: PickMethod): Promise<boolean> {
     if (!card || fly || gated) return false;
@@ -172,6 +173,8 @@ export function SwipeDeck({
         body: { side, source: "feed", ...(prev ? {} : { dwellMs }), meta: { method, pos: deckPos.current, sessionId: currentSessionId() ?? undefined } },
       });
       if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
+      if (r.softGate != null) setSoft(r.softGate);
+      if (r.gatePrompt) setPrompt(true);
       setResult(r.results);
       setPP(r.ppBalance);
       if (r.ppBalance != null) setPp(r.ppBalance);
@@ -329,7 +332,9 @@ export function SwipeDeck({
             {guestLeft != null && guestLeft > 0
               ? `${guestLeft} free vote${guestLeft === 1 ? "" : "s"} left.`
               : guestLeft === 0
-                ? "You’ve used your free votes."
+                ? soft
+                  ? "Keep voting, or sign up to save your picks."
+                  : "You’ve used your free votes."
                 : "Votes count without an account."}{" "}
             <Link href="/signin?callbackUrl=/vote" className="text-accent">
               Sign up to earn ⚡
@@ -359,7 +364,7 @@ export function SwipeDeck({
     return (
       <div>
         {header}
-        <SignupGate limit={guestLimit} next="/vote" />
+        <SignupGate limit={guestLimit} next="/vote" place="deck" log={{ pos: deckPos.current, battleId: card.id }} />
       </div>
     );
 
@@ -416,6 +421,9 @@ export function SwipeDeck({
   return (
     <div>
       {header}
+      {prompt && (
+        <SignupGate soft limit={guestLimit} next="/vote" place="deck" log={{ pos: deckPos.current }} onClose={() => setPrompt(false)} />
+      )}
       <div className="relative h-[calc(100dvh-15.35rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
         {roll != null && <RollCard count={roll} onDone={() => setRoll(null)} />}
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}

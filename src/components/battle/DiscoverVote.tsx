@@ -24,6 +24,7 @@ export function DiscoverVote({ initial, source }: { initial: V; source: "discove
   const [picked, setPicked] = useState<"A" | "B" | null>(null);
   const [busy, setBusy] = useState(false);
   const [gate, setGate] = useState(false);
+  const [softGate, setSoftGate] = useState(false);
   const mountedAt = useRef(Date.now());
 
   function back() {
@@ -38,14 +39,18 @@ export function DiscoverVote({ initial, source }: { initial: V; source: "discove
     setBusy(true);
     setPicked(side);
     try {
-      const r = await api<{ points: number; ppBalance: number | null }>(`/api/battles/${v.slug}/vote`, {
+      const r = await api<{ points: number; ppBalance: number | null; gatePrompt?: boolean }>(`/api/battles/${v.slug}/vote`, {
         body: { side, dwellMs: Date.now() - mountedAt.current, source },
       });
       markDone(v.id);
       navigator.vibrate?.(12);
       toast(r.points > 0 ? `Vote counted · +${r.points} ⚡` : "Vote counted", r.points > 0 ? "pp" : "ok");
       setPP(r.ppBalance);
-      setTimeout(back, 650);
+      // Group B of the sign-up gate test: show the closable dialog; closing it goes back as usual.
+      if (r.gatePrompt) {
+        setSoftGate(true);
+        setGate(true);
+      } else setTimeout(back, 650);
     } catch (e) {
       setPicked(null);
       if (e instanceof ApiError && e.code === "SIGNUP_REQUIRED") setGate(true);
@@ -122,7 +127,17 @@ export function DiscoverVote({ initial, source }: { initial: V; source: "discove
           </button>
         </div>
       )}
-      {gate && <SignupGate next={`/b/${v.slug}?src=${source}`} onClose={() => setGate(false)} />}
+      {gate && (
+        <SignupGate
+          soft={softGate}
+          next={`/b/${v.slug}?src=${source}`}
+          place="discover"
+          onClose={() => {
+            setGate(false);
+            if (softGate) back();
+          }}
+        />
+      )}
     </article>
   );
 }

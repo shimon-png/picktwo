@@ -16,7 +16,7 @@ import { OptionFace } from "./OptionFace";
 import { CopyLink, ShareGrid, ShareIconButton } from "./ShareButtons";
 import { ReportButton } from "./ReportButton";
 
-type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null };
+type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; gatePrompt?: boolean };
 type V = NonNullable<BattleView>;
 
 export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: { initial: V; signedIn: boolean; shareUrl: string; source?: string }) {
@@ -26,6 +26,8 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
   const [reasonSaved, setReasonSaved] = useState(!!initial.myVote?.reason);
   const [editing, setEditing] = useState(false);
   const [gate, setGate] = useState(false);
+  // Sign-up gate test, group B: the server lets the vote through and asks us to show the closable dialog.
+  const [softGate, setSoftGate] = useState(false);
   const mountedAt = useRef(Date.now());
   const router = useRouter();
 
@@ -53,6 +55,10 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       markDone(v.id);
       if (r.points > 0) toast(`+${r.points} for voting — thanks for helping!`, "pp");
       setPP(r.ppBalance);
+      if (r.gatePrompt) {
+        setSoftGate(true);
+        setGate(true);
+      }
       await refresh();
     } catch (e) {
       setV(prev);
@@ -374,7 +380,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
           </Link>
         </div>
       )}
-      {gate && <SignupGate next={`/b/${v.slug}`} onClose={() => setGate(false)} />}
+      {gate && <SignupGate soft={softGate} next={`/b/${v.slug}`} place="battle" onClose={() => setGate(false)} />}
     </article>
   );
 }

@@ -5,6 +5,8 @@ import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
 import { brainChecks } from "@/server/services/brain-checks";
 import { signupJourneys } from "@/server/services/signup-journeys";
+import { gateTestResults } from "@/server/services/gate-test";
+import { ARM_LABELS, type GateCell } from "@/server/services/gate-test-rules";
 import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 import type { BrainListKind } from "@/server/services/brain-lists";
 
@@ -12,6 +14,17 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
 
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "—");
+const pctN = (x: number) => `${(100 * x).toFixed(1)}%`;
+const gateRow = (day: React.ReactNode, group: string, c: GateCell): React.ReactNode[] => [
+  day,
+  group,
+  c.visitors,
+  c.votes,
+  c.avgVotes.toFixed(2),
+  `${c.reachedGate} (${pct(c.reachedGate, c.visitors)})`,
+  c.signups,
+  pctN(c.signupRate),
+];
 const secs = (ms: number | null | undefined) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)}s`);
 
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
@@ -74,7 +87,14 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30), view), signupJourneys()]);
+  const [s, taste, wb, acq, journeys, gt] = await Promise.all([
+    getBrainStats(days, view),
+    tasteByGroup(),
+    winbackStats(),
+    signupSources(Math.max(days, 30), view),
+    signupJourneys(),
+    gateTestResults(days),
+  ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const viewedTotal = s.byKind.reduce((a, k) => a + k.seen, 0);
@@ -185,6 +205,47 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
             ];
           })}
         />
+      </Section>
+
+      <Section
+        title="Sign-up gate test (A/B)"
+        note={`Every new signed-out browser is put in a group at random and stays there. A (control): after ${gt.limit} free votes, a sign-up wall they can't skip. B: a sign-up dialog they can close and keep voting; it shows again every ${gt.every} votes. ${gt.pct}% go to B (gateTestPct in Config; 0 stops the test, everyone gets A). Rows are by the day the browser was first seen (New York). Votes count everything that browser did since, as a guest and in the account it signed up to; seed votes, bots and admins left out. Reached the gate = saw the wall or dialog at least once.`}
+      >
+        {gt.startedAt ? (
+          <>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+              {(
+                [
+                  ["Sign-up rate, A → B", `${pctN(gt.total.control.signupRate)} → ${pctN(gt.total.soft.signupRate)}`, gt.signupLift, gt.signupP],
+                  ["Avg votes per visitor, A → B", `${gt.total.control.avgVotes.toFixed(1)} → ${gt.total.soft.avgVotes.toFixed(1)}`, gt.votesLift, gt.votesP],
+                ] as const
+              ).map(([label, value, lift, p]) => (
+                <div key={label} className="rounded-xl bg-surface p-3 md:col-span-2">
+                  <div className="text-xs text-zinc-500">{label}</div>
+                  <div className="text-lg tabular-nums">{value}</div>
+                  <div className="text-xs text-zinc-500">
+                    {lift == null ? "Not enough data yet" : `B is ${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}% vs A · `}
+                    {p == null ? "" : p < 0.05 ? <span className="text-green">real difference (p = {p.toFixed(3)})</span> : `could be chance (p = ${p.toFixed(2)})`}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Rows
+              head={["Day", "Group", "Visitors", "Votes", "Avg votes per visitor", "Reached the gate", "Sign-ups", "Sign-up rate"]}
+              rows={[
+                ...(["control", "soft"] as const).map((arm) => gateRow(<b key="t">All days</b>, ARM_LABELS[arm], gt.total[arm])),
+                ...gt.daily.flatMap((d) => (["control", "soft"] as const).map((arm) => gateRow(d.day, ARM_LABELS[arm], d[arm]))),
+              ]}
+            />
+            <p className="text-xs text-zinc-500">
+              Test started {nyTime(gt.startedAt)}. Judge it on the All days rows once each group has a few hundred visitors; a green
+              &quot;real difference&quot; means p &lt; 0.05. Newer days have had less time to vote and sign up, so compare A and B on the same day,
+              not one day with another.
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-zinc-500">{gt.pct > 0 ? "Running: no signed-out visitors yet." : "Off (gateTestPct is 0 in Config)."}</p>
+        )}
       </Section>
 
       <Section
