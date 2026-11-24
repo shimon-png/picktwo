@@ -9,7 +9,9 @@ import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules"
 /**
  * Two ways to look at the Brain (Alex, Nov 23 2026). Nothing is ever deleted; the views only filter.
  * - clean (default): real people from the economy setting `brainCleanFrom` (YYYYMMDD, New York midnight) on.
- *   No seed votes or seed battles, no email-less (seed / "post as") accounts, no admins or their browsers, no bots.
+ *   No seed votes (vote.source = 'seed') and no seed battles in battle counts. A real person's vote on a seed
+ *   battle IS counted (most of the deck is seed content; Alex, Nov 24: excluding those made votes not add up).
+ *   No no email-less (seed / "post as") accounts, no admins or their browsers, no bots.
  * - all ("AI view"): everything, seed votes and test activity included (bots still left out).
  */
 export type BrainView = "clean" | "all";
@@ -58,7 +60,7 @@ export async function brainScope(view: BrainView, days: number) {
     since,
     ev: sql`COALESCE((e.props->>'bot')::boolean, false) = false AND e.created_at >= ${cleanFrom}
       AND ${notIn(sql`e.user_id`, ids)} AND ${notIn(sql`e.device_id`, devs)} AND ${realUser(sql`e.user_id`)}`,
-    vt: sql`COALESCE(v.source, '') <> 'seed' AND v.battle_id NOT LIKE 'seed_%' AND v.created_at >= ${cleanFrom}
+    vt: sql`COALESCE(v.source, '') <> 'seed' AND v.created_at >= ${cleanFrom}
       AND ${notIn(sql`v.user_id`, ids)} AND ${notIn(sql`v.device_id`, devs)} AND ${realUser(sql`v.user_id`)}`,
     bt: sql`b.id NOT LIKE 'seed_%' AND b.created_at >= ${cleanFrom} AND ${notIn(sql`b.author_id`, ids)} AND ${realUser(sql`b.author_id`)}`,
   };
@@ -79,6 +81,7 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       (SELECT count(DISTINCT COALESCE(e.user_id, e.device_id))::int FROM analytics_event e WHERE e.name = 'session_start' AND e.created_at > ${since} AND ${notBot}) AS visitors,
       (SELECT count(*)::int FROM analytics_event e WHERE e.name = 'card_shown' AND e.created_at > ${since} AND ${notBot}) AS views,
       (SELECT count(*)::int FROM vote v WHERE v.created_at > ${since} AND ${voteOK} AND NOT v.flagged) AS real_votes,
+      (SELECT count(DISTINCT COALESCE(v.user_id, v.device_id))::int FROM vote v WHERE v.created_at > ${since} AND ${voteOK} AND NOT v.flagged) AS voters,
       (SELECT count(*)::int FROM vote v WHERE v.created_at > ${since} AND v.source = 'feed' AND NOT v.flagged AND ${voteOK}) AS deck_votes,
       (SELECT count(*)::int FROM vote v WHERE v.source = 'seed') AS seed_votes_all,
       (SELECT count(*)::int FROM skip s WHERE s.created_at > ${since} AND s.battle_id NOT LIKE ${view === "clean" ? "seed_%" : ""}) AS skips,
@@ -89,19 +92,24 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY v.dwell_ms)::float FROM vote v WHERE v.created_at > ${since} AND v.source = 'feed' AND v.dwell_ms IS NOT NULL AND ${voteOK}) AS median_pick_ms
   `);
 
-  // Text vs photo: a view converts when the same person (user or device) voted on that battle.
-  const byKind = await db.execute<{ kind: string; views: number; voted: number; median_ms: number | null }>(sql`
-    SELECT e.props->>'kind' AS kind, count(*)::int AS views,
-      count(v.id)::int AS voted,
+  // Text vs photo, counted per person × battle (a card shown twice to the same person counts once), and voted =
+  // that person cast a counted vote on it in the window. So "Voted" adds up to at most the votes tile.
+  const byKind = await db.execute<{ kind: string; views: number; seen: number; voted: number; median_ms: number | null }>(sql`
+    WITH c AS (
+      SELECT e.props->>'kind' AS kind, e.props->>'battleId' AS battle_id, e.user_id, e.device_id, count(*)::int AS shown
+      FROM analytics_event e
+      WHERE e.name = 'card_shown' AND e.created_at > ${since} AND ${notBot}
+      GROUP BY 1, 2, 3, 4
+    )
+    SELECT c.kind, sum(c.shown)::int AS views, count(*)::int AS seen, count(v.id)::int AS voted,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY v.dwell_ms)::float AS median_ms
-    FROM analytics_event e
+    FROM c
     LEFT JOIN LATERAL (
       SELECT v.id, v.dwell_ms FROM vote v
-      WHERE v.battle_id = e.props->>'battleId'
-        AND ((e.user_id IS NOT NULL AND v.user_id = e.user_id) OR (e.device_id IS NOT NULL AND v.device_id = e.device_id))
+      WHERE v.battle_id = c.battle_id AND v.created_at > ${since} AND NOT v.flagged AND ${voteOK}
+        AND ((c.user_id IS NOT NULL AND v.user_id = c.user_id) OR (c.device_id IS NOT NULL AND v.device_id = c.device_id))
       LIMIT 1
     ) v ON true
-    WHERE e.name = 'card_shown' AND e.created_at > ${since} AND ${notBot}
     GROUP BY 1 ORDER BY 2 DESC`);
 
   // How deep people go into the deck.

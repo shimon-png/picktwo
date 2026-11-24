@@ -75,16 +75,16 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const [s, taste, wb, acq, journeys] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30)), signupJourneys()]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
-  const viewedTotal = s.byKind.reduce((a, k) => a + k.views, 0);
+  const viewedTotal = s.byKind.reduce((a, k) => a + k.seen, 0);
   const viewedVoted = s.byKind.reduce((a, k) => a + k.voted, 0);
   const tiles: [string, string | number][] = [
     ["Visits", n("sessions")],
     ["Visitors", n("visitors")],
-    ["Cards viewed", n("views")],
-    // Share of logged card views that the same person voted on. (Not deck votes ÷ views: votes from browsers
-    // still running the old app, which logs no views, made that go over 100%.)
-    ["Cards viewed → voted", pct(viewedVoted, viewedTotal)],
-    [view === "clean" ? "Real votes" : "Votes (incl. seed)", n("real_votes")],
+    ["Deck cards shown", n("views")],
+    // Share of cards seen (person × battle) that the same person voted on.
+    ["Cards seen → voted", pct(viewedVoted, viewedTotal)],
+    [view === "clean" ? "Votes by real people" : "Votes (incl. seed)", n("real_votes")],
+    ["People who voted", n("voters")],
     ["Median time to pick", secs(t.median_pick_ms)],
     ["Skips", n("skips")],
     ["Hit sign-up wall", n("gates")],
@@ -286,12 +286,18 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         />
       </Section>
 
-      <Section title="Text vs photo" note="Views in the Vote deck, and how many turned into a vote by the same person.">
-        <Rows head={["Card type", "Views", "Voted", "Vote rate", "Median pick"]} rows={s.byKind.map((k) => [k.kind ?? "?", k.views, k.voted, pct(k.voted, k.views), secs(k.median_ms)])} />
+      <Section
+        title="Text vs photo"
+        note="Vote deck only. Times shown counts every display (the same card can come back before you vote). Cards seen counts each person × battle once; Voted = how many of those that person voted on, so Voted adds up to the deck share of the votes tile (homepage and battle-page votes aren't deck views)."
+      >
+        <Rows
+          head={["Card type", "Times shown", "Cards seen", "Voted", "Vote rate", "Median pick"]}
+          rows={s.byKind.map((k) => [k.kind ?? "?", k.views, k.seen, k.voted, pct(k.voted, k.seen), secs(k.median_ms)])}
+        />
       </Section>
 
-      <Section title="Raw source tags" note="utm_source, else the referring site, else direct, and how many of those visitors voted.">
-        <Rows head={["Source", "Visits", "Visitors", "Voted", "Voter rate"]} rows={s.sources.map((r) => [r.source, r.sessions, r.visitors, r.voters, pct(r.voters, r.visitors)])} />
+      <Section title="Raw source tags" note="utm_source, else the referring site, else direct. These are people, not votes: Visitors who came that way, and how many of them voted at least once.">
+        <Rows head={["Source", "Visits", "Visitors (people)", "People who voted", "Voter rate"]} rows={s.sources.map((r) => [r.source, r.sessions, r.visitors, r.voters, pct(r.voters, r.visitors)])} />
       </Section>
 
       <Section
