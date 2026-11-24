@@ -225,6 +225,13 @@
       "when": 1795463908000,
       "tag": "0031_signin_prev_code",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795500000000,
+      "tag": "0032_seed_batch_2",
+      "breakpoints": true
     }
   ]
 }

@@ -77,7 +77,8 @@ export async function seed({ demo = true }: { demo?: boolean } = {}) {
     .insert(users)
     .values(
       VOTER_PROFILES.map((p, i) => ({
-        handle: `demo_${p.name.toLowerCase()}`,
+        // Believable sign-up style names (Alex, Nov 23: "demo_dan" is obviously fake).
+        handle: `${p.name.toLowerCase()}${4100 + i * 613}`,
         name: p.name,
         isAdultConfirmed: true,
         onboardedAt: new Date(),
