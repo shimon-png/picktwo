@@ -20,6 +20,10 @@ const good: BrainNumbers = {
     { seen: 20, voted: 15 },
     { seen: 10, voted: 8 },
   ],
+  votePlaces: [
+    { place: "Vote deck", n: 25 },
+    { place: "Homepage card", n: 5 },
+  ],
   rawSources: [{ sessions: 10, visitors: 7, voters: 5 }],
   signupSourcesTotal: 2,
 };
@@ -30,7 +34,7 @@ describe("brainChecks", () => {
   });
 
   it("flags Text vs photo votes above the votes tile (the Nov 24 bug)", () => {
-    const bad = { ...good, votes: 20, daily: [{ ...good.daily[0], votes: 20 }, { ...good.daily[1], votes: 0 }] };
+    const bad = { ...good, votes: 20, votePlaces: undefined, daily: [{ ...good.daily[0], votes: 20 }, { ...good.daily[1], votes: 0 }] };
     const failed = brainChecks(bad).filter((c) => !c.ok).map((c) => c.rule);
     expect(failed).toEqual(["Text vs photo: Voted ≤ Votes tile"]);
   });
@@ -53,5 +57,11 @@ describe("brainChecks", () => {
     const { signupSourcesTotal: _omit, ...rest } = good;
     void _omit;
     expect(brainChecks(rest).some((c) => c.rule.startsWith("Sign-ups by source"))).toBe(false);
+  });
+
+  it("flags places that don't add up to the votes tile (the 664 vs 700 question)", () => {
+    const bad = { ...good, votePlaces: [{ place: "Vote deck", n: 25 }] };
+    const failed = brainChecks(bad).filter((c) => !c.ok).map((c) => c.rule);
+    expect(failed).toEqual(["Where votes were made / Text vs photo All votes add up to the Votes tile"]);
   });
 });

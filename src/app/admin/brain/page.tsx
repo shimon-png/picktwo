@@ -78,6 +78,11 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const n = (k: string) => Number(t[k] ?? 0);
   const viewedTotal = s.byKind.reduce((a, k) => a + k.seen, 0);
   const viewedVoted = s.byKind.reduce((a, k) => a + k.voted, 0);
+  const placeKind = (pl: string, k: string) => s.votePlaces.filter((r) => r.place === pl && r.kind === k).reduce((a, r) => a + r.n, 0);
+  const votesByKind = (k: string) => s.votePlaces.filter((r) => r.kind === k).reduce((a, r) => a + r.n, 0);
+  const placeTotal = s.votePlaces.reduce((a, r) => a + r.n, 0);
+  const places = [...new Set(s.votePlaces.map((r) => r.place))];
+  const kinds = [...new Set(["text", "photo", ...s.byKind.map((k) => k.kind ?? "?")])];
   const checks = brainChecks({
     visits: n("sessions"),
     visitors: n("visitors"),
@@ -88,6 +93,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     daily: s.daily,
     visitSources: s.visitSources,
     byKind: s.byKind,
+    votePlaces: s.votePlaces,
     rawSources: s.sources,
     signupSourcesTotal: acq.days === days ? acq.total.signups : undefined,
   });
@@ -322,11 +328,30 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section
         title="Text vs photo"
-        note="Vote deck only. Times shown counts every display (the same card can come back before you vote). Cards seen counts each person × battle once; Voted = how many of those that person voted on, so Voted adds up to the deck share of the votes tile (homepage and battle-page votes aren't deck views)."
+        note={`All votes = every vote counted in the "Votes by real people" tile (${n("real_votes")}), from any place, so this column adds up to the tile. The other columns are the Vote deck only: Times shown counts every display, Cards seen counts each person × battle once, and Seen → voted counts the cards that person then voted on. Votes made on the homepage card, a battle page or Discover have no deck view, so they're in All votes but not in Seen → voted (see "Where votes were made").`}
       >
         <Rows
-          head={["Card type", "Times shown", "Cards seen", "Voted", "Vote rate", "Median pick"]}
-          rows={s.byKind.map((k) => [k.kind ?? "?", k.views, k.seen, k.voted, pct(k.voted, k.seen), secs(k.median_ms)])}
+          head={["Card type", "All votes", "Times shown", "Cards seen", "Seen → voted", "Vote rate", "Median pick"]}
+          rows={[
+            ...kinds.map((k) => {
+              const d = s.byKind.find((r) => (r.kind ?? "?") === k);
+              return [k, votesByKind(k), d?.views ?? 0, d?.seen ?? 0, d?.voted ?? 0, pct(d?.voted ?? 0, d?.seen ?? 0), secs(d?.median_ms ?? null)];
+            }),
+            ["Total", placeTotal, s.byKind.reduce((a, k) => a + k.views, 0), viewedTotal, viewedVoted, pct(viewedVoted, viewedTotal), ""],
+          ]}
+        />
+      </Section>
+
+      <Section title="Where votes were made" note={`Every counted vote, by the screen it was made on. The total matches the "Votes by real people" tile.`}>
+        <Rows
+          head={["Place", "Text", "Photo", "Total"]}
+          rows={[
+            ...places.map((pl) => {
+              const t = placeKind(pl, "text"), ph = placeKind(pl, "photo");
+              return [pl, t, ph, t + ph];
+            }),
+            ["Total", votesByKind("text"), votesByKind("photo"), placeTotal],
+          ]}
         />
       </Section>
 

@@ -115,21 +115,30 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
   // that person cast a counted vote on it in the window. So "Voted" adds up to at most the votes tile.
   const byKind = await db.execute<{ kind: string; views: number; seen: number; voted: number; median_ms: number | null }>(sql`
     WITH c AS (
-      SELECT e.props->>'kind' AS kind, e.props->>'battleId' AS battle_id, e.user_id, e.device_id, count(*)::int AS shown
-      FROM analytics_event e
+      SELECT e.props->>'kind' AS kind, e.props->>'battleId' AS battle_id, ${WHO_E} AS who, count(*)::int AS shown
+      FROM ${EV_FROM}
       WHERE e.name = 'card_shown' AND e.created_at > ${since} AND ${notBot}
-      GROUP BY 1, 2, 3, 4
+      GROUP BY 1, 2, 3
     )
     SELECT c.kind, sum(c.shown)::int AS views, count(*)::int AS seen, count(v.id)::int AS voted,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY v.dwell_ms)::float AS median_ms
     FROM c
     LEFT JOIN LATERAL (
-      SELECT v.id, v.dwell_ms FROM vote v
-      WHERE v.battle_id = c.battle_id AND v.created_at > ${since} AND NOT v.flagged AND ${voteOK}
-        AND ((c.user_id IS NOT NULL AND v.user_id = c.user_id) OR (c.device_id IS NOT NULL AND v.device_id = c.device_id))
+      SELECT v.id, v.dwell_ms FROM ${V_FROM}
+      WHERE v.battle_id = c.battle_id AND v.source = 'feed' AND v.created_at > ${since} AND NOT v.flagged AND ${voteOK} AND ${WHO_V} = c.who
       LIMIT 1
     ) v ON true
     GROUP BY 1 ORDER BY 2 DESC`);
+
+  // Every counted vote by where it was made × text/photo battle. Adds up exactly to the votes tile.
+  const votePlaces = await db.execute<{ place: string; kind: string; n: number }>(sql`
+    SELECT CASE COALESCE(v.source, '')
+        WHEN 'feed' THEN 'Vote deck' WHEN 'home' THEN 'Homepage card' WHEN 'discover' THEN 'Discover'
+        WHEN 'search' THEN 'Search' WHEN 'profile' THEN 'Profile' WHEN 'seed' THEN 'Seed votes (fake, All view only)' ELSE 'Battle page / shared link' END AS place,
+      CASE WHEN EXISTS (SELECT 1 FROM "option" o WHERE o.battle_id = v.battle_id AND o.image_url IS NOT NULL) THEN 'photo' ELSE 'text' END AS kind,
+      count(*)::int AS n
+    FROM vote v WHERE v.created_at > ${since} AND ${voteOK} AND NOT v.flagged
+    GROUP BY 1, 2 ORDER BY 3 DESC`);
 
   // How deep people go into the deck.
   const depth = await db.execute<{ bucket: string; views: number }>(sql`
@@ -214,7 +223,7 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
 
   const [daily, visitSources] = await Promise.all([dailyNumbers(scope), visitsBySource(scope)]);
 
-  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byTheme, byStakes, untagged: untagged?.n ?? 0, days, tiles, byKind, depth, methods, sources, retention, topEngaging, closest, lopsided };
+  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byTheme, byStakes, untagged: untagged?.n ?? 0, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
 }
 
 type Scope = Awaited<ReturnType<typeof brainScope>>;
