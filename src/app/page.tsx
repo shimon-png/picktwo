@@ -6,6 +6,7 @@ import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { ArrowRight, Camera, MessageCircleHeart, Sparkles, ThumbsDown, ThumbsUp, Users, Zap } from "lucide-react";
 import { getViewer } from "@/server/viewer";
 import { getFeed } from "@/server/services/feed";
+import { guestVotesLeft } from "@/server/services/votes";
 import { getEconomy } from "@/server/services/config";
 import { battleCards, type BattleCard } from "@/server/services/battles";
 import { db } from "@/server/db";
@@ -28,11 +29,12 @@ export default async function HomePage() {
 
   track("landing_viewed", {}, { deviceId: viewer.deviceId });
   const weekAgo = new Date(Date.now() - 7 * 86400_000);
-  const [feed, stories, [{ weekVotes }], economy] = await Promise.all([
-    getFeed({ user: null, deviceId: viewer.deviceId }, { limit: 12 }),
+  const [feed, stories, [{ weekVotes }], economy, guestLeft] = await Promise.all([
+    getFeed({ user: null, deviceId: viewer.deviceId }, { limit: 200 }),
     battleCards(and(eq(battles.visibility, "PUBLIC"), eq(battles.status, "CLOSED"), isNotNull(outcomes.id)), 20),
     db.select({ weekVotes: sql<number>`count(*)::int` }).from(votes).where(gte(votes.createdAt, weekAgo)),
     getEconomy(),
+    guestVotesLeft({ user: null, deviceId: viewer.deviceId }),
   ]);
   // Skip repeat stories (same question/options posted more than once).
   const seenStories = new Set<string>();
@@ -41,9 +43,10 @@ export default async function HomePage() {
     return seenStories.has(k) ? false : (seenStories.add(k), true);
   });
   const live = feed[0];
-  // Hero cycles through the first few; the carousel shows the rest (or everything but the first when there are few).
-  const heroBattles = feed.slice(0, 5);
-  const deciding = feed.length > 8 ? feed.slice(5) : feed.slice(1);
+  // "Deciding now" shows the top of the ranked feed; the hero cycles through every other live battle the visitor
+  // hasn't voted on, in random order, with no repeats (Alex, Nov 24). Votes there count toward the free votes.
+  const deciding = feed.slice(0, feed.length > 16 ? 8 : 1);
+  const heroBattles = shuffle(feed.length > 16 ? feed.slice(8) : feed);
 
   return (
     <div className="-mx-4 -mt-2 overflow-x-clip">
@@ -87,7 +90,7 @@ export default async function HomePage() {
             <div aria-hidden className="absolute inset-x-6 -top-5 h-24 rotate-6 rounded-[22px] bg-accent-900 shadow-ring" />
             <div aria-hidden className="absolute inset-x-0 -top-2.5 h-24 rounded-[22px] bg-surface shadow-ring" />
             <div className="relative" data-track="hero_card">
-              <HeroRotator battles={heroBattles} />
+              <HeroRotator battles={heroBattles} guestLeft={guestLeft} guestLimit={economy.guestVoteLimit} />
             </div>
           </div>
         )}
@@ -268,4 +271,13 @@ function StoryCard({ b }: { b: BattleCard }) {
       )}
     </Link>
   );
+}
+
+function shuffle<T>(xs: T[]): T[] {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
