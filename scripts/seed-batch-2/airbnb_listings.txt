@@ -1,0 +1,50 @@
+0|765270270881978376|Nashville house|4 bedrooms, hot tub on the roof|42670607|Scottsdale house|4 bedrooms, heated pool + fire pit|52
+1|34864514|Downtown house|rooftop deck with downtown views|655280180851727722|Lake house|private pool, lake views|41
+2|46453870|Miami Beach condo|3 bedrooms with a view|17236431|Key West house|4 bedrooms, 4 bathrooms|47
+3|27156940|Asheville cottage|in the trees, hot tub|16486050|Charleston house|historic southern house|55
+4|600885580372307973|Maui condo|ocean view, steps to the beach|44885826|Tulum apartment|private plunge pool|51
+5|19924835|Seaside cottage||39873771|Napa vineyard room|in the middle of a vineyard|44
+6|32446883|Palm Springs house|pool, spa and fire pit|32628779|Joshua Tree house|hot tub under the stars|49
+7|769826396927020898|Smokies cabin|7 bedrooms, game room|13953139|Outer Banks house|8 bedrooms, oceanfront pool|45
+8|9541850|Breck condo|steps to the lifts|1950467|Park City house|5 min walk to Main St|43
+9|24544074|Beach condo|penthouse, right on the sand|47717182|Mountain cabin|mountain view, treehouse feel|57
+10|53737540|French Quarter loft|5 bedrooms, hot tub|28151615|Garden District house|pool and spa on Magazine St|53
+11|53924774|Catskills A-frame|sauna in the woods|645002799244821683|Hudson apartment|on Warren St, walk to dinner|66
+12|736957965314850349|Vegas house|6 bedrooms, 8 min to the Strip|713607942823719111|Ozarks lake house|dock + putting green|46
+13|17763551|Savannah Victorian|by Forsyth Park|54307061|St. Augustine duplex|historic, with a pool|58
+14|47950410|Lake house|6 bedrooms, sunset view|52780378|Galena house|6 bedrooms, hot tub|48
+15|43498125|Napa house|3 beds, hot tub downtown|13625550|Sonoma house|pool, hot tub and bocce|45
+16|34548122|Big Bear cabin|5 bedrooms, arcade + hot tub|52374057|Arrowhead cabin|treetop view, rec room|54
+17|1138345807552324596|Lake A-frame|4 bedrooms, hot tub on the pier|649906858536454609|West Loop loft|5 bedrooms, rooftop jacuzzi|52
+18|12366403|Destin condo|beach view, chairs set up for you|45362384|Orlando townhouse|private pool, 6 mi to Disney|46
+19|28868765|Sedona suite|red rock views, pool|14912999|Santa Fe casita|adobe with a fireplace|49
+20|45273505|South Lake house|hot tub, 6 min to the beach|13167746|Truckee house|2 primary bedrooms|56
+21|10068675|South Beach villa|5 bedrooms, hot tub|12113797|Coconut Grove house||61
+22|20253954|Stowe house|10 miles to the mountain|11034694|Lake Placid house|5 bedrooms on Mirror Lake|44
+23|46353538|Cabo condo|ocean view terrace|50053915|Vallarta condo|rooftop pool, Romantic Zone|53
+24|42545559|Scottsdale house|5 bedrooms, heated pool|45214186|Myrtle Beach house|4 bed 4 bath|58
+25|1006489937375375878|Fredericksburg house|sleeps 10, hot tub|45432352|Austin house|3 stories, pool + sauna|63
+26|23481166|Positano B&B||4073032|Chianti farmhouse|with a pool|47
+27|23086650|Roma Norte apartment|3 bedrooms, private patio|16416546|Condesa apartment|rooftop views|48
+28|686663596322266612|Glass cabin|hot tub, sauna, cold plunge|41800927|Asheville cottage|hot tub, king bed|61
+29|9055915|Cape Cod cottage|4 bedrooms|21067948|Maine house|2 full baths (!!)|52
+30|765205166812515394|Asheville house|hot tub, 4 mi to downtown|1199893294854808327|Louisville house|has its own bourbon lounge|46
+31|551327349567177715|Lake George cabin||22683586|Seneca Lake cottage|private dock + hot tub|39
+32|1036123169008473789|Outer Banks house|waterfront in Duck|38523096|Myrtle Beach townhouse|walk to the beach, secret playroom|48
+33|13489403|San Juan house|walk to the beach|16755813|Rincón villa|private pool, walk to the beach|47
+34|36103144|Vermont barn loft|timber barn, big views|32483394|NH cabin|wood stove + hot tub|52
+35|38406427|Tulum treehouse|3 min walk to the cenotes|36207585|Cancun condo|beachfront, by the clubs|58
+36|624159631942875379|Austin house|pool + hot tub, sleeps 14|681862627523905384|Denver house|sauna, game room, mini golf|47
+37|53690716|Vegas house|heated pool|570484153411871659|Palm Springs villa||42
+38|1027040047722982463|Saugatuck house|5 bedrooms, home theater|52858698|Door County house|private trails|55
+39|6782036|Portland apartment|3 bedrooms on Munjoy Hill|6321113|Burlington loft|3 bedrooms|50
+40|11184859|Kauai studio|ocean view|52797865|Kona condo|huge view|54
+41|7558853|Steamboat condo|close to the mountain|23896903|Jackson townhouse|4 bedrooms|46
+42|867431573695729170|Fredericksburg house|on Main St, fire pit|19930446|Wimberley cabin|on the river, hot tub|49
+43|635755277284730890|Galveston beach house|beachfront, 4 kings|48546386|San Antonio cottage|by the Riverwalk|53
+44|42752719|Reykjavik studio||27289000|Canmore condo|hot tubs, mountain views|56
+45|49463392|Ozarks lake house|huge views, dock|29741887|Table Rock cabin|2 min to the lake|55
+46|653005223156359153|Joshua Tree house|heated pool & spa|47796274|Sedona house|3 bedrooms, big views|48
+47|545069446215377447|Pigeon Forge cabin|log cabin, hot tub|4568813|Tahoe cabin||45
+48|42274520|Charleston pink house|pool and a yard|562895267028868441|Savannah house|historic, downtown|63
+49|52853462|Key Largo place|waterfront sunsets|20090455|Whitefish loft|downtown|55
