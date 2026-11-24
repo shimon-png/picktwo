@@ -16,3 +16,18 @@ Run before every analysis (and daily once the Brain page exists). Record the dat
 
 | Date | Result | Notes |
 | --- | --- | --- |
+
+## Number scrub (Nov 24 2026)
+
+What was wrong and is now fixed:
+- Clean view dropped real people's votes on seed battles (PR 87). Only `vote.source = 'seed'` is excluded now.
+- Text vs photo counted every display and votes from any time (PR 87). Now person × battle, votes in the window.
+- Visitors / voters counted a guest browser and the account it signed into as two people. Now `WHO_E` / `WHO_V`.
+- Sign-ups came from the `onboarding_completed` event on the tiles but from the user table elsewhere; sign-ups by source included admins and ignored the clean start date. Now one rule, `brainScope().us`.
+- Skips ignored the clean filter (admins, start date) and dropped real skips of seed battles.
+- Day-by-day "Battles posted" left out deleted battles while the tile counted them.
+- "How deep people go" put cards with no position into 50+.
+- Theme / stakes votes were all-time while views were windowed.
+- Engagement score table hid seed battles in the clean view, though the score only uses real votes.
+
+The Brain page runs `brainChecks()` on every load and shows any rule that fails.

@@ -3,6 +3,7 @@ import { getBrainStats, type BrainView } from "@/server/services/brain";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
+import { brainChecks } from "@/server/services/brain-checks";
 import { signupJourneys } from "@/server/services/signup-journeys";
 import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 
@@ -72,14 +73,28 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30)), signupJourneys()]);
+  const [s, taste, wb, acq, journeys] = await Promise.all([getBrainStats(days, view), tasteByGroup(), winbackStats(), signupSources(Math.max(days, 30), view), signupJourneys()]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const viewedTotal = s.byKind.reduce((a, k) => a + k.seen, 0);
   const viewedVoted = s.byKind.reduce((a, k) => a + k.voted, 0);
+  const checks = brainChecks({
+    visits: n("sessions"),
+    visitors: n("visitors"),
+    votes: n("real_votes"),
+    voters: n("voters"),
+    signups: n("signups"),
+    battles: n("real_battles"),
+    daily: s.daily,
+    visitSources: s.visitSources,
+    byKind: s.byKind,
+    rawSources: s.sources,
+    signupSourcesTotal: acq.days === days ? acq.total.signups : undefined,
+  });
+  const failed = checks.filter((c) => !c.ok);
   const tiles: [string, string | number][] = [
     ["Visits", n("sessions")],
-    ["Visitors", n("visitors")],
+    ["Visitors (people)", n("visitors")],
     ["Deck cards shown", n("views")],
     // Share of cards seen (person × battle) that the same person voted on.
     ["Cards seen → voted", pct(viewedVoted, viewedTotal)],
@@ -90,7 +105,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     ["Hit sign-up wall", n("gates")],
     ["Sign-ups", n("signups")],
     ["Vote changes", n("changed")],
-    [view === "clean" ? "Real battles posted" : "Battles posted", n("real_battles")],
+    [view === "clean" ? "Battles posted by real people" : "Battles posted", n("real_battles")],
     ["Seed votes (all time, excluded)", n("seed_votes_all")],
   ];
 
@@ -112,14 +127,33 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
       </div>
       <p className="text-xs text-zinc-500">
         {view === "clean"
-          ? `Clean view: real people only, counting from ${nyDate(s.cleanFrom!)} (New York time). Leaves out seed votes and seed battles, made-up seed accounts, admins and their browsers, and bots. Nothing is deleted; "All data" shows everything. Change the start date with brainCleanFrom in Config.`
+          ? `Clean view: real people only, counting from ${nyDate(s.cleanFrom!)} (New York time). Leaves out the fake seed votes, made-up seed accounts, admins and their browsers, and bots. Real people's votes on seed battles count; seed battles don't count as posted battles. Nothing is deleted; "All data" shows everything. Change the start date with brainCleanFrom in Config.`
           : "All data: everything we have, including the 5,000 seed votes, seed battles and admin test activity (bots still left out)."}{" "}
         Hypotheses and requests live in the repo under docs/brain/.
       </p>
 
-      <Section title="Day by day" note="New York days, newest first. The small number is the change from the day before.">
+      <div className={`card p-3 text-sm ${failed.length ? "ring-1 ring-b" : ""}`}>
+        {failed.length === 0 ? (
+          <span>
+            <span className="text-green">✓</span> All {checks.length} number checks pass: the tables below add up to the tiles.
+          </span>
+        ) : (
+          <>
+            <div className="font-medium text-b">{failed.length} number check{failed.length > 1 ? "s" : ""} failed. Tell Claude; something is counting wrong.</div>
+            <ul className="mt-1 list-disc pl-5 text-xs">
+              {failed.map((c, i) => (
+                <li key={i}>
+                  {c.rule}: {c.detail}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </div>
+
+      <Section title="Day by day" note="New York days, newest first. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both.">
         <Rows
-          head={["Day", "Visitors", "Visits", "Sign-ups", "Votes", "Voters", "Battles posted"]}
+          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Battles posted"]}
           rows={s.daily.map((d, i) => {
             const prev = s.daily[i + 1];
             return [
@@ -137,10 +171,10 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section
         title="Visits by source"
-        note="Each visit's own tags: an X ad click (twclid) or utm_source=x/twitter is the X campaign, a t.co / x.com referrer is X organic. Tip: put utm_source on every campaign link, because apps often hide the referrer."
+        note="Each visit's own tags: an X ad click (twclid) or utm_source=x/twitter is the X campaign, a t.co / x.com referrer is X organic. Visits add up to the Visits tile; a person who came two ways counts under both. Tip: put utm_source on every campaign link, because apps often hide the referrer."
       >
         <Rows
-          head={["Source", "Visitors today", "Yesterday", "Visitors", "Visits", "Top tags"]}
+          head={["Source", "People today", "People yesterday", "People", "Visits", "Top tags"]}
           rows={s.visitSources.map((r) => [r.label, r.today, r.yesterday, r.visitors, r.visits, <span key="t" className="text-xs text-zinc-500">{r.detail || "—"}</span>])}
         />
       </Section>
@@ -202,7 +236,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
       </Section>
 
       <Section
-        title={`Sign-ups by source · last ${acq.days} days`}
+        title={`Sign-ups by source · last ${acq.days} days${view === "clean" ? " (from the clean start date)" : ""}`}
         note={`Where each new account first came from (their first visit, incl. visits before signing up). X campaign = an X ad click (twclid) or utm_source=x/twitter; X organic = a link from t.co / x.com. Engaged = voted on ${acq.minVoteDays}+ different days, or posted a battle, within ${acq.windowDays} days of signing up. "Engaged (full ${acq.windowDays}d)" only counts people who signed up at least ${acq.windowDays} days ago, so sources are compared fairly. The X pixel fires a sign-up conversion for every new account.`}
       >
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -239,7 +273,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section
         title="Engagement score (Shimon)"
-        note="Share of a battle's real voters who came back 1–3 days later (next day counts most). Updates live when a voter returns, plus a full recount daily. Needs 3+ voters with a day to come back."
+        note="Share of a battle's real voters who came back 1–3 days later (next day counts most). All-time score from real votes only (seed votes never count), so seed battles can rank too. Updates live when a voter returns, plus a full recount daily. Needs 3+ voters with a day to come back."
       >
         <div><RecomputeEngagement /></div>
         <Rows
@@ -256,11 +290,11 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section
         title="By theme (AI tags)"
-        note="Each battle is tagged by AI when posted: theme, stakes, and what picking each side suggests about the voter. Real votes are all-time; views are for the selected window."
+        note="Each battle is tagged by AI when posted: theme, stakes, and what picking each side suggests about the voter. Battles posted by real people only (seed battles aren't AI-tagged). Votes and views are for the selected window."
       >
         <div><TagBattles remaining={s.untagged} /></div>
         <Rows
-          head={["Theme", "Battles", "Real votes", "Vote rate", "Avg score"]}
+          head={["Theme", "Battles", "Votes", "Vote rate", "Avg score"]}
           rows={s.byTheme.map((r) => [r.tag.replace(/_/g, " "), r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
         />
       </Section>
@@ -281,7 +315,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section title="By stakes" note="Small (snack, nail colour), medium (event outfit, gadget), big (house, job, proposal).">
         <Rows
-          head={["Stakes", "Battles", "Real votes", "Vote rate", "Avg score"]}
+          head={["Stakes", "Battles", "Votes", "Vote rate", "Avg score"]}
           rows={s.byStakes.map((r) => [r.tag, r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
         />
       </Section>
@@ -310,24 +344,24 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         />
       </Section>
 
-      <Section title="Next-day return" note="People first seen that day (New York time) who visited again the next day.">
+      <Section title="Next-day return" note="People first seen in this window on that day (New York time) who visited again the next day. The last day can't have returns yet.">
         <Rows head={["First seen", "New visitors", "Back next day", "Rate"]} rows={s.retention.map((r) => [r.day, r.new_visitors, r.back_d1, pct(r.back_d1, r.new_visitors)])} />
       </Section>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Section title="How deep people go" note="Cards viewed by position in the deck.">
-          <Rows head={["Position", "Views"]} rows={s.depth.map((d) => [d.bucket, d.views])} />
+        <Section title="How deep people go" note="Deck cards shown, by position in the deck (adds up to the Deck cards shown tile).">
+          <Rows head={["Position", "Times shown"]} rows={s.depth.map((d) => [d.bucket, d.views])} />
         </Section>
-        <Section title="How people pick">
+        <Section title="How people pick" note="Every vote, by how it was made (tap, swipe, key), from the vote log.">
           <Rows head={["Method", "Votes"]} rows={s.methods.map((m) => [m.method, m.n])} />
         </Section>
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Section title="Closest to 50/50" note="All time, 10+ real votes.">
+        <Section title="Closest to 50/50" note={view === "clean" ? "10+ real votes since the clean start date." : "All time, 10+ votes incl. seed."}>
           <Rows head={["Battle", "A", "B"]} rows={s.closest.map((b) => [battleLink(b.slug, b.title), pct(b.a, b.total), pct(b.b, b.total)])} />
         </Section>
-        <Section title="Most one-sided" note="All time, 10+ real votes.">
+        <Section title="Most one-sided" note={view === "clean" ? "10+ real votes since the clean start date." : "All time, 10+ votes incl. seed."}>
           <Rows head={["Battle", "A", "B"]} rows={s.lopsided.map((b) => [battleLink(b.slug, b.title), pct(b.a, b.total), pct(b.b, b.total)])} />
         </Section>
       </div>
