@@ -15,9 +15,21 @@ const OUT_MS = 380;
  * away to the left and the next one slides in. Pauses while the visitor hovers/touches/focuses it and when the tab
  * is hidden. Votes count toward the guest's free votes; once they're used, a tap opens the sign-up sheet.
  */
-export function HeroRotator({ battles, guestLeft: initialLeft, guestLimit }: { battles: BattleCard[]; guestLeft: number | null; guestLimit: number }) {
+export function HeroRotator({
+  battles,
+  guestLeft: initialLeft,
+  guestLimit,
+  softGate = false,
+}: {
+  battles: BattleCard[];
+  guestLeft: number | null;
+  guestLimit: number;
+  /** Sign-up gate test, group B: never blocked; a closable dialog instead of the wall. */
+  softGate?: boolean;
+}) {
   const [idx, setIdx] = useState(0);
   const [guestLeft, setGuestLeft] = useState(initialLeft);
+  const [soft, setSoft] = useState(softGate);
   const [gate, setGate] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [voted, setVoted] = useState(false);
@@ -81,18 +93,20 @@ export function HeroRotator({ battles, guestLeft: initialLeft, guestLimit }: { b
         )}
         <HeroBattle
           b={b}
-          gated={guestLeft !== null && guestLeft <= 0}
+          gated={!soft && guestLeft !== null && guestLeft <= 0}
           onGate={() => {
             setGuestLeft(0);
             setGate(true);
           }}
-          onVoted={() => {
+          onVoted={(r) => {
             setVoted(true);
             setGuestLeft((n) => (n === null ? n : Math.max(0, n - 1)));
+            if (r.softGate != null) setSoft(r.softGate);
+            if (r.gatePrompt) setGate(true);
           }}
         />
       </div>
-      {gate && <SignupGate limit={guestLimit} next="/vote" onClose={() => setGate(false)} />}
+      {gate && <SignupGate soft={soft} limit={guestLimit} next="/vote" place="home" onClose={() => setGate(false)} />}
       {many && battles.length > 10 && (
         <p className="mt-3 text-center text-xs text-zinc-500" aria-hidden>
           {idx + 1} of {battles.length}

@@ -121,6 +121,14 @@ export const ECONOMY_DEFAULTS = {
   tierTopAt: 40,
   /** Battles a signed-out visitor can vote on before the "Sign up to keep voting" gate. */
   guestVoteLimit: 5,
+  /**
+   * Sign-up gate A/B test (services/gate-test.ts): % of new signed-out browsers put in group B, where the gate is a
+   * closable dialog and they can keep voting. Group A (control) is the hard gate. 0 = test off, everyone gets A.
+   * Assignments are saved, so changing this only affects browsers seen after the change.
+   */
+  gateTestPct: 50,
+  /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */
+  softGateEvery: 5,
   /** Close the loop (docs/rules/close-the-loop-and-experts.md): longest a battle can run, in hours (5 days). */
   maxBattleHours: 120,
   /** Posting is blocked while a user has this many closed battles with no reported choice (0 = off). */

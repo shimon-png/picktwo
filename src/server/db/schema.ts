@@ -131,6 +131,18 @@ export const devices = pgTable("device", {
   createdAt: now("created_at"),
 });
 
+/** A/B test groups (services/gate-test.ts). One row per experiment × unit (a browser's device id); never changes. */
+export const experimentAssignments = pgTable(
+  "experiment_assignment",
+  {
+    experiment: text("experiment").notNull(),
+    unitId: text("unit_id").notNull(),
+    arm: text("arm").notNull(),
+    createdAt: now("created_at"),
+  },
+  (t) => [primaryKey({ columns: [t.experiment, t.unitId] }), index("experiment_assignment_created").on(t.experiment, t.createdAt)],
+);
+
 // ---------- Battles ----------
 export const categories = pgTable("category", {
   id: text("id").primaryKey(),

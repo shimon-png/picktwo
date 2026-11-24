@@ -4,6 +4,8 @@ import { battles, votes, skips, users, reasonHelpful, devices, type User } from 
 import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { awardPoints, votePointsToday } from "./points";
+import { gateArm } from "./gate-test";
+import { gateDecision, type GateArm } from "./gate-test-rules";
 import { getEconomy } from "./config";
 import { voteQualityIssue, isValidReason } from "./priority";
 import { notify } from "./notifications";
@@ -64,6 +66,9 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
 
   const economy = await getEconomy();
   const user = viewer.user;
+  // Sign-up gate A/B test: group A hits the wall after the free votes, group B gets a closable dialog.
+  const arm: GateArm | null = user ? null : await gateArm(viewer.deviceId);
+  let gatePrompt = false;
   // A one-tap suggested reason chip counts as a reason even though it's short.
   const reasonEarns =
     isValidReason(input.reason, economy.reasonMinChars) || (!!input.reason && isReasonChip(input.reason));
@@ -109,8 +114,12 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
     } else {
       isNew = true;
       // Signed-out visitors get a few free votes, then must sign up (the client shows the gate first).
-      if (!user && (await guestVotesUsed(viewer.deviceId!, tx)) >= economy.guestVoteLimit)
-        throw new AppError("SIGNUP_REQUIRED", "Sign up to keep voting — it takes 4 quick steps.");
+      if (!user) {
+        const used = await guestVotesUsed(viewer.deviceId!, tx);
+        const gate = gateDecision(arm ?? "control", used, economy.guestVoteLimit, economy.softGateEvery);
+        if (!gate.allow) throw new AppError("SIGNUP_REQUIRED", "Sign up to keep voting — it takes 4 quick steps.");
+        gatePrompt = gate.prompt;
+      }
       // Quality checks for points (PRD 5.5)
       let issue: ReturnType<typeof voteQualityIssue> = "anonymous";
       if (user) {
@@ -193,7 +202,17 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
     } else {
       guestLeft = Math.max(0, economy.guestVoteLimit - (await guestVotesUsed(viewer.deviceId!, tx)));
     }
-    return { voteId, points, results: pct(fresh.votesA, fresh.votesB), ppBalance, guestVotesLeft: guestLeft, isNew };
+    return {
+      voteId,
+      points,
+      results: pct(fresh.votesA, fresh.votesB),
+      ppBalance,
+      guestVotesLeft: guestLeft,
+      /** Group B of the sign-up gate test: never blocked; `gatePrompt` = show the closable sign-up dialog now. */
+      softGate: arm === "soft",
+      gatePrompt,
+      isNew,
+    };
   });
 
   if (res.isNew)
@@ -207,6 +226,7 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
         dwellMs: input.dwellMs,
         withReason: !!input.reason,
         points: res.points,
+        ...(arm ? { gateArm: arm } : {}),
         ...input.meta,
       },
       { userId: user?.id, deviceId: viewer.deviceId },

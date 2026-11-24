@@ -53,7 +53,7 @@ export function diversify<T extends { categoryId: string; authorId: string }>(so
 }
 
 /** FNV-1a 32-bit hash → [0, 1). Deterministic, so a seed gives a stable order. */
-function hashUnit(s: string): number {
+export function hashUnit(s: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i);

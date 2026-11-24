@@ -239,6 +239,13 @@
       "when": 1795500001000,
       "tag": "0033_seed_batch_2_same_people",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795523459075,
+      "tag": "0034_gate_ab_test",
+      "breakpoints": true
     }
   ]
 }
