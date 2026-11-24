@@ -82,6 +82,20 @@ function Delta({ now, prev }: { now: number; prev: number | undefined }) {
   );
 }
 
+const ratio = (n: number, d: number) => (d ? n / d : null);
+
+/** "4.2 +0.8": an average with its change from the day before. */
+function Ratio({ now, prev }: { now: number | null; prev?: number | null }) {
+  if (now == null) return <>—</>;
+  const d = prev == null ? 0 : Math.round((now - prev) * 10) / 10;
+  return (
+    <>
+      {now.toFixed(1)}
+      {d !== 0 && <span className={`ml-1 text-[11px] ${d > 0 ? "text-green" : "text-b"}`}>{d > 0 ? `+${d.toFixed(1)}` : `−${(-d).toFixed(1)}`}</span>}
+    </>
+  );
+}
+
 export default async function BrainPage({ searchParams }: { searchParams: Promise<{ days?: string; view?: string }> }) {
   const sp = await searchParams;
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
@@ -181,9 +195,9 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         )}
       </div>
 
-      <Section title="Day by day" note="New York days, newest first. Tap any number to see who or what is behind it. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both.">
+      <Section title="Day by day" note="New York days, newest first. Tap any number to see who or what is behind it. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both. Votes per voter = votes ÷ people who voted that day; votes per visitor = votes ÷ everyone who visited.">
         <Rows
-          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Battles posted"]}
+          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Votes per voter", "Votes per visitor", "Battles posted"]}
           rows={s.daily.map((d, i) => {
             const prev = s.daily[i + 1];
             const cell = (kind: BrainListKind, now: number, before: number | undefined) =>
@@ -201,6 +215,8 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
               cell("signups", d.signups, prev?.signups),
               cell("votes", d.votes, prev?.votes),
               cell("voters", d.voters, prev?.voters),
+              <Ratio key="vpv" now={ratio(d.votes, d.voters)} prev={prev && ratio(prev.votes, prev.voters)} />,
+              <Ratio key="vpvis" now={ratio(d.votes, d.visitors)} prev={prev && ratio(prev.votes, prev.visitors)} />,
               cell("battles", d.posts, prev?.posts),
             ];
           })}
