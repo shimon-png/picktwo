@@ -16,7 +16,7 @@ import {
 } from "../db/schema";
 import { AppError } from "../errors";
 import { createSlug } from "@/lib/id";
-import { DEFAULT_CATEGORY_ID, REASON_CHIPS, kidAgeLabel } from "@/lib/constants";
+import { DEFAULT_CATEGORY_ID, kidAgeLabel } from "@/lib/constants";
 import { createBattleInput, type CreateBattleInput } from "@/lib/validators";
 import { assertCleanText, hashMatchImage, screenImage } from "../moderation";
 import { strictest } from "./safety";
@@ -353,7 +353,6 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     boostCost: economy.boostCost,
     viewerPP: viewer.user?.ppBalance ?? null,
     relevantVotes,
-    reasonSuggestions: REASON_CHIPS,
     loopRewards: {
       loop: economy.loopClosedPoints,
       fast: economy.loopClosedFastBonus,

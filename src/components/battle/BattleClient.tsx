@@ -272,19 +272,10 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
               </>
             )}
           </p>
-          {!reasonSaved && (
-            <div className="flex flex-wrap gap-1.5">
-              {v.reasonSuggestions.map((c) => (
-                <button key={c} type="button" className="chip" onClick={() => saveReason(c)}>
-                  {c}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="flex gap-2">
             <input
               className="input"
-              placeholder="Or write one line…"
+              placeholder="Write one line…"
               maxLength={140}
               value={reason}
               onChange={(e) => {

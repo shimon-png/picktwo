@@ -12,7 +12,6 @@ import { notify } from "./notifications";
 import { getBattleRow, assertCanView } from "./battles";
 import { track } from "../analytics";
 import { pct } from "@/lib/utils";
-import { isReasonChip } from "@/lib/constants";
 
 const VOTE_MILESTONES = [1, 10, 50, 100];
 
@@ -69,9 +68,7 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
   // Sign-up gate A/B test: group A hits the wall after the free votes, group B gets a closable dialog.
   const arm: GateArm | null = user ? null : await gateArm(viewer.deviceId);
   let gatePrompt = false;
-  // A one-tap suggested reason chip counts as a reason even though it's short.
-  const reasonEarns =
-    isValidReason(input.reason, economy.reasonMinChars) || (!!input.reason && isReasonChip(input.reason));
+  const reasonEarns = isValidReason(input.reason, economy.reasonMinChars);
 
   // A changed vote overwrites vote.side, so the first pick is kept in the event log (data brain).
   let changedFrom: "A" | "B" | null = null;

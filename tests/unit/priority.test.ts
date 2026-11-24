@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { loopFactor, posterPriority, priorityFactor, priorityTier, pointsTier, voteQualityIssue, isValidReason, reminderDue } from "@/server/services/priority";
 import { createBattleInput } from "@/lib/validators";
-import { isReasonChip } from "@/lib/constants";
 
 const base = {
   signedIn: true,
@@ -134,9 +133,3 @@ describe("createBattleInput.postAs (admin post-as)", () => {
   });
 });
 
-describe("reason chips", () => {
-  it("recognises the one-tap chips", () => {
-    expect(isReasonChip("Just feels right")).toBe(true);
-    expect(isReasonChip("nope")).toBe(false);
-  });
-});
