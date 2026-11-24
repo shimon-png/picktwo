@@ -12,6 +12,8 @@ _Last updated: November 2026_
 ## Advertising measurement
 We use the X (Twitter) pixel to measure our ads on X. It tells X when someone visits crowdpick.ai and when a new account is created, so X can report how many sign-ups an ad brought. We don't send X your name, email, votes or anything you post. You can limit this with your browser's tracking protection or X's own ad settings.
 
+We also use Vercel Web Analytics, our hosting provider's privacy-friendly visit counter. It counts page views without cookies and without identifying you.
+
 ## How we use it
 - To run crowdpick.ai: show battles to relevant voters, calculate results, priority points and reputation.
 - To send you notifications you've enabled.

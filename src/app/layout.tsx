@@ -20,6 +20,7 @@ import { Nav, ChromeOnly, ContentShell, HeaderLogo, YouButton } from "@/componen
 import { PriorityPill } from "@/components/priority/PriorityPill";
 import { Toaster } from "@/components/ui/Toaster";
 import { XPixel } from "@/components/analytics/XPixel";
+import { Analytics } from "@vercel/analytics/next";
 import { Telemetry } from "@/components/layout/Telemetry";
 import { appUrl } from "@/lib/utils";
 
@@ -90,6 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Nav />
         <Toaster />
         <XPixel />
+        <Analytics />
       </body>
     </html>
   );
