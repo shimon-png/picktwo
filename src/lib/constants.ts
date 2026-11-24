@@ -112,8 +112,8 @@ export const ECONOMY_DEFAULTS = {
   /** Display tiers on the ⚡ meter: Normal below tierHighAt, High below tierTopAt, Top at/above. */
   tierHighAt: 20,
   tierTopAt: 40,
-  /** Battles a signed-out visitor can vote on before the "Sign up to keep voting" gate. */
-  guestVoteLimit: 5,
+  /** Battles a signed-out visitor can vote on before the "Sign up to keep voting" gate (15 since Nov 25, Shimon; was 5). */
+  guestVoteLimit: 15,
   /**
    * Sign-up gate A/B test (services/gate-test.ts): % of new signed-out browsers put in group B, where the gate is a
    * closable dialog and they can keep voting. Group A (control) is the hard gate. 0 = test off, everyone gets A.
