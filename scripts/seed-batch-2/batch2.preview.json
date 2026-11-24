@@ -199,7 +199,7 @@
   "id": "seed_b2_t8",
   "slug": "TTCMPunh",
   "kind": "text",
-  "title": "Fiancé wants his mom to help pick my wedding dress. I want my mom and my sister only. Who's right?",
+  "title": "Fianc\u00e9 wants his mom to help pick my wedding dress. I want my mom and my sister only. Who's right?",
   "story": "His mom has already sent me 11 links.",
   "cat": "couples",
   "pctA": 86,
@@ -423,7 +423,7 @@
   "id": "seed_b2_t16",
   "slug": "Rd2yaL36",
   "kind": "text",
-  "title": "My fiancé wants a 'cheap' wedding ring for himself so he can spend more on his golf clubs. Who's right here?",
+  "title": "My fianc\u00e9 wants a 'cheap' wedding ring for himself so he can spend more on his golf clubs. Who's right here?",
   "story": "He's spending $1,400 on clubs and $40 on a ring.",
   "cat": "couples",
   "pctA": 58,
@@ -675,7 +675,7 @@
   "id": "seed_b2_t25",
   "slug": "xTdnzwvH",
   "kind": "text",
-  "title": "My fiancée wants a prenup because her parents told her to. I'm hurt. Which one of us is right?",
+  "title": "My fianc\u00e9e wants a prenup because her parents told her to. I'm hurt. Which one of us is right?",
   "story": "I make more money than her. I'm the one who should worry lol",
   "cat": "couples",
   "pctA": 58,
@@ -1095,7 +1095,7 @@
   "id": "seed_b2_t40",
   "slug": "uZUEZN7p",
   "kind": "text",
-  "title": "I found out my fiancé still pays for his ex's Netflix. Is that a big deal?",
+  "title": "I found out my fianc\u00e9 still pays for his ex's Netflix. Is that a big deal?",
   "story": "They broke up in 2021. He 'forgot'.",
   "cat": "cheating",
   "pctA": 62,
@@ -2103,7 +2103,7 @@
   "id": "seed_b2_t76",
   "slug": "TjGtDFqm",
   "kind": "text",
-  "title": "Fiancé proposed with his grandma's ring. I don't love it. Tell him?",
+  "title": "Fianc\u00e9 proposed with his grandma's ring. I don't love it. Tell him?",
   "story": "It's beautiful, just not my style. It's very yellow gold.",
   "cat": "wedding",
   "pctA": 34,
@@ -2327,7 +2327,7 @@
   "id": "seed_b2_t84",
   "slug": "Y4PYSqMJ",
   "kind": "text",
-  "title": "My fiancé wants his groomsmen in matching Crocs for the 'fun pics'. Allow it?",
+  "title": "My fianc\u00e9 wants his groomsmen in matching Crocs for the 'fun pics'. Allow it?",
   "story": "They're black. He says they're 'formal Crocs'.",
   "cat": "wedding",
   "pctA": 28,
@@ -2691,7 +2691,7 @@
   "id": "seed_b2_t97",
   "slug": "TLUaUM2f",
   "kind": "text",
-  "title": "My fiancé wants our first dance to be a choreographed TikTok routine. Yes or no?",
+  "title": "My fianc\u00e9 wants our first dance to be a choreographed TikTok routine. Yes or no?",
   "story": "He's been practicing secretly. His brother told me.",
   "cat": "wedding",
   "pctA": 64,
@@ -3503,7 +3503,7 @@
   "id": "seed_b2_t126",
   "slug": "KhqYWrhh",
   "kind": "text",
-  "title": "Fiancé wants to put the wedding on credit cards. Do it or postpone?",
+  "title": "Fianc\u00e9 wants to put the wedding on credit cards. Do it or postpone?",
   "story": "We'd owe $26k at 24%.",
   "cat": "money",
   "pctA": 12,
@@ -3979,7 +3979,7 @@
   "id": "seed_b2_t143",
   "slug": "J3Yn44LJ",
   "kind": "text",
-  "title": "My fiancé's best friend is a girl and she wants to be in his groomsman lineup. Ok?",
+  "title": "My fianc\u00e9's best friend is a girl and she wants to be in his groomsman lineup. Ok?",
   "story": "She'd wear a suit. I'd honestly kind of love it.",
   "cat": "life",
   "pctA": 62,
@@ -4355,13 +4355,13 @@
    {
     "label": "Pink top",
     "line": null,
-    "img": "https://images.pexels.com/photos/6230489/pexels-photo-6230489.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Black top + jacket",
     "line": null,
-    "img": "https://images.pexels.com/photos/34372388/pexels-photo-34372388.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -4495,13 +4495,13 @@
    {
     "label": "Rooftop",
     "line": null,
-    "img": "https://images.pexels.com/photos/9657239/pexels-photo-9657239.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Wildflower field",
     "line": null,
-    "img": "https://images.pexels.com/photos/18664663/pexels-photo-18664663.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -4579,13 +4579,13 @@
    {
     "label": "Keep it long",
     "line": null,
-    "img": "https://images.pexels.com/photos/32055831/pexels-photo-32055831.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Get the bob",
     "line": null,
-    "img": "https://images.pexels.com/photos/6364028/pexels-photo-6364028.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -4859,13 +4859,13 @@
    {
     "label": "Navy suit",
     "line": null,
-    "img": "https://images.pexels.com/photos/30609636/pexels-photo-30609636.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Black tux",
     "line": null,
-    "img": "https://images.pexels.com/photos/27691961/pexels-photo-27691961.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -5139,13 +5139,13 @@
    {
     "label": "Red lip",
     "line": null,
-    "img": "https://images.pexels.com/photos/7290642/pexels-photo-7290642.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Nude",
     "line": null,
-    "img": "https://images.pexels.com/photos/30408335/pexels-photo-30408335.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -5240,7 +5240,7 @@
   "slug": "LP9WxpZL",
   "kind": "photo",
   "title": "Christmas card photo. Us with the dog or just us?",
-  "story": "The dog is a 90 lb lab who hates holding still.",
+  "story": "The dog is a 70 lb fluffball who hates holding still.",
   "cat": "life",
   "pctA": 81,
   "votes": 16,
@@ -5251,13 +5251,13 @@
    {
     "label": "With the dog",
     "line": null,
-    "img": "https://images.pexels.com/photos/11885343/pexels-photo-11885343.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": "https://images.pexels.com/photos/5859857/pexels-photo-5859857.jpeg?auto=compress&cs=tinysrgb&w=1080",
     "url": null
    },
    {
     "label": "Just us",
     "line": null,
-    "img": "https://images.pexels.com/photos/29382406/pexels-photo-29382406.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": "https://images.pexels.com/photos/5859855/pexels-photo-5859855.jpeg?auto=compress&cs=tinysrgb&w=1080",
     "url": null
    }
   ],
@@ -5335,13 +5335,13 @@
    {
     "label": "Blazer",
     "line": null,
-    "img": "https://images.pexels.com/photos/4964995/pexels-photo-4964995.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Cardigan",
     "line": null,
-    "img": "https://images.pexels.com/photos/8989555/pexels-photo-8989555.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -5391,13 +5391,13 @@
    {
     "label": "Black",
     "line": null,
-    "img": "https://images.pexels.com/photos/34921744/pexels-photo-34921744.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Color",
     "line": null,
-    "img": "https://images.pexels.com/photos/33510853/pexels-photo-33510853.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -5503,13 +5503,13 @@
    {
     "label": "Matching set",
     "line": null,
-    "img": "https://images.pexels.com/photos/29242391/pexels-photo-29242391.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Old t-shirt",
     "line": null,
-    "img": "https://images.pexels.com/photos/30572587/pexels-photo-30572587.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -5587,13 +5587,13 @@
    {
     "label": "Buzz it",
     "line": null,
-    "img": "https://images.pexels.com/photos/11744656/pexels-photo-11744656.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    },
    {
     "label": "Keep the curls",
     "line": null,
-    "img": "https://images.pexels.com/photos/41206499/pexels-photo-41206499.jpeg?auto=compress&cs=tinysrgb&w=1080",
+    "img": null,
     "url": null
    }
   ],
@@ -6527,8 +6527,8 @@
   "id": "seed_b2_a34",
   "slug": "vzspBDk2",
   "kind": "airbnb",
-  "title": "Girls trip to Puerto Rico, 6 of us. San Juan or Rincón?",
-  "story": "None of us speak Spanish. All of us can order a piña colada.",
+  "title": "Girls trip to Puerto Rico, 6 of us. San Juan or Rinc\u00f3n?",
+  "story": "None of us speak Spanish. All of us can order a pi\u00f1a colada.",
   "cat": "life",
   "pctA": 47,
   "votes": 16,
@@ -6543,7 +6543,7 @@
     "url": "https://www.airbnb.com/rooms/13489403"
    },
    {
-    "label": "Rincón villa",
+    "label": "Rinc\u00f3n villa",
     "line": "private pool, walk to the beach",
     "img": "https://images.pexels.com/photos/13914268/pexels-photo-13914268.jpeg?auto=compress&cs=tinysrgb&w=1080",
     "url": "https://www.airbnb.com/rooms/16755813"
@@ -6752,7 +6752,7 @@
   "slug": "gcVa3Eim",
   "kind": "airbnb",
   "title": "Girls ski weekend, 6 of us. Steamboat or Jackson Hole?",
-  "story": "Two of us ski. Four of us après.",
+  "story": "Two of us ski. Four of us apr\u00e8s.",
   "cat": "life",
   "pctA": 46,
   "votes": 19,
