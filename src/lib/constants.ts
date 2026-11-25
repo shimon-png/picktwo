@@ -169,6 +169,24 @@ export const ECONOMY_DEFAULTS = {
   aboutHoldoutPct: 10,
   /** Profile bar (Pickbot Phase 0): share of people (stable per account/browser) who never see it, to measure what it adds. */
   profileBarHoldoutPct: 10,
+  /** Pickbot (docs/plans/pickbot-prd.html). 1 = every signed-in person (not the holdout); 0 = admins only (alpha). */
+  pickbotOpen: 1,
+  /** Answer model: 0 = Claude Sonnet 5.5 (launch choice), 1 = Claude Opus 5.5. */
+  pickbotModelOpus: 0,
+  /** Free Pickbot answers per person per New York day (Plus = unlimited). */
+  pickbotFreePerDay: 3,
+  /** Crowd battles a person can post from Pickbot per day (Plus = pickbotPlusCrowdPerDay). */
+  pickbotCrowdPerDay: 1,
+  pickbotPlusCrowdPerDay: 5,
+  /** Similar battles (by theme) sent to Claude as crowd signals, and the votes one needs to count. */
+  pickbotSimilarBattles: 10,
+  pickbotMinCrowdVotes: 20,
+  /** A crowd battle's results go back to the asker at this many votes, or when it closes. */
+  pickbotResultsAt: 50,
+  /** Default length of a Pickbot crowd battle, in hours. */
+  pickbotCrowdHours: 24,
+  /** Share of people (stable per account) who don't get Pickbot, to measure what it adds. */
+  pickbotHoldoutPct: 10,
   /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */
   softGateEvery: 5,
   /** Close the loop (docs/rules/close-the-loop-and-experts.md): longest a battle can run, in hours (5 days). */

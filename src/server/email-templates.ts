@@ -105,6 +105,19 @@ ${btn(u("A"), `I picked ${o.labelA}`, A)}${btn(u("B"), `I picked ${o.labelB}`, B
   };
 }
 
+export function pickbotResults(o: { title: string; url: string; labelA: string; labelB: string; votesA: number; votesB: number; agreed: boolean | null }): Built {
+  const pa = pctOf(o.votesA, o.votesB);
+  const winner = o.votesA === o.votesB ? null : o.votesA > o.votesB ? o.labelA : o.labelB;
+  const line = o.agreed === true ? "The crowd agreed with Pickbot." : o.agreed === false ? "The crowd went the other way from Pickbot." : "";
+  return {
+    subject: `The crowd answered: ${o.title}`,
+    preheader: winner ? `${winner} won ${Math.max(pa, 100 - pa)}%. ${line}` : `It's a tie. ${line}`,
+    body: `${h1("The crowd is in")}${p(`<b>${esc(o.title)}</b> · ${o.votesA + o.votesB} votes`)}${splitBar(o.labelA, o.labelB, pa)}${line ? p(line) : ""}${p("See how people like you voted, and tell us what you picked.", true)}
+${btn(o.url, "See the results", A)}`,
+    text: `The crowd answered: ${o.title}\n${o.labelA} ${pa}% · ${o.labelB} ${100 - pa}%\n${o.url}`,
+  };
+}
+
 export function loopReminder(o: { title: string; reportUrl: string; labelA: string; labelB: string; n: number; loopPoints: number }): Built {
   const u = (c: string) => `${o.reportUrl}${o.reportUrl.includes("?") ? "&" : "?"}c=${c}`;
   return {

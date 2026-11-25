@@ -119,7 +119,7 @@ export async function aboutAfterVote(v: Viewer): Promise<AboutCardPayload | null
  */
 export async function answerAbout(
   v: Viewer,
-  input: { question: AboutQuestionId; answer: string | null; kidAges?: string[]; via?: "card" | "signup" | "settings" },
+  input: { question: AboutQuestionId; answer: string | null; kidAges?: string[]; via?: "card" | "signup" | "settings" | "pickbot" },
 ) {
   if (!v.user && !v.deviceId) throw new AppError("VALIDATION", "Please enable cookies");
   const q = ABOUT_QUESTIONS[input.question];

@@ -4,6 +4,7 @@ import { sendWinbacks } from "@/server/services/winback";
 import { ensureZipIncome } from "@/server/services/passive";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 import { runDailyEmails, runHourlyEmails } from "@/server/services/lifecycle";
+import { deliverPickbotResults, purgeOldThreads } from "@/server/services/pickbot";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -20,7 +21,9 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   hourly: async () => ({
     closed: await closeDueBattles(),
     emails: await runHourlyEmails(),
+    pickbotResults: await deliverPickbotResults(),
   }),
+  "pickbot-results": () => deliverPickbotResults(),
   // Once a day.
   daily: async () => ({
     closed: await closeDueBattles(),
@@ -32,6 +35,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     winback: await sendWinbacks(),
     emails: await runDailyEmails(),
     zipIncome: await ensureZipIncome(),
+    pickbotPurged: await purgeOldThreads(),
   }),
 };
 

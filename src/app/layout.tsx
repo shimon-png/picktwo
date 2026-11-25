@@ -16,6 +16,7 @@ import { unreadMessageCount } from "@/server/services/messages";
 import { MessagesButton } from "@/components/messages/MessagesButton";
 import { countOpenLoops } from "@/server/services/points";
 import { getEconomy } from "@/server/services/config";
+import { showAskTab } from "@/server/services/pickbot";
 import { Nav, ChromeOnly, ContentShell, HeaderLogo, YouButton } from "@/components/layout/Nav";
 import { PriorityPill } from "@/components/priority/PriorityPill";
 import { Toaster } from "@/components/ui/Toaster";
@@ -45,6 +46,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let unreadDms = 0;
   let openLoops = 0;
   const economy = await getEconomy();
+  const ask = await showAskTab(user).catch(() => false);
   if (user) {
     if (deviceId) await linkDevice(user.id, deviceId).catch((e) => console.error("[linkDevice]", e));
     [unread, openLoops, unreadDms] = await Promise.all([unreadCount(user.id), countOpenLoops(user.id, economy), unreadMessageCount(user.id)]);
@@ -88,7 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {children}
           </main>
         </ContentShell>
-        <Nav />
+        <Nav ask={ask} />
         <Toaster />
         <XPixel />
         <Analytics />

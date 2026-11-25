@@ -54,6 +54,8 @@ export type BattleTags = {
   brain?: BrainTags;
   /** Pinned first: the homepage hero and the top of everyone's Vote deck while it's open (set by a migration). */
   featured?: boolean;
+  /** Posted from a Pickbot thread ("Asked via Pickbot"). The asker is only in pickbot_thread, never shown. */
+  pickbot?: boolean;
 };
 
 // ---------- Users & auth (Auth.js drizzle adapter compatible) ----------
@@ -83,6 +85,9 @@ export const users = pgTable("user", {
   relationship: text("relationship"),
   housing: text("housing"),
   workStatus: text("work_status"),
+  /** Pickbot Plus (PRD §12): paid until this time (Stripe subscription, kept in sync by the webhook). */
+  plusUntil: ts("plus_until"),
+  stripeCustomerId: text("stripe_customer_id"),
   interests: text("interests").array().notNull().default([]),
   ppBalance: integer("pp_balance").notNull().default(10),
   /** Lifetime correct picks (votes that matched the poster's reported choice); drives Pro / Expert / Super expert. */
@@ -478,6 +483,57 @@ export const directMessages = pgTable(
     createdAt: now("created_at"),
   },
   (t) => [index("dm_conversation_created").on(t.conversationId, t.createdAt)],
+);
+
+/**
+ * Pickbot (docs/plans/pickbot-prd.html): one thread per question. `classification` is the small model's read of the
+ * first question (scope, theme, relevant extended fields); `state` holds the asker's choices (skip questions, general
+ * vs tailored, stop quick battles). Phase 2: `battleId` is the anonymous crowd battle made from it, `pickSide` the
+ * option Pickbot's pick became, `resultsAt` when the results summary went back to the asker. Private to the owner.
+ */
+export const pickbotThreads = pgTable(
+  "pickbot_thread",
+  {
+    id: id(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    classification: jsonb("classification").$type<import("@/lib/pickbot").Classification>().notNull(),
+    state: jsonb("state").$type<import("@/lib/pickbot").ThreadState>().notNull().default({}),
+    battleId: text("battle_id").references(() => battles.id, { onDelete: "set null" }),
+    pickSide: sideEnum("pick_side"),
+    resultsAt: ts("results_at"),
+    createdAt: now("created_at"),
+    updatedAt: now("updated_at"),
+  },
+  (t) => [index("pickbot_thread_user").on(t.userId, t.updatedAt), index("pickbot_thread_battle").on(t.battleId)],
+);
+
+/**
+ * Messages in a Pickbot thread. role USER | BOT. kind: question (the asker's text + photos), note (a short line,
+ * e.g. a profile answer or a bot line), answer (`answer` JSON + model, tokens, cost), draft (crowd battle draft in
+ * `data`), results (crowd results summary in `data`). `rating` UP/DOWN on answers.
+ */
+export const pickbotMessages = pgTable(
+  "pickbot_message",
+  {
+    id: id(),
+    threadId: text("thread_id").notNull().references(() => pickbotThreads.id, { onDelete: "cascade" }),
+    role: text("role").$type<"USER" | "BOT">().notNull(),
+    kind: text("kind").$type<"question" | "note" | "answer" | "draft" | "results">().notNull(),
+    text: text("text").notNull().default(""),
+    photos: jsonb("photos").$type<string[]>().notNull().default([]),
+    answer: jsonb("answer").$type<import("@/lib/pickbot").Answer & { kind: import("@/lib/pickbot").AnswerKind }>(),
+    data: jsonb("data").$type<Record<string, unknown>>(),
+    model: text("model"),
+    inputTokens: integer("input_tokens"),
+    outputTokens: integer("output_tokens"),
+    costUsd: doublePrecision("cost_usd"),
+    latencyMs: integer("latency_ms"),
+    rating: thumbEnum("rating"),
+    ratingNote: text("rating_note"),
+    createdAt: now("created_at"),
+  },
+  (t) => [index("pickbot_message_thread").on(t.threadId, t.createdAt)],
 );
 
 // Every lifecycle email we decide about: one row per (user, kind, ref), so nothing sends twice.

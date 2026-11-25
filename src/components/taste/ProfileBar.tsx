@@ -23,7 +23,7 @@ export function ProfileBar({
   className,
 }: {
   p: ProfileProgress;
-  place: "deck" | "you";
+  place: "deck" | "you" | "ask";
   onAsk?: (q: AboutQuestionId) => void;
   /** Just completed: show the done state (the deck hides the bar a moment later). */
   celebrate?: boolean;

@@ -280,6 +280,11 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
             See who voted like you →
           </Link>
         )}
+        {v.myVote && v.myVote.id !== "pending" && (
+          <Link href="/ask" className="ml-4 mt-3 inline-flex items-center gap-1 text-sm text-accent" data-track="pickbot_from_battle">
+            Stuck on your own choice? Ask Pickbot →
+          </Link>
+        )}
       </div>
 
       {/* Reason after voting */}

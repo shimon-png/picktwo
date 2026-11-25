@@ -10,7 +10,7 @@ const input = z.object({
   /** null = skipped */
   answer: z.string().trim().max(12).nullable(),
   kidAges: z.array(z.string().max(12)).max(6).optional(),
-  via: z.enum(["card", "signup", "settings"]).optional(),
+  via: z.enum(["card", "signup", "settings", "pickbot"]).optional(),
 });
 
 /** Answer (or skip) an about-you card. Works for guests (saved on the browser) and accounts (saved on the profile). */

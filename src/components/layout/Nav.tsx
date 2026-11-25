@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Compass, Layers, PlusSquare } from "lucide-react";
+import { Compass, Layers, PlusSquare, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "./Logo";
 
@@ -64,13 +64,15 @@ function useKeyboardOpen() {
   return open;
 }
 
-export function Nav() {
+/** `ask`: show the Ask (Pickbot) tab: everyone it's open to, and the signed-out (they're asked to sign up). */
+export function Nav({ ask = false }: { ask?: boolean }) {
   const path = usePathname();
   const keyboard = useKeyboardOpen();
   if (isFullScreen(path) || keyboard) return null;
-  // "You" lives in the header (avatar, top right); the tab bar is Vote · Post · Discover.
+  // "You" lives in the header (avatar, top right); the tab bar is Vote · Ask · Post · Discover (Ask = Pickbot).
   const items: { href: string; label: string; icon: typeof Layers; badge?: number; match: (p: string) => boolean }[] = [
     { href: "/vote", label: "Vote", icon: Layers, match: (p: string) => p.startsWith("/vote") || p === "/" },
+    ...(ask ? [{ href: "/ask", label: "Ask", icon: Sparkles, match: (p: string) => p.startsWith("/ask") }] : []),
     { href: "/post", label: "Post", icon: PlusSquare, match: (p: string) => p.startsWith("/post") },
     { href: "/discover", label: "Discover", icon: Compass, match: (p: string) => p.startsWith("/discover") || p.startsWith("/u/") },
   ];

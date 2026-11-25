@@ -15,12 +15,14 @@ import { LoadZipIncome, RecomputeEngagement, TagBattles } from "@/components/adm
 import { passiveStats, type GroupRow } from "@/server/services/passive-stats";
 import { aboutStats, type ArmNumbers } from "@/server/services/about-stats";
 import { profileBarStats } from "@/server/services/profile-progress";
+import { pickbotStats } from "@/server/services/pickbot-stats";
 import { ABOUT_QUESTIONS } from "@/lib/about";
 import type { BrainListKind } from "@/server/services/brain-lists";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
 
+const usd = (n: number, digits: number) => "$" + n.toFixed(digits);
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "—");
 
 type UeStats = Awaited<ReturnType<typeof unitEconomicsStats>>;
@@ -239,7 +241,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb, pk] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -253,6 +255,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     unitEconomicsStats(view),
     pinnedNumbers(view),
     profileBarStats(view, days),
+    pickbotStats(view, days),
   ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
@@ -574,6 +577,45 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
             .filter((r) => r.shown > 0 || ABOUT_QUESTIONS[r.id].inDeck)
             .map((r) => [QUESTION_LABELS[r.id] ?? r.id, r.shown, r.answered, r.skipped, pct(r.answered, r.shown)])}
         />
+      </Section>
+
+      <Section
+        title="Pickbot"
+        note={`Ask tab (docs/plans/pickbot-prd.html). ${pk.open ? "Open to every signed-in person" : "Admins only (Config pickbotOpen = 0)"}; answers by ${pk.model}; ${pk.holdoutPct}% of accounts never get it. People = distinct people who did each step in the window.`}
+      >
+        <Rows head={["Step", "People", "Times"]} rows={pk.funnel.map((f) => [f.label, f.people, f.events])} />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {(
+            [
+              ["Answers", pk.totalAnswers],
+              ["AI cost", usd(pk.totalCost, 2)],
+              ["Cost per answer", pk.totalAnswers ? usd(pk.totalCost / pk.totalAnswers, 3) : "—"],
+              ["Chose tailored", pct(pk.choice.tailored ?? 0, (pk.choice.tailored ?? 0) + (pk.choice.general ?? 0))],
+              ["👍 rate", pct(pk.ratings.reduce((t, r) => t + r.up, 0), pk.ratings.reduce((t, r) => t + r.up + r.down, 0))],
+              ["Crowd agreed with Pickbot", pct(pk.agree.yes, pk.agree.yes + pk.agree.no)],
+            ] as [string, React.ReactNode][]
+          ).map(([k, val]) => (
+            <div key={k} className="card p-3">
+              <div className="text-xs text-zinc-500">{k}</div>
+              <div className="text-xl font-medium">{val}</div>
+            </div>
+          ))}
+        </div>
+        <Rows
+          head={["Model", "Answer type", "Answers", "Cost each", "Avg seconds"]}
+          rows={pk.answers.map((a) => [a.model, a.kind, a.n, usd(a.costPer, 3), a.latencyS.toFixed(1)])}
+        />
+        <Rows head={["Model", "👍", "👎", "👍 rate"]} rows={pk.ratings.map((r) => [r.model, r.up, r.down, pct(r.up, r.up + r.down)])} />
+        <Rows
+          head={["Group (accounts)", "Visitors", "Votes", "Votes per visitor"]}
+          rows={(["pickbot", "holdout"] as const).map((k) => [
+            k === "pickbot" ? "Has Pickbot" : `Holdout (${pk.holdoutPct}%, no Pickbot)`,
+            pk.arms[k].visitors,
+            pk.arms[k].votes,
+            pk.arms[k].visitors ? (pk.arms[k].votes / pk.arms[k].visitors).toFixed(2) : "—",
+          ])}
+        />
+        <p className="text-xs text-zinc-500">{pk.holdoutP == null ? "Holdout: not enough data yet." : `Holdout difference: ${pk.holdoutP < 0.05 ? "real" : "could be chance"} (p = ${pk.holdoutP.toFixed(3)}).`}</p>
       </Section>
 
       <Section

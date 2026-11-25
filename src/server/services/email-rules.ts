@@ -15,7 +15,8 @@ export type EmailKind =
   | "first_battle_nudge" // E9
   | "tier_up" // E10
   | "weekly" // E12
-  | "dm_request"; // someone who follows you wants to message you
+  | "dm_request" // someone who follows you wants to message you
+  | "pickbot_results"; // the crowd answered your Pickbot question
 
 type KindMeta = {
   group: EmailGroup;
@@ -39,6 +40,7 @@ export const EMAIL_KINDS: Record<EmailKind, KindMeta> = {
   tier_up: { group: "tips", engagement: true, commercial: false, ignoresQuietHours: false },
   weekly: { group: "weekly", engagement: true, commercial: true, ignoresQuietHours: false },
   dm_request: { group: "messages", engagement: false, commercial: false, ignoresQuietHours: false },
+  pickbot_results: { group: "battles", engagement: false, commercial: false, ignoresQuietHours: false },
 };
 
 export const EMAIL_GROUP_LABELS: Record<Exclude<EmailGroup, "always">, { label: string; desc: string }> = {

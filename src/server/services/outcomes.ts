@@ -7,15 +7,19 @@ import { awardPoints } from "./points";
 import { getEconomy } from "./config";
 import { notify } from "./notifications";
 import { applyOutcomeToReputation } from "./reputation";
-import { getOwnedBattle } from "./battles";
+import { getBattleRow, getOwnedBattle } from "./battles";
+import { PICKBOT_NAME } from "@/lib/pickbot";
 import { track } from "../analytics";
 
 export async function reportOutcome(
   slug: string,
   user: User,
   input: { chosen: "A" | "B" | "NEITHER"; thumb?: "UP" | "DOWN" | null; note?: string; photoUrl?: string },
+  /** Pickbot crowd battle: the caller checked `user` asked it (pickbot_thread). Voters only ever see "Asked via Pickbot". */
+  opts: { pickbotAsker?: boolean } = {},
 ) {
-  const b = await getOwnedBattle(slug, user);
+  const b = opts.pickbotAsker ? await getBattleRow(slug) : await getOwnedBattle(slug, user);
+  if (!b) throw new AppError("NOT_FOUND", "Battle not found");
   const economy = await getEconomy();
   const total = b.votesA + b.votesB;
   const now = new Date();
@@ -73,7 +77,7 @@ export async function reportOutcome(
         thumb,
         yourSide: v.side,
         points: called,
-        poster: user.name || user.handle,
+        poster: opts.pickbotAsker ? PICKBOT_NAME : user.name || user.handle,
       });
     }
     await applyOutcomeToReputation(tx, b, input.chosen, thumb);
