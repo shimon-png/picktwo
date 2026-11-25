@@ -117,8 +117,21 @@ function verdict(holdout: { visitors: number; votes: number }, cards: { visitors
   return p < 0.05 ? `${side} · real difference (p = ${p.toFixed(3)})` : `${side} · could be chance (p = ${p.toFixed(2)})`;
 }
 
+/** Votes per visitor for one version, both groups together (cards + no cards). */
+function sinceV2(versions: { version: string; from: string; cards: ArmNumbers; holdout: ArmNumbers }[]) {
+  const v2 = versions.find((v) => v.version === "v2");
+  if (!v2) return undefined;
+  const v1 = versions.find((v) => v.version === "v1");
+  const all = (v: typeof v2) => {
+    const n = v.cards.visitors + v.holdout.visitors;
+    return n ? ((v.cards.votes + v.holdout.votes) / n).toFixed(2) : "—";
+  };
+  const from = new Date(v2.from).toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+  return { now: all(v2), before: v1 ? all(v1) : "—", from: `${from} (cards v2)` };
+}
+
 /** Pinned big numbers (Alex, Nov 25): today so far, yesterday underneath. */
-function PinnedRow({ today, yesterday }: { today: PinnedDay; yesterday: PinnedDay }) {
+function PinnedRow({ today, yesterday, since }: { today: PinnedDay; yesterday: PinnedDay; since?: { now: string; before: string; from: string } }) {
   const r = (x: number | null) => (x == null ? "—" : x.toFixed(2));
   const items: [string, string | number, string | number][] = [
     ["Votes per visitor", r(today.votesPerVisitor), r(yesterday.votesPerVisitor)],
@@ -127,13 +140,15 @@ function PinnedRow({ today, yesterday }: { today: PinnedDay; yesterday: PinnedDa
     ["New sign-ups", today.signups, yesterday.signups],
     ["New battles posted", today.posts, yesterday.posts],
   ];
+  // Temporary (Alex, Nov 25): votes per visitor since cards v2 went live, everyone incl. the no-cards group.
+  if (since) items.splice(1, 0, [`Votes per visitor since ${since.from}`, since.now, since.before]);
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" aria-label="Pinned numbers, today">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" aria-label="Pinned numbers, today">
       {items.map(([label, now, before], i) => (
         <div key={label} className={`card p-4 ${i === 0 ? "col-span-2 sm:col-span-1" : ""}`}>
-          <div className="text-xs text-zinc-500">{label} · today</div>
+          <div className="text-xs text-zinc-500">{label.startsWith("Votes per visitor since") ? label : `${label} · today`}</div>
           <div className="font-display text-[40px] font-semibold leading-none tabular-nums">{now}</div>
-          <div className="mt-1 text-xs text-zinc-500">Yesterday {before}</div>
+          <div className="mt-1 text-xs text-zinc-500">{label.startsWith("Votes per visitor since") ? `Cards v1 ${before}` : `Yesterday ${before}`}</div>
         </div>
       ))}
     </div>
@@ -297,7 +312,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         Hypotheses and requests live in the repo under docs/brain/.
       </p>
 
-      <PinnedRow today={pins.today} yesterday={pins.yesterday} />
+      <PinnedRow today={pins.today} yesterday={pins.yesterday} since={sinceV2(ab.versions)} />
 
       <div className={`card p-3 text-sm ${failed.length ? "ring-1 ring-b" : ""}`}>
         {failed.length === 0 ? (
