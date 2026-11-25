@@ -23,7 +23,8 @@ const V_FROM = sql`vote v LEFT JOIN device dv ON dv.id = v.device_id`;
 
 export type PersonRow = { who: string; handle: string | null; n: number; first: string; last: string };
 export type BattleRow = { slug: string; title: string; status: string; at: string; handle: string | null; authorId: string; votes: number; photo: boolean; iVoted: boolean };
-export type VoteRow = { at: string; who: string; handle: string | null; slug: string; title: string; picked: string; source: string | null };
+/** `who` is null for a vote whose account was deleted after its browser's votes moved into it (no owner left). */
+export type VoteRow = { at: string; who: string | null; handle: string | null; slug: string; title: string; picked: string; source: string | null };
 export type SignupRow = { who: string; handle: string | null; at: string; sex: string | null; ageRange: string | null; votes: number };
 
 export type BrainList =
@@ -83,7 +84,8 @@ export async function brainList(kind: BrainListKind, view: BrainView, days: numb
             AND ${onDay(sql`e.created_at`)} GROUP BY 1`;
   const rows = await db.execute<PersonRow>(sql`
     SELECT p.who, (SELECT pu.handle FROM "user" pu WHERE pu.id = p.who) AS handle, p.n, p.first::text AS first, p.last::text AS last
-    FROM (${inner}) p ORDER BY p.last DESC LIMIT ${LIMIT}`);
-  const [t] = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM (${inner}) p`);
+    FROM (${inner}) p WHERE p.who IS NOT NULL ORDER BY p.last DESC LIMIT ${LIMIT}`);
+  // No owner left (account deleted after its guest votes moved into it): not a person, and the tiles' count(DISTINCT) skips it too.
+  const [t] = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM (${inner}) p WHERE p.who IS NOT NULL`);
   return { kind, total: t?.n ?? 0, rows: [...rows] };
 }
