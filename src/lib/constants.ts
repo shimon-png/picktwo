@@ -146,6 +146,8 @@ export const ECONOMY_DEFAULTS = {
    * 1,000 votes; ueSignupValue = $ a signed-up user brings in a year; ueLifetimeVisits 0 = use the measured visits
    * per visitor.
    */
+  /** Unit economics counts everything from this New York day (YYYYMMDD) on, whatever window the Brain page shows. */
+  ueFrom: 20261123,
   ueAdCpm: 4,
   ueVotesPerAd: 5,
   ueSponsoredSharePct: 10,
