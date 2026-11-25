@@ -4,7 +4,20 @@ export function isBotUserAgent(ua: string): boolean {
   return !ua || /bot|crawl|spider|slurp|headless|lighthouse|preview|facebookexternalhit|embedly|monitor|curl|wget|python|axios|node-fetch/i.test(ua);
 }
 
-const PROFILE_FIELDS = ["sex", "ageRange", "zipCode", "kidsStatus", "kidAges", "country", "region", "city", "interests"] as const;
+const PROFILE_FIELDS = [
+  "sex",
+  "ageRange",
+  "zipCode",
+  "kidsStatus",
+  "kidAges",
+  "country",
+  "region",
+  "city",
+  "interests",
+  "relationship",
+  "housing",
+  "workStatus",
+] as const;
 export type ProfileFields = Partial<Record<(typeof PROFILE_FIELDS)[number], unknown>>;
 
 export function profileDiff(before: ProfileFields, after: ProfileFields): Record<string, { from: unknown; to: unknown }> {

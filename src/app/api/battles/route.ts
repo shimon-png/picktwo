@@ -10,7 +10,7 @@ import { profileIncomplete } from "@/lib/profile";
 
 export const POST = handler(async (req) => {
   const user = await requireUser();
-  if (profileIncomplete(user)) throw new AppError("FORBIDDEN", "Finish your profile (ZIP, sex and age) before posting");
+  if (profileIncomplete(user)) throw new AppError("FORBIDDEN", "Finish signing up before posting");
   await rateLimit("createBattleHour", user.id);
   await rateLimit("createBattleDay", user.id);
   const input = createBattleInput.parse(await req.json());

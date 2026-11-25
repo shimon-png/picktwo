@@ -149,3 +149,25 @@ export function TagBattles({ remaining }: { remaining: number }) {
     </button>
   );
 }
+
+export function LoadZipIncome({ rows }: { rows: number }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    setBusy(true);
+    try {
+      const r = await api<{ loaded: number; year: number; error?: string }>("/api/admin/brain/zip-income", { method: "POST" });
+      toast(r.error ? `Census: ${r.error}` : `Loaded ${r.loaded.toLocaleString()} ZIP areas (ACS ${r.year})`, r.error ? "error" : "ok");
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button className="chip !py-1 text-xs" onClick={run} disabled={busy}>
+      {busy ? "Loading Census data…" : rows ? `Reload Census income (${rows.toLocaleString()} ZIPs)` : "Load Census income by ZIP"}
+    </button>
+  );
+}

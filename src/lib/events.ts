@@ -62,6 +62,7 @@ function ensureSession(): Session {
     s = { id: createId(), last: now, seq: 1 };
     writeSession(s);
     queue.push({ id: createId(), name: "session_start", at: now, sessionId: s.id, seq: 1, props: startProps(a ?? attribution()) });
+    deviceHints();
   }
   return s;
 }
@@ -77,6 +78,11 @@ function startProps(a: Record<string, string>): Record<string, unknown> {
     standalone,
     vw: window.innerWidth,
     vh: window.innerHeight,
+    // Screen + density place an iPhone in a class (passive-rules deviceTier); deviceMemory is Chrome-only.
+    sw: window.screen?.width,
+    sh: window.screen?.height,
+    dpr: window.devicePixelRatio,
+    mem: (navigator as unknown as { deviceMemory?: number }).deviceMemory,
     tz: (() => {
       try {
         return Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -86,6 +92,20 @@ function startProps(a: Record<string, string>): Record<string, unknown> {
     })(),
     lang: navigator.language,
   };
+}
+
+/** Android Chrome can name the phone model (client hints); once per session, as its own `device_hints` event. */
+function deviceHints() {
+  try {
+    const uad = (navigator as unknown as { userAgentData?: { mobile?: boolean; getHighEntropyValues?: (h: string[]) => Promise<Record<string, string>> } }).userAgentData;
+    if (!uad?.mobile || !uad.getHighEntropyValues) return;
+    uad
+      .getHighEntropyValues(["model", "platformVersion"])
+      .then((h) => {
+        if (h.model) logEvent("device_hints", { model: String(h.model).slice(0, 40), platformVersion: String(h.platformVersion ?? "").slice(0, 20), mem: (navigator as unknown as { deviceMemory?: number }).deviceMemory });
+      })
+      .catch(() => {});
+  } catch {}
 }
 
 function nextSeq(): { sessionId: string; seq: number } {

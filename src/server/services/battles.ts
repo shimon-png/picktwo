@@ -31,6 +31,7 @@ import { pct } from "@/lib/utils";
 import { isAdmin } from "../viewer";
 import { cleanTarget } from "./targeting";
 import { checkZipTarget } from "./zip";
+import { likeYouFor } from "./about";
 
 // ---------------- Create ----------------
 /**
@@ -305,6 +306,8 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
   const totalVotes = b.votesA + b.votesB;
   const now = new Date();
   const expertResults = showResults ? ((await expertScores([b.id], economy.expertAt)).get(b.id) ?? null) : null;
+  // "People like you" bar for people who voted (not the poster).
+  const likeYou = myVote && !isOwner ? await likeYouFor(b.id, viewer) : null;
 
   // Voter relevance (owner view): how many votes came from parents of same-age kids.
   let relevantVotes: { count: number; ageLabel: string } | null = null;
@@ -336,6 +339,7 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     results,
     /** "Expert score": votes from Expert and Super expert voters only (status when they voted). */
     expertResults,
+    likeYou,
     totalVotes: showResults ? totalVotes : null,
     /** Vote count only (no split); Discover shows it to everyone. */
     voteCount: totalVotes,

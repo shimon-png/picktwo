@@ -1,6 +1,7 @@
 import { refreshEngagement } from "@/server/services/engagement";
 import { tagUntagged } from "@/server/services/tagging";
 import { sendWinbacks } from "@/server/services/winback";
+import { ensureZipIncome } from "@/server/services/passive";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 import { runDailyEmails, runHourlyEmails } from "@/server/services/lifecycle";
 
@@ -30,6 +31,7 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     tagging: await tagUntagged(40),
     winback: await sendWinbacks(),
     emails: await runDailyEmails(),
+    zipIncome: await ensureZipIncome(),
   }),
 };
 

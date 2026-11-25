@@ -63,6 +63,9 @@ export const POST = handler(async (req) => {
     sex: p.sex,
     ageRange: p.ageRange,
     interests: p.interests,
+    ...(p.relationship !== undefined ? { relationship: p.relationship } : {}),
+    ...(p.housing !== undefined ? { housing: p.housing } : {}),
+    ...(p.workStatus !== undefined ? { workStatus: p.workStatus } : {}),
   };
   await db
     .update(users)
@@ -80,6 +83,9 @@ export const POST = handler(async (req) => {
       sex: p.sex,
       ageRange: p.ageRange,
       interests: p.interests,
+      ...(p.relationship !== undefined ? { relationship: p.relationship } : {}),
+      ...(p.housing !== undefined ? { housing: p.housing } : {}),
+      ...(p.workStatus !== undefined ? { workStatus: p.workStatus } : {}),
       dataConsent: p.dataConsent,
       onboardedAt: user.onboardedAt ?? new Date(),
     })

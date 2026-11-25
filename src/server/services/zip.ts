@@ -69,3 +69,11 @@ export function checkZipTarget(raw: string): string | null {
   if (/^[A-Z]\d[A-Z](\d[A-Z]\d)?$/.test(s)) return zipcodes.lookup(s.slice(0, 3))?.country === "Canada" ? s : null;
   return null;
 }
+
+/** "Austin, TX" for a US ZIP (short label for the one-tap sign-up card), else null. */
+export function zipPlace(code: string | null | undefined): string | null {
+  const m = code ? US_RE.exec(clean(code)) : null;
+  if (!m) return null;
+  const z = zipcodes.lookup(m[1]);
+  return z && z.country === "US" ? `${z.city}, ${z.state}` : null;
+}

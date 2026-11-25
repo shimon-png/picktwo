@@ -79,6 +79,10 @@ export const users = pgTable("user", {
   /** Answer to "Do you have kids?": YES / NO / UNDISCLOSED (null = not answered). */
   kidsStatus: text("kids_status"),
   kidAges: text("kid_ages").array().$type<KidAge[]>().notNull().default([]),
+  /** About-you cards (lib/about.ts): SINGLE / DATING / TAKEN / MARRIED; RENT / OWN / FAMILY; STUDENT / WORKING / BOTH / NEITHER. */
+  relationship: text("relationship"),
+  housing: text("housing"),
+  workStatus: text("work_status"),
   interests: text("interests").array().notNull().default([]),
   ppBalance: integer("pp_balance").notNull().default(10),
   /** Lifetime correct picks (votes that matched the poster's reported choice); drives Pro / Expert / Super expert. */
@@ -138,6 +142,52 @@ export const devices = pgTable("device", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: now("created_at"),
+  // Passive signals (services/passive.ts), from the browser's first real visit; never shown to anyone.
+  /** Vercel IP geolocation: country (ISO-2), state/region code, city, ZIP. Metro-level guesses; never overwrite a typed ZIP. */
+  ipCountry: text("ip_country"),
+  ipRegion: text("ip_region"),
+  ipCity: text("ip_city"),
+  ipZip: text("ip_zip"),
+  /** parseDevice(ua): ios / android / desktop / other, browser, in-app browser (x, instagram, tiktok, …). */
+  platform: text("platform"),
+  browser: text("browser"),
+  inApp: text("in_app"),
+  /** Screen "WxH@dpr", Android model from client hints, and deviceTier(): budget / mid / flagship / unknown. */
+  screen: text("screen"),
+  model: text("model"),
+  tier: text("tier"),
+  seenAt: ts("seen_at"),
+});
+
+/**
+ * About-you cards (services/about.ts): one row per card shown to a person (account or guest browser) and what
+ * happened: shown → answered / skipped. Answers from sign-up or Settings are rows with via = signup / settings.
+ * A guest's rows move to their account on sign-in (linkDevice).
+ */
+export const profileAnswers = pgTable(
+  "profile_answer",
+  {
+    id: id(),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    deviceId: text("device_id"),
+    question: text("question").notNull(),
+    answer: text("answer"),
+    status: text("status").notNull(),
+    via: text("via").notNull().default("card"),
+    /** The person's vote count when it was asked. */
+    atVotes: integer("at_votes").notNull().default(0),
+    createdAt: now("created_at"),
+    updatedAt: ts("updated_at"),
+  },
+  (t) => [index("profile_answer_user").on(t.userId, t.question), index("profile_answer_device").on(t.deviceId, t.question)],
+);
+
+/** Census ACS 5-year by ZIP area (ZCTA): median household income (B19013) and share of renter households (B25003). */
+export const zipIncome = pgTable("zip_income", {
+  zip: text("zip").primaryKey(),
+  medianIncome: integer("median_income"),
+  renterPct: doublePrecision("renter_pct"),
+  year: integer("year").notNull(),
 });
 
 /** A/B test groups (services/gate-test.ts). One row per experiment × unit (a browser's device id); never changes. */

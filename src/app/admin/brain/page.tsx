@@ -7,7 +7,9 @@ import { brainChecks } from "@/server/services/brain-checks";
 import { signupJourneys } from "@/server/services/signup-journeys";
 import { gateTestResults } from "@/server/services/gate-test";
 import { ARM_LABELS, type GateCell } from "@/server/services/gate-test-rules";
-import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
+import { LoadZipIncome, RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
+import { passiveStats, type GroupRow } from "@/server/services/passive-stats";
+import { aboutStats } from "@/server/services/about-stats";
 import type { BrainListKind } from "@/server/services/brain-lists";
 
 export const dynamic = "force-dynamic";
@@ -101,13 +103,15 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
     signupSources(Math.max(days, 30), view),
     signupJourneys(),
     gateTestResults(days),
+    passiveStats(view, days),
+    aboutStats(view, days),
   ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
@@ -262,6 +266,53 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         ) : (
           <p className="text-sm text-zinc-500">{gt.pct > 0 ? "Running: no signed-out visitors yet." : "Off (gateTestPct is 0 in Config)."}</p>
         )}
+      </Section>
+
+      <Section
+        title="Who visitors are (no questions asked)"
+        note={`People who visited in this window, from signals every browser sends: state from the IP address (Vercel's geolocation, metro-level), iPhone vs Android, phone price tier (iPhone screen size; Android model), the app they opened us in, and an income band estimated from their ZIP area's Census median income (typed ZIP, else the IP guess) nudged by phone tier. Estimates for groups, never shown to anyone. Collected from Nov 25; older visitors show as unknown.`}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          {(
+            [
+              ["State (IP)", ps.region.slice(0, 12)],
+              ["Platform", ps.platform],
+              ["Phone tier", ps.tier],
+              ["Opened in", ps.inApp],
+              ["Est. income band", ps.income],
+            ] as [string, GroupRow[]][]
+          ).map(([label, rows]) => (
+            <div key={label}>
+              <Rows
+                head={[label, "People", "Voted", "Signed up"]}
+                rows={rows.map((r) => [r.key, r.visitors, `${r.voted} (${pct(r.voted, r.visitors)})`, `${r.signedUp} (${pct(r.signedUp, r.visitors)})`])}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          <span>{ps.zipIncomeRows ? `Census income loaded for ${ps.zipIncomeRows.toLocaleString()} ZIP areas.` : "Census income isn't loaded yet (the daily job loads it; or tap the button)."}</span>
+          <LoadZipIncome rows={ps.zipIncomeRows} />
+        </div>
+      </Section>
+
+      <Section
+        title="About-you cards"
+        note={`One-tap questions in the Vote deck (sex after vote 2, age 4, relationship 7, ZIP 12; with an account: kids 20, home 25, work 35; numbers in Config). ${ab.holdoutPct}% of people never see a card, so the second table shows what cards cost or add in votes per visitor.`}
+      >
+        <Rows
+          head={["Question", "Shown", "Answered", "Skipped", "Answer rate"]}
+          rows={ab.questions.map((r) => [r.id === "zip" ? "ZIP" : r.id[0].toUpperCase() + r.id.slice(1), r.shown, r.answered, r.skipped, pct(r.answered, r.shown)])}
+        />
+        <Rows
+          head={["Group", "Visitors", "Votes", "Votes per visitor"]}
+          rows={(["cards", "holdout"] as const).map((k) => [
+            k === "cards" ? "Sees cards" : `Holdout (${ab.holdoutPct}%, no cards)`,
+            ab.arms[k].visitors,
+            ab.arms[k].votes,
+            ab.arms[k].visitors ? (ab.arms[k].votes / ab.arms[k].visitors).toFixed(2) : "—",
+          ])}
+        />
       </Section>
 
       <Section

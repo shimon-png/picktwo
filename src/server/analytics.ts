@@ -2,6 +2,7 @@ import { db } from "./db";
 import { analyticsEvents } from "./db/schema";
 import { recordReturn } from "./services/engagement";
 import { isBotUserAgent, profileDiff, type ProfileFields } from "@/lib/analytics-rules";
+import { recordDevice, recordDeviceHints, startFacts, type Geo } from "./services/passive";
 
 export function track(name: string, props: Record<string, unknown> = {}, ids: { userId?: string | null; deviceId?: string | null } = {}) {
   // Fire-and-forget; analytics must never break a request.
@@ -19,9 +20,15 @@ export type ClientEvent = { id: string; name: string; at: number; sessionId: str
  * Append a batch of browser events in one insert. Identity and server time come from the request, never the
  * client; the client's id makes resends harmless (ON CONFLICT DO NOTHING).
  */
-export async function logClientEvents(events: ClientEvent[], ctx: { userId: string | null; deviceId: string | null; userAgent: string }) {
+export async function logClientEvents(
+  events: ClientEvent[],
+  ctx: { userId: string | null; deviceId: string | null; userAgent: string; geo?: Geo },
+) {
   if (!events.length) return;
   const bot = isBotUserAgent(ctx.userAgent);
+  const geo: Geo = ctx.geo ?? { country: null, region: null, city: null, zip: null };
+  // Passive signals (services/passive.ts): parsed device + IP geo on session_start, and on the device row.
+  const facts = new Map(events.filter((e) => e.name === "session_start").map((e) => [e.id, startFacts(ctx.userAgent, geo, e.props)]));
   const rows = events.map((e) => ({
     id: `c_${e.id}`,
     name: e.name,
@@ -34,13 +41,19 @@ export async function logClientEvents(events: ClientEvent[], ctx: { userId: stri
       clientAt: new Date(e.at).toISOString(),
       v: CLIENT_EVENT_VERSION,
       ...(bot ? { bot: true } : {}),
-      ...(e.name === "session_start" ? { ua: ctx.userAgent.slice(0, 300) } : {}),
+      ...(e.name === "session_start" ? { ua: ctx.userAgent.slice(0, 300), ...facts.get(e.id) } : {}),
     },
   }));
   try {
     await db.insert(analyticsEvents).values(rows).onConflictDoNothing();
   } catch (e) {
     console.error("[analytics] client events", e);
+  }
+  if (!bot && ctx.deviceId) {
+    const last = [...facts.values()].pop();
+    if (last) await recordDevice(ctx.deviceId, last);
+    const hints = events.find((e) => e.name === "device_hints");
+    if (hints) await recordDeviceHints(ctx.deviceId, hints.props);
   }
   // A new visit may be a voter coming back: credit Shimon's engagement score live.
   if (!bot && events.some((e) => e.name === "session_start")) await recordReturn({ userId: ctx.userId, deviceId: ctx.deviceId });

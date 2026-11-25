@@ -7,9 +7,9 @@ const base = { name: "Sam", handle: "sam_1", isAdultConfirmed: true as const, zi
 describe("profileIncomplete", () => {
   const done = { onboardedAt: new Date(), zipCode: "10001", sex: "MALE", ageRange: "AGE_18_24" };
   it("is complete when onboarded with zip, sex and age", () => expect(profileIncomplete(done)).toBe(false));
-  it.each(["onboardedAt", "zipCode", "sex", "ageRange"] as const)("is incomplete without %s", (k) =>
-    expect(profileIncomplete({ ...done, [k]: null })).toBe(true),
-  );
+  it("is incomplete until sign-up finishes", () => expect(profileIncomplete({ ...done, onboardedAt: null })).toBe(true));
+  // One-tap sign-up (Nov 25 2026): ZIP, sex and age are optional; the Vote deck asks for them later.
+  it.each(["zipCode", "sex", "ageRange"] as const)("is still complete without %s", (k) => expect(profileIncomplete({ ...done, [k]: null })).toBe(false));
 });
 
 describe("profileInput required fields", () => {

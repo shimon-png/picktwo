@@ -60,9 +60,10 @@ export const AGE_RANGE_IDS = ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54"
 export const KIDS_STATUS_OPTIONS = [
   { id: "YES", label: "Yes" },
   { id: "NO", label: "No" },
+  { id: "EXPECTING", label: "Expecting" },
   { id: "UNDISCLOSED", label: "Prefer not to say" },
 ] as const;
-export const KIDS_STATUS_IDS = ["YES", "NO", "UNDISCLOSED"] as const;
+export const KIDS_STATUS_IDS = ["YES", "NO", "EXPECTING", "UNDISCLOSED"] as const;
 export const kidAgeLabel = (id: string) => KID_AGES.find((k) => k.id === id)?.label ?? id;
 
 export const RECIPIENTS = ["Child", "Partner", "Parent", "Friend", "Myself", "Other"] as const;
@@ -120,6 +121,29 @@ export const ECONOMY_DEFAULTS = {
    * Assignments are saved, so changing this only affects browsers seen after the change.
    */
   gateTestPct: 50,
+  /**
+   * About-you cards in the Vote deck (lib/about.ts): the vote number each question is first asked after (0 = off).
+   * Guests: sex, age, relationship, ZIP. With an account: kids, housing, work.
+   */
+  aboutSexAt: 2,
+  aboutAgeAt: 4,
+  aboutRelationshipAt: 7,
+  aboutZipAt: 12,
+  aboutKidsAt: 20,
+  aboutHousingAt: 25,
+  aboutWorkAt: 35,
+  /** "People like you" result bar: smallest group (sex × age, else sex) shown, and how long the deck shows a result with it (ms). */
+  likeYouMinVotes: 20,
+  likeYouResultMs: 2200,
+  /** Taste profile (lib/taste-profile.ts): first two traits show at this many votes, all six (and the type name) at the second. */
+  tasteFirstAt: 10,
+  tasteFullAt: 30,
+  /** Votes between two about-you cards (2 = never two in a row, two battles between). */
+  aboutMinGap: 2,
+  /** A skipped question comes back once, this many votes later. */
+  aboutSkipRetry: 10,
+  /** Share of people (stable per account/browser) who never see about-you cards, to measure their cost in votes. */
+  aboutHoldoutPct: 10,
   /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */
   softGateEvery: 5,
   /** Close the loop (docs/rules/close-the-loop-and-experts.md): longest a battle can run, in hours (5 days). */

@@ -30,6 +30,7 @@ export default async function VotePage() {
       guestLeft={guestLeft}
       guestLimit={economy.guestVoteLimit}
       softGate={softGate}
+      likeYouMs={economy.likeYouResultMs}
       />
       <Tutorial signedIn={!!viewer.user} accountSeen={!!viewer.user?.tourSeenAt} />
     </>

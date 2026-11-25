@@ -260,6 +260,20 @@
       "when": 1795548322675,
       "tag": "0036_guest_vote_limit_15",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1795621087877,
+      "tag": "0037_passive_signals",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795621402306,
+      "tag": "0038_about_you",
+      "breakpoints": true
     }
   ]
 }
