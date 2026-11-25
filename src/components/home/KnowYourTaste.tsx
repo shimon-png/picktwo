@@ -16,7 +16,7 @@ const SAMPLE_WHEEL = [
 function Step({ n, title, line, children }: { n: number; title: string; line: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-3 rounded-[18px] bg-surface p-4">
-      <div className="relative flex min-h-[230px] items-center justify-center overflow-hidden rounded-[14px] bg-white p-3 pt-8 shadow-ring">
+      <div className="relative flex min-h-[230px] items-center justify-center overflow-hidden rounded-[14px] bg-white p-3 pt-8 shadow-ring sm:h-[272px] sm:min-h-0">
         <span className="absolute right-2 top-2 rounded-full bg-surface px-2 py-0.5 text-[10px] uppercase tracking-wide text-zinc-500">Example</span>
         {children}
       </div>
