@@ -55,6 +55,7 @@ export default async function AskPage() {
           </span>
         )}
       </p>
+      {left === 0 && <div className="card px-4 py-3 text-[14px]">You’ve used today’s free answers. Come back tomorrow for more.</div>}
       <PickbotHistory rows={threads} />
     </div>
   );

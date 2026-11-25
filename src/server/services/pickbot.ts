@@ -23,6 +23,7 @@ import { notify } from "./notifications";
 import { deliver } from "./mailer";
 import { zipPlace } from "./zip";
 import { similarBattles } from "./pickbot-crowd";
+import { sendPush } from "./push";
 import { classifyQuestion, draftCrowdBattle, pickbotConfigured, streamAnswer, type CrowdDraft, type ProfileForAi, type Turn } from "./pickbot-ai";
 import {
   answerModel,
@@ -117,7 +118,7 @@ async function screen(user: User, photos: string[]) {
 /** A new question: screen photos, classify, open the thread. Off-topic and crisis replies are added right away. */
 export async function askPickbot(userIn: User | null, input: { text: string; photos: string[] }) {
   const user = await requireAccess(userIn);
-  if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow, or get Pickbot Plus for unlimited answers.");
+  if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow for more.");
   await screen(user, input.photos);
   const { c, stats } = await classifyQuestion(input.text, input.photos);
   const [t] = await db.insert(pickbotThreads).values({ userId: user.id, title: c.title, classification: c, state: {} }).returning();
@@ -133,7 +134,7 @@ export async function followUp(userIn: User | null, id: string, input: { text: s
   const user = await requireAccess(userIn);
   const t = await ownThread(user, id);
   if (t.classification.scope === "off_topic") throw new AppError("VALIDATION", "Start a new question for that one.");
-  if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow, or get Pickbot Plus for unlimited answers.");
+  if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow for more.");
   await screen(user, input.photos);
   await addMessage(t.id, { role: "USER", kind: "question", text: input.text, photos: input.photos });
   track("pickbot_asked", { threadId: t.id, photos: input.photos.length, chars: input.text.length, followUp: true }, { userId: user.id });
@@ -315,7 +316,7 @@ export async function answerThread(userIn: User | null, id: string, onText: (chu
   const msgs = await db.select().from(pickbotMessages).where(eq(pickbotMessages.threadId, t.id)).orderBy(asc(pickbotMessages.createdAt));
   const step = await threadStep(user, t, msgs);
   if (step.type !== "answer") throw new AppError("CONFLICT", "Pickbot isn't ready to answer yet.");
-  if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow, or get Pickbot Plus for unlimited answers.");
+  if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow for more.");
   const e = await getEconomy();
   const { p, likeLabel } = await profileForAi(user, t.classification.extended);
   const similar = t.classification.scope === "off_topic" ? [] : await similarBattles(t.classification.theme, user, e.pickbotSimilarBattles, e.pickbotMinCrowdVotes);
@@ -548,6 +549,7 @@ export async function deliverPickbotResults(now = new Date()) {
       votesB: summary.votesB,
       agreed: summary.agreed,
     });
+    await sendPush(owner.id, { title: "The crowd answered", body: summary.line, url: `/ask/${t.id}`, tag: `pickbot:${t.id}` });
     track("pickbot_results_delivered", { threadId: t.id, battleId: b.id, votes: summary.total, agreed: summary.agreed, closed }, { userId: owner.id });
     n++;
   }

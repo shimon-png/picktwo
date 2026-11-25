@@ -85,7 +85,7 @@ export const users = pgTable("user", {
   relationship: text("relationship"),
   housing: text("housing"),
   workStatus: text("work_status"),
-  /** Pickbot Plus (PRD §12): paid until this time (Stripe subscription, kept in sync by the webhook). */
+  /** Pickbot Plus (PRD §12, payments not built yet): Plus until this time. Unused until Stripe is added. */
   plusUntil: ts("plus_until"),
   stripeCustomerId: text("stripe_customer_id"),
   interests: text("interests").array().notNull().default([]),
@@ -534,6 +534,20 @@ export const pickbotMessages = pgTable(
     createdAt: now("created_at"),
   },
   (t) => [index("pickbot_message_thread").on(t.threadId, t.createdAt)],
+);
+
+/** Web push (PRD phase 4): one row per browser that allowed notifications. Removed when the push service says it's gone. */
+export const pushSubscriptions = pgTable(
+  "push_subscription",
+  {
+    id: id(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: now("created_at"),
+  },
+  (t) => [uniqueIndex("push_subscription_endpoint").on(t.endpoint), index("push_subscription_user").on(t.userId)],
 );
 
 // Every lifecycle email we decide about: one row per (user, kind, ref), so nothing sends twice.

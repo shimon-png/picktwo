@@ -8,6 +8,7 @@ import { cn, pct } from "@/lib/utils";
 import { CONFIDENCE_LABEL, battlesTime, partialField, type Answer, type AnswerKind } from "@/lib/pickbot";
 import type { ThreadView } from "@/server/services/pickbot";
 import { AskComposer } from "./AskComposer";
+import { PushButton } from "@/components/app/PushButton";
 import { shuffled } from "@/lib/about";
 
 type Msg = ThreadView["messages"][number];
@@ -212,6 +213,7 @@ export function PickbotThread({ initial }: { initial: ThreadView }) {
           </Link>
         </div>
       )}
+      {v.crowd && !v.messages.some((m) => m.kind === "results") && <PushButton />}
 
       {(done || v.step.type === "off_topic") && v.thread.scope !== "off_topic" && (
         <div className="pt-2">
