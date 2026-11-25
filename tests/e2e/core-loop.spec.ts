@@ -498,3 +498,66 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await b.goto("/people-like-you");
   await expect(b.getByText(/You’re hidden from “Voted like you”/)).toBeVisible();
 });
+
+test("Pickbot: ask → profile question → tailored → quick battles → answer → anonymous crowd battle (fake AI)", async ({ browser }) => {
+  // 10% of accounts are in the Pickbot holdout (stable per account): make a fresh one until it isn't.
+  let p: Page | null = null;
+  for (let i = 0; i < 4 && !p; i++) {
+    const page = await newUser(browser, `asker${i}`);
+    await page.goto("/ask");
+    if (await page.getByLabel("Ask Pickbot").isVisible()) p = page;
+  }
+  test.skip(!p, "every account landed in the holdout");
+  const page = p!;
+  await expect(page.getByRole("link", { name: "Ask", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask Pickbot" })).toBeVisible();
+  await snap(page, "pickbot-01-ask");
+  await page.getByLabel("Ask Pickbot").fill("Which dress for a winter wedding, the green or the burgundy?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.waitForURL(/\/ask\/[^/]+$/);
+
+  // Onboarding gave sex, age and ZIP: Pickbot asks only the missing relationship question.
+  const gate = page.getByTestId("pickbot-gate");
+  await expect(gate.getByText("of 4")).toBeVisible();
+  await snap(page, "pickbot-02-gate");
+  await gate.getByRole("button", { name: "Single" }).click();
+  await expect(page.getByText("Single", { exact: true })).toBeVisible();
+
+  // Under 30 battles: general or tailored.
+  await page.getByRole("button", { name: /Tailored to my personality/ }).click();
+  const battles = page.getByTestId("pickbot-battles");
+  await expect(battles.getByText(/more to go/)).toBeVisible();
+  await snap(page, "pickbot-03-battles");
+  await battles.getByRole("button", { name: /^Vote for/ }).first().click();
+  await expect(battles.getByText(/\d+%/).first()).toBeVisible();
+  await page.getByRole("button", { name: "Stop and answer now" }).click();
+
+  // The (fake) answer streams in, labelled General since the profile isn't complete.
+  const answer = page.getByTestId("pickbot-answer").last();
+  await expect(answer.getByText("The first option")).toBeVisible();
+  await expect(answer.getByText("General")).toBeVisible();
+  await expect(answer.getByText(/Why it fits you/)).toBeVisible();
+  await answer.getByRole("button", { name: "Helpful", exact: true }).click();
+  await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await snap(page, "pickbot-04-answer");
+
+  // Ask the crowd: draft → review → post as "Asked via Pickbot".
+  await page.getByRole("button", { name: "Yes, ask the crowd" }).click();
+  const draft = page.getByTestId("pickbot-draft");
+  await expect(draft.getByText("Anonymous · preview")).toBeVisible();
+  await snap(page, "pickbot-05-draft");
+  await draft.getByRole("button", { name: "Post anonymously" }).click();
+  await expect(page.getByText("Posted anonymously.", { exact: false })).toBeVisible();
+  await expect(page.getByText("With the crowd")).toBeVisible();
+  await page.getByRole("link", { name: "See it →" }).click();
+  await expect(page.getByText(/askedviapickbot|Asked via Pickbot/).first()).toBeVisible();
+  await expect(page.getByText(/asker\d_/)).toHaveCount(0);
+
+  // Follow-up in the same thread, and the question shows in history.
+  await page.goBack();
+  await page.getByLabel("Ask a follow-up").fill("What shoes go with it?");
+  await page.getByLabel("Ask a follow-up").press("Enter");
+  await expect(page.getByTestId("pickbot-answer")).toHaveCount(2);
+  await page.goto("/ask");
+  await expect(page.getByRole("heading", { name: "Your questions" })).toBeVisible();
+});

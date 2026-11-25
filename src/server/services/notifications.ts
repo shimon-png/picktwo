@@ -12,7 +12,8 @@ export type NotificationType =
   | "FOLLOW"
   | "POINTS"
   | "DM_REQUEST"
-  | "DM_ACCEPTED";
+  | "DM_ACCEPTED"
+  | "PICKBOT_RESULTS";
 
 export async function notify(tx: DbOrTx, userId: string, type: NotificationType, payload: Record<string, unknown>) {
   await tx.insert(notifications).values({ userId, type, payload });

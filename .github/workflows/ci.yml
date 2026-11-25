@@ -25,6 +25,8 @@ jobs:
       DEV_LOGIN: "true"
       # Every e2e user signs in from the same IP; relax rate limits for the test run only.
       E2E_RELAX_RATE_LIMITS: "true"
+      # Pickbot answers come from a canned fake (no Claude API key in CI).
+      PICKBOT_FAKE_AI: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       # No X pixel in tests: no third-party script, no fake sign-up conversions in the ad account.
       NEXT_PUBLIC_X_PIXEL_ID: ""

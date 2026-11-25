@@ -43,6 +43,16 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | `engaged` | browser, first tap/click or scroll past 120px on a page view (Shimon: bounce = never taps or scrolls) | 2026-11-23 | `how` (click/scroll), `path` |
 | `home_click` | browser, tap on an element with `data-track` (homepage buttons and cards) | 2026-11-23 | `target` (ask_crowd, start_voting, hero_card, deciding_see_all, deciding_card, story_card, bottom_ask, taste_start), `path` |
 | `profile_bar_tap` | browser, opening the profile bar (Vote deck or You) | 2026-11-25 | `place` (deck, you), `votes`, `left` (battles to the target), `missing` (core about-you questions unanswered) |
+| `profile_bar_tap` place `ask` | browser, the profile bar on Ask | 2026-11-26 | as above |
+| `pickbot_asked` | server, a Pickbot question or follow-up | 2026-11-26 | `threadId`, `photos`, `chars`, `scope`, `theme`, `crisis`, `followUp` (never the text) |
+| `pickbot_gate_answered` / `pickbot_gate_skipped` | server, a profile question inside Pickbot | 2026-11-26 | `threadId`, `question` |
+| `pickbot_choice` | server, general vs tailored (incl. `retailor` after a general answer) | 2026-11-26 | `threadId`, `choice` |
+| `pickbot_battles_stopped` | server, "Stop and answer now" during quick battles | 2026-11-26 | `threadId` |
+| `pickbot_answered` | server, an answer saved | 2026-11-26 | `threadId`, `kind` (tailored/general), `model`, `latencyMs`, `inputTokens`, `outputTokens`, `costUsd`, `similar`, `confidence` |
+| `pickbot_rated` | server, 👍/👎 on an answer | 2026-11-26 | `threadId`, `rating`, `model`, `withNote` |
+| `pickbot_crowd_drafted` / `pickbot_crowd_posted` | server, crowd draft made / posted | 2026-11-26 | `threadId`, `removed`; posted: `battleId`, `photos`, `targeted`, `hours`, `inReview` |
+| `pickbot_results_delivered` | server (hourly), crowd results sent back | 2026-11-26 | `threadId`, `battleId`, `votes`, `agreed`, `closed` |
+| `pickbot_outcome` / `pickbot_thread_deleted` | server, the asker said what they picked / deleted a thread | 2026-11-26 | `threadId`, `chosen` |
 | `signup_gate_shown` | browser, guest hits the free-vote limit. From 2026-11-24 logged by the gate itself on every surface (deck, home, battle page, discover), and each time group B's dialog opens | 2026-11-23 | `pos`, `battleId`; from 2026-11-24 also `place` (deck/home/battle/discover), `arm` (control/soft) |
 | `signup_gate_closed` | browser, guest closes the sign-up sheet/dialog | 2026-11-24 | `place`, `arm`, `pos` |
 | Sign-up gate test group | table `experiment_assignment` (experiment `signup_gate_v1`, unit = device id), set the first time the server sees a new signed-out browser; never changes | 2026-11-24 | `arm`: `control` (A, the wall after `guestVoteLimit` free votes) or `soft` (B, closable dialog every `softGateEvery` votes, never blocked). `gateTestPct` (economy) = share put in B. Also on guest `vote_cast` as `gateArm`. Results: /admin/brain "Sign-up gate test (A/B)" |

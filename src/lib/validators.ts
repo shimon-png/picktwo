@@ -74,7 +74,7 @@ export const voteInput = z.object({
   side: z.enum(["A", "B"]),
   reason: z.string().trim().max(140).optional(),
   dwellMs: z.number().int().min(0).max(3_600_000).optional(),
-  source: z.enum(["link", "feed", "profile", "home", "discover", "search"]).optional(),
+  source: z.enum(["link", "feed", "profile", "home", "discover", "search", "pickbot"]).optional(),
   /** Data-brain context (docs/brain/data-dictionary.md): how the pick was made and where in the deck. */
   meta: z
     .object({

@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pickbot PRD</title>
+<style>
+@font-face { font-family: Chakra; font-weight: 600; src: url(file:///home/user/picktwo/node_modules/@fontsource/chakra-petch/files/chakra-petch-latin-600-normal.woff2); }
+@font-face { font-family: Chakra; font-weight: 700; src: url(file:///home/user/picktwo/node_modules/@fontsource/chakra-petch/files/chakra-petch-latin-700-normal.woff2); }
+@font-face { font-family: Inter; font-weight: 100 900; src: url(file:///home/user/picktwo/node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2); }
+
+@page { size: Letter; margin: 0.6in 0.65in 0.7in; }
+:root {
+  --ink: #16122b; --muted: #5d5878; --line: #e3e0ee; --soft: #f5f3fb;
+  --night: #120e26; --panel: #1f1940; --panel2: #2c2556; --nline: #3a3170; --nink: #eae6ff; --nmuted: #a29ac9;
+  --a: #2bd2ff; --b: #ff3cac; --lime: #c6ff3d; --asoft: #173a52; --bsoft: #4a1840; --limesoft: #2b3a1a;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 10.2pt/1.5 Inter, sans-serif; color: var(--ink); }
+h1, h2, h3, h4 { font-family: Chakra, sans-serif; margin: 0; line-height: 1.15; }
+h2 { font-size: 17pt; margin: 22pt 0 6pt; padding-top: 4pt; border-top: 2px solid var(--ink); }
+h2 .n { color: #7a58ff; margin-right: 6pt; }
+h3 { font-size: 11.5pt; margin: 12pt 0 4pt; }
+h4 { font-size: 10pt; margin: 8pt 0 2pt; }
+p { margin: 0 0 6pt; }
+ul, ol { margin: 0 0 6pt; padding-left: 16pt; }
+li { margin: 0 0 2.5pt; }
+code { font: 8.6pt ui-monospace, Menlo, monospace; background: var(--soft); padding: 0 3pt; border-radius: 3pt; }
+.muted { color: var(--muted); }
+.small { font-size: 8.6pt; }
+.page-break { break-before: page; }
+.avoid { break-inside: avoid; }
+
+/* cover */
+.cover { height: 9.7in; display: flex; flex-direction: column; justify-content: space-between; background: radial-gradient(120% 70% at 20% 0%, #2a1d5c, var(--night) 60%); color: var(--nink); margin: -0.6in -0.65in 0; padding: 0.9in 0.8in 0.7in; }
+.cover .eyebrow { font: 700 10pt Chakra; letter-spacing: .18em; text-transform: uppercase; color: var(--lime); }
+.cover h1 { font-size: 40pt; margin-top: 14pt; }
+.cover h1 em { font-style: normal; color: var(--lime); }
+.cover .sub { font-size: 13pt; color: var(--nmuted); margin-top: 12pt; max-width: 5.6in; }
+.cover table { color: var(--nink); font-size: 9.5pt; border-collapse: collapse; }
+.cover td { padding: 3pt 14pt 3pt 0; vertical-align: top; }
+.cover td:first-child { color: var(--nmuted); }
+.logo { display: inline-flex; align-items: center; gap: 8pt; font: 700 18pt Chakra; }
+
+/* boxes */
+.tldr { background: var(--soft); border: 1px solid var(--line); border-left: 4px solid #7a58ff; border-radius: 6pt; padding: 10pt 12pt; margin: 8pt 0; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10pt; }
+.card { border: 1px solid var(--line); border-radius: 6pt; padding: 8pt 10pt; }
+.card h4 { margin-top: 0; }
+table.t { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9pt; }
+table.t th { text-align: left; font: 700 8pt Chakra; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--ink); padding: 4pt 6pt; }
+table.t td { border-bottom: 1px solid var(--line); padding: 4pt 6pt; vertical-align: top; }
+table.t tr { break-inside: avoid; }
+.pill { display: inline-block; font: 700 7.5pt Chakra; letter-spacing: .05em; text-transform: uppercase; padding: 1.5pt 5pt; border-radius: 9pt; }
+.p0 { background: #ffe0ef; color: #b0186d; } .p1 { background: #e3f6ff; color: #0b6f91; } .p2 { background: #eee; color: #555; }
+
+/* flow */
+.flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6pt; margin: 8pt 0 4pt; }
+.step { border: 1px solid var(--line); border-radius: 6pt; padding: 6pt 7pt; font-size: 8.6pt; position: relative; background: #fff; }
+.step b { display: block; font: 700 9pt Chakra; margin-bottom: 2pt; }
+.step .k { position: absolute; top: -7pt; left: 6pt; background: var(--ink); color: #fff; font: 700 7.5pt Chakra; border-radius: 8pt; padding: 1pt 5pt; }
+.step.gate { border-color: #7a58ff; background: #f4f0ff; }
+.step.ai { border-color: #0b6f91; background: #effaff; }
+.step.crowd { border-color: #b0186d; background: #fff2f9; }
+
+/* phone mockups */
+.screens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10pt 12pt; margin: 6pt 0; }
+figure { margin: 0; break-inside: avoid; }
+figcaption { font-size: 8.4pt; color: var(--muted); margin-top: 5pt; }
+figcaption b { color: var(--ink); }
+.phone { width: 100%; border-radius: 22pt; background: #0b0819; padding: 6pt; box-shadow: 0 0 0 1px #2a2450; }
+.screen { border-radius: 17pt; background: radial-gradient(120% 60% at 50% 0%, #2a1d5c, var(--night) 60%); height: 3.6in; padding: 8pt 7pt; display: flex; flex-direction: column; gap: 5pt; color: var(--nink); font-size: 7.6pt; overflow: hidden; }
+.bar { display: flex; justify-content: space-between; align-items: center; font: 600 7pt Chakra; color: var(--nmuted); }
+.bar .lg { color: var(--nink); font-size: 8.5pt; letter-spacing: .02em; }
+.bar .lg i { font-style: normal; color: var(--a); } .bar .lg em { font-style: normal; color: var(--b); }
+.meter { background: var(--panel); border-radius: 8pt; padding: 5pt 6pt; }
+.meter .row { display: flex; justify-content: space-between; font: 600 6.8pt Chakra; color: var(--nmuted); }
+.meter .row b { color: var(--lime); }
+.track { height: 4pt; border-radius: 4pt; background: var(--panel2); margin-top: 3pt; overflow: hidden; }
+.track span { display: block; height: 100%; background: linear-gradient(90deg, var(--lime), #8dff6a); border-radius: 4pt; }
+.msg { max-width: 88%; border-radius: 9pt; padding: 5pt 7pt; line-height: 1.35; }
+.me { align-self: flex-end; background: var(--asoft); color: #dff6ff; border-bottom-right-radius: 3pt; }
+.bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--nline); border-bottom-left-radius: 3pt; }
+.bot .who { font: 700 6.6pt Chakra; color: var(--lime); letter-spacing: .06em; text-transform: uppercase; display: block; margin-bottom: 2pt; }
+.taps { display: grid; gap: 3pt; margin-top: 4pt; }
+.tap { border-radius: 7pt; padding: 4pt 6pt; text-align: center; font: 600 8pt Chakra; }
+.ta { background: var(--asoft); color: var(--a); box-shadow: 0 0 0 1px rgba(43,210,255,.35); }
+.tb { background: var(--bsoft); color: var(--b); box-shadow: 0 0 0 1px rgba(255,60,172,.35); }
+.tl { background: var(--limesoft); color: var(--lime); box-shadow: 0 0 0 1px rgba(198,255,61,.35); }
+.tn { background: var(--panel2); color: var(--nink); }
+.btn { border-radius: 99pt; background: var(--lime); color: var(--night); font: 700 8pt Chakra; text-align: center; padding: 5pt; }
+.btn.ghost { background: transparent; color: var(--nink); box-shadow: 0 0 0 1px var(--nline); }
+.photos { display: grid; grid-template-columns: 1fr 1fr; gap: 3pt; margin-bottom: 3pt; }
+.ph { height: 46pt; border-radius: 5pt; display: flex; align-items: flex-end; padding: 3pt; font: 600 6.5pt Chakra; color: #fff; }
+.ph1 { background: linear-gradient(160deg, #2f7d5a, #1c3f2f); } .ph2 { background: linear-gradient(160deg, #7c2d4f, #3a1428); }
+.input { margin-top: auto; display: flex; gap: 4pt; align-items: center; background: var(--panel); border: 1px solid var(--nline); border-radius: 99pt; padding: 4pt 5pt 4pt 8pt; color: var(--nmuted); }
+.input .go { margin-left: auto; width: 15pt; height: 15pt; border-radius: 50%; background: var(--lime); }
+.chip { display: inline-block; border-radius: 99pt; background: var(--panel2); padding: 2.5pt 6pt; margin: 0 2pt 3pt 0; font-size: 7pt; }
+.lock { display: flex; gap: 4pt; align-items: center; background: #1a1535; border-radius: 6pt; padding: 3.5pt 5pt; font-size: 6.8pt; color: var(--nink); }
+.battle { background: var(--panel2); border-radius: 8pt; padding: 5pt; }
+.battle .q { font: 700 8pt Chakra; margin-bottom: 4pt; }
+.opts { display: grid; grid-template-columns: 1fr 1fr; gap: 3pt; }
+.opts div { border-radius: 5pt; padding: 10pt 4pt; text-align: center; font: 700 8pt Chakra; color: var(--night); }
+.oa { background: #c9daff; } .ob { background: #ffd1c2; }
+.res { display: grid; gap: 3pt; margin-top: 4pt; }
+.rb { display: grid; grid-template-columns: 58pt 1fr 22pt; gap: 4pt; align-items: center; font-size: 6.8pt; }
+.rb .t { height: 4pt; border-radius: 4pt; background: rgba(255,255,255,.12); overflow: hidden; }
+.rb .t span { display: block; height: 100%; background: var(--a); }
+.rb.lm .t span { background: var(--lime); } .rb.lm { color: var(--lime); font-weight: 600; }
+.rb b { text-align: right; font-family: Chakra; }
+.deck { background: var(--panel); border-radius: 12pt; padding: 7pt; flex: 1; display: flex; flex-direction: column; gap: 5pt; }
+.deck .opts div { padding: 34pt 4pt; font-size: 10pt; }
+.tag { align-self: flex-start; font: 700 6pt Chakra; letter-spacing: .1em; text-transform: uppercase; padding: 2pt 5pt; border-radius: 99pt; background: var(--asoft); color: var(--a); }
+.tag.lime { background: var(--limesoft); color: var(--lime); }
+.note { font-size: 6.6pt; color: var(--nmuted); }
+.notif { background: #f2f0f8; color: #16122b; border-radius: 9pt; padding: 5pt 6pt; font-size: 7pt; display: flex; gap: 5pt; align-items: flex-start; }
+.notif .ic { width: 14pt; height: 14pt; border-radius: 4pt; background: var(--night); flex: none; }
+.foot { position: fixed; bottom: -0.45in; left: 0; right: 0; font-size: 7.5pt; color: var(--muted); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="cover">
+  <div>
+    <div class="logo"><svg width="42" height="34" viewBox="0 0 48 40" fill="none"><circle cx="14" cy="29" r="9.5" stroke="#2BD2FF" stroke-width="3.4"/><circle cx="17.5" cy="27" r="3.6" fill="#2BD2FF"/><circle cx="34" cy="29" r="9.5" stroke="#FF3CAC" stroke-width="3.4"/><circle cx="37.5" cy="27" r="3.6" fill="#FF3CAC"/><g fill="#C6FF3D"><circle cx="29" cy="10" r="2.3"/><circle cx="34" cy="7.5" r="2.3"/><circle cx="39" cy="10" r="2.3"/></g></svg>crowdpick</div>
+    <div class="eyebrow" style="margin-top:40pt">Product requirements · v1.0</div>
+    <h1>Pickbot: answers tailored to <em>you</em>, checked by the crowd</h1>
+    <p class="sub">Ask anything in plain chat (text, photos, links). Pickbot learns who you are, answers with Claude using your demographic and taste profile, then lets real people like you vote on it.</p>
+  </div>
+  <table>
+    <tr><td>Product</td><td>crowdpick.ai (repo: picktwo)</td></tr>
+    <tr><td>Owners</td><td>Shimon, Alex</td></tr>
+    <tr><td>Date</td><td>November 26, 2026</td></tr>
+    <tr><td>Status</td><td>Draft for review</td></tr>
+    <tr><td>Builds on</td><td>About-you cards, taste profile, “people like you” results, one-tap sign-up, lifecycle emails, photo safety, AI battle tags</td></tr>
+  </table>
+</section>
+
+<!-- ============ 1. SUMMARY ============ -->
+<h2 class="page-break"><span class="n">1</span>Summary</h2>
+<div class="tldr">
+  <p><b>Pickbot</b> is a chat assistant inside crowdpick. You ask it a decision question the way you’d ask a friend (“Which of these two dresses for a winter wedding?” with two photos). Before answering, Pickbot makes sure it knows enough about you:</p>
+  <ol>
+    <li><b>Demographics first.</b> If anything is missing, it asks one question at a time (sex, age range, relationship status, ZIP…) and explains that each answer makes its advice better.</li>
+    <li><b>Then personality.</b> If you haven’t voted on 30 battles yet, it offers a choice: a <i>general answer now</i>, or a <i>tailored answer</i> after a few more quick battles that complete your taste profile.</li>
+    <li><b>Then the answer.</b> Pickbot sends the question, your profile and what people like you picked on similar battles to Claude, and returns a clear recommendation with “why this fits you”.</li>
+    <li><b>Then the crowd.</b> It asks: “Want real people to weigh in too?” If yes, it turns your question into an anonymous battle, and brings you back when the votes are in.</li>
+  </ol>
+  <p>Everywhere you vote, a <b>profile bar</b> shows how close you are to a complete profile (“12 more battles to unlock tailored answers”).</p>
+</div>
+
+<h3>Why now</h3>
+<ul>
+  <li><b>We already have the ingredients.</b> About-you cards collect demographics one tap at a time; the taste profile scores six personality axes from votes; “people like you” results group votes by sex × age; AI tags describe every battle. Pickbot puts them to work for the person who gave them.</li>
+  <li><b>It gives voting a personal payoff.</b> Today voting helps <i>other</i> people. With Pickbot, every vote makes <i>your own</i> answers better. That turns the 30-battle profile from a nice extra into a goal.</li>
+  <li><b>It feeds the crowd.</b> Every “get human input” creates a fresh, real question for the Vote deck, and a reason for the asker to come back.</li>
+  <li><b>Unit economics.</b> Our break-even per visitor is about $0.10 and mostly comes from sign-ups. Pickbot creates a strong reason to sign up (save your profile, get your answers back) and a natural paid tier.</li>
+</ul>
+
+<!-- ============ 2. GOALS ============ -->
+<h2><span class="n">2</span>Goals, non-goals and success metrics</h2>
+<div class="grid2">
+  <div class="card avoid">
+    <h4>Goals</h4>
+    <ul>
+      <li>Give each person a better answer than a generic AI chat, because it knows them and what people like them chose.</li>
+      <li>Raise engagement: more battles answered per person, more return visits.</li>
+      <li>Complete more profiles (demographics + 30 battles).</li>
+      <li>Create a steady flow of real questions for the Vote deck.</li>
+      <li>Create a reason to sign up and a path to a paid tier.</li>
+    </ul>
+  </div>
+  <div class="card avoid">
+    <h4>Non-goals (v1)</h4>
+    <ul>
+      <li>Open-ended chat about anything. Pickbot is for decisions and opinions; it politely declines other uses.</li>
+      <li>Medical, legal or financial advice beyond general information (see §10).</li>
+      <li>A native app (web first; home-screen install and push later).</li>
+      <li>Sharing anyone’s answers or profile with other users.</li>
+    </ul>
+  </div>
+</div>
+
+<table class="t avoid">
+  <tr><th>Metric</th><th>Definition</th><th>Target (90 days after launch)</th></tr>
+  <tr><td>Profile completion</td><td>Signed-up users with all core demographics + 30 battles</td><td>25% (from ~5% today)</td></tr>
+  <tr><td>Battles per Pickbot user</td><td>Votes in the 7 days after the first Pickbot question</td><td>+50% vs similar users without Pickbot</td></tr>
+  <tr><td>Tailored choice rate</td><td>Asked “general or tailored?” and chose tailored</td><td>≥ 50%</td></tr>
+  <tr><td>Tailored completion</td><td>Chose tailored and finished the extra battles</td><td>≥ 60%</td></tr>
+  <tr><td>Answer satisfaction</td><td>👍 share on Pickbot answers</td><td>≥ 75%</td></tr>
+  <tr><td>Human-input opt-in</td><td>Answers where the user said yes to “get human input”</td><td>≥ 30%</td></tr>
+  <tr><td>Results return rate</td><td>Askers who come back to see their battle results</td><td>≥ 55%</td></tr>
+  <tr><td>D7 return</td><td>Pickbot users active again within 7 days</td><td>+10 points vs non-users</td></tr>
+  <tr><td>Sign-up rate</td><td>Guests who sign up after a Pickbot interaction</td><td>2× the deck’s sign-up rate</td></tr>
+</table>
+
+<!-- ============ 3. CONCEPTS ============ -->
+<h2><span class="n">3</span>Key concepts</h2>
+<table class="t">
+  <tr><th style="width:22%">Concept</th><th>Definition</th><th style="width:30%">Where it comes from today</th></tr>
+  <tr><td><b>Demographic profile</b></td><td>Core: sex, age range, relationship status, ZIP. Extended (asked only when relevant to the question): kids (age ranges only), home (rent/own), work.</td><td><code>user.sex / age_range / relationship / zip_code / kids_status / housing / work_status</code>, filled by about-you cards, sign-up and Settings</td></tr>
+  <tr><td><b>Psychographic profile</b></td><td>Six taste axes (Romantic↔Practical, Adventurous↔Cautious, Spender↔Saver, Trendy↔Classic, Forgiving↔Strict, Direct↔Diplomatic) and a type name. <b>Complete at 30 battles answered</b> (economy <code>tasteFullAt</code>).</td><td><code>lib/taste-profile.ts</code> from AI-tagged votes</td></tr>
+  <tr><td><b>Profile completeness</b></td><td>One number shown to the user: core demographics answered (4 steps) + battles answered toward 30. Displayed as the profile bar.</td><td>New (computed)</td></tr>
+  <tr><td><b>General answer</b></td><td>Claude’s answer with whatever profile exists, clearly labelled “general”.</td><td>New</td></tr>
+  <tr><td><b>Tailored answer</b></td><td>Claude’s answer using the complete profile and crowd signals from people like the asker.</td><td>New</td></tr>
+  <tr><td><b>Crowd signals</b></td><td>How people like the asker (same sex × age, similar taste) voted on similar battles.</td><td><code>likeYouFor</code>, <code>battle.tags.brain</code> (theme, traits)</td></tr>
+  <tr><td><b>Human input</b></td><td>An anonymous battle made from the asker’s question, shown in the Vote deck, results returned to the asker.</td><td><code>createBattle</code>, targeting, lifecycle emails</td></tr>
+</table>
+
+<!-- ============ 4. FLOW ============ -->
+<h2 class="page-break"><span class="n">4</span>End-to-end flow</h2>
+<div class="flow">
+  <div class="step"><span class="k">1</span><b>Ask</b>Text, up to 4 photos, or a link. Safety screen on photos and text.</div>
+  <div class="step gate"><span class="k">2</span><b>Demographics gate</b>Missing core fields? Ask one at a time inside the chat. Skippable.</div>
+  <div class="step gate"><span class="k">3</span><b>Taste check</b>Fewer than 30 battles? “General answer now, or tailored after N quick battles?”</div>
+  <div class="step gate"><span class="k">4</span><b>Quick battles</b>Inline battles in the chat until the profile is complete (or the person stops).</div>
+  <div class="step ai"><span class="k">5</span><b>Claude answers</b>Question + profile + crowd signals → recommendation, why it fits you, confidence.</div>
+  <div class="step"><span class="k">6</span><b>Feedback</b>👍 / 👎, follow-up questions in the same thread.</div>
+  <div class="step crowd"><span class="k">7</span><b>Human input?</b>Yes → Pickbot drafts an anonymous battle; the asker reviews and posts it.</div>
+  <div class="step crowd"><span class="k">8</span><b>Results return</b>When the battle closes (or hits enough votes), notify and summarize in the thread.</div>
+</div>
+<p class="small muted">Purple = profile gates. Blue = AI. Pink = crowd. Every gate has an exit: a person can always skip to a general answer.</p>
+
+<h3>Rules that keep the flow pleasant</h3>
+<ul>
+  <li><b>Never block the answer.</b> Each gate offers “Skip, answer now”. Skipping marks the answer as general.</li>
+  <li><b>Ask only what matters.</b> Extended demographics (kids, home, work) are asked only when the question is about them, as judged by a quick classifier on the question.</li>
+  <li><b>One question per message.</b> Same tap style as about-you cards; answers shuffled; “never shown on your profile” line.</li>
+  <li><b>Remember everything.</b> Answers given in Pickbot fill the same profile the deck uses, and vice versa. Nobody is asked twice.</li>
+  <li><b>Make the wait worth it.</b> While doing quick battles, the bar shows “3 more and your answer is tailored”. The battles are picked to be relevant to the question’s theme when possible.</li>
+</ul>
+
+<!-- ============ 5. SCREENS ============ -->
+<h2 class="page-break"><span class="n">5</span>Screens</h2>
+<p class="muted small">Mockups in the live Arcade Night look. Content is illustrative.</p>
+<div class="screens">
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">crowd<i>p</i><em>i</em>ck</span><span>Ask</span></div>
+      <div class="meter"><div class="row"><span>Your profile</span><b>18 / 30 battles</b></div><div class="track"><span style="width:60%"></span></div></div>
+      <div style="font:700 13pt Chakra;margin-top:6pt">Ask <span style="color:var(--lime)">Pickbot</span></div>
+      <div class="note" style="font-size:7.4pt">Stuck on a choice? Ask in your own words. Add photos or a link. I’ll answer for <i>you</i>, and the crowd can weigh in.</div>
+      <div style="margin-top:4pt">
+        <span class="chip">Which dress for a winter wedding?</span><span class="chip">Should I text him back?</span><span class="chip">Rent this one or keep looking?</span><span class="chip">Gift for my mom under $50</span>
+      </div>
+      <div class="lock">🔒 Your questions stay private unless you choose to ask the crowd.</div>
+      <div class="input">Ask anything… <span style="margin-left:6pt">📷</span><span class="go"></span></div>
+    </div></div>
+    <figcaption><b>S1 · Ask.</b> New tab (or a button on Vote and You). Example questions, photo/link attach, and the profile bar at the top.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">Pickbot</span><span>Profile 1 of 4</span></div>
+      <div class="msg me"><div class="photos"><div class="ph ph1">A · green</div><div class="ph ph2">B · burgundy</div></div>Winter wedding next month, outdoor ceremony. Which dress?</div>
+      <div class="msg bot"><span class="who">Pickbot</span>Great question. To give you an answer that fits <i>you</i>, I need 4 quick things first. Each takes one tap.<br><br><b>I’m a…</b>
+        <div class="taps"><div class="tap ta">Woman</div><div class="tap tb">Man</div></div>
+      </div>
+      <div class="note">Why I ask: people of different ages and backgrounds choose very differently. <u>Skip, just answer</u></div>
+    </div></div>
+    <figcaption><b>S2 · Demographics gate.</b> One question per message, same tap cards as the deck. A “why” line and a skip link on every step.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">Pickbot</span><span>Profile 4 of 4 ✓</span></div>
+      <div class="msg bot"><span class="who">Pickbot</span>Thanks! One more thing. You’ve voted on <b>18 of 30</b> battles, so I only know part of your taste.</div>
+      <div class="msg bot" style="max-width:100%"><span class="who">Your choice</span>
+        <div class="taps">
+          <div class="tap tl">Tailored to my personality<br><span style="font:500 6.5pt Inter;color:var(--nink)">12 quick battles (~2 min), then my answer</span></div>
+          <div class="tap tn">General answer now<br><span style="font:500 6.5pt Inter;color:var(--nmuted)">based on what you’ve told me so far</span></div>
+        </div>
+      </div>
+      <div class="meter"><div class="row"><span>Taste profile</span><b>18 / 30</b></div><div class="track"><span style="width:60%"></span></div></div>
+      <div class="note">Tailored answers use your 6 taste traits and how people like you voted.</div>
+    </div></div>
+    <figcaption><b>S3 · General or tailored.</b> Shown only when the taste profile is incomplete. Says how many battles and roughly how long.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">Pickbot</span><span>3 more to go</span></div>
+      <div class="meter"><div class="row"><span>Tailored answer unlocks in</span><b>3 battles</b></div><div class="track"><span style="width:90%"></span></div></div>
+      <div class="battle"><div class="q">Wedding guest: bold color or safe neutral?</div><div class="opts"><div class="oa">Bold color</div><div class="ob">Safe neutral</div></div></div>
+      <div class="note">Picked for your question: style and occasion battles teach me your taste fastest.</div>
+      <div class="battle"><div class="q" style="opacity:.55">Splurge on one great coat or two good ones?</div><div class="opts" style="opacity:.35"><div class="oa">One great</div><div class="ob">Two good</div></div></div>
+      <div class="note" style="margin-top:auto">Each vote also counts in the Vote deck. <u>Stop and answer now</u></div>
+    </div></div>
+    <figcaption><b>S4 · Quick battles inside the chat.</b> Real deck battles, chosen to match the question’s theme. The bar counts down; the person can stop any time.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">Pickbot</span><span class="tag lime" style="font-size:5.8pt">Tailored</span></div>
+      <div class="msg bot" style="max-width:100%"><span class="who">My pick</span><b style="font:700 10pt Chakra;color:var(--lime)">Dress A, the green one</b><br>
+        <b>Why it fits you:</b> you lean <i>trendy</i> and <i>romantic</i>, and you usually pick the bolder option for events. Green photographs well outdoors in winter light; burgundy is the safer, more common choice.<br><br>
+        <b>People like you:</b>
+        <div class="res"><div class="rb lm"><span>Women 25–34</span><span class="t"><span style="width:68%"></span></span><b>68%</b></div><div class="rb"><span>Everyone</span><span class="t"><span style="width:54%"></span></span><b>54%</b></div></div>
+        <span class="note">on 41 similar “wedding guest” battles</span><br><br>
+        <b>Confidence:</b> fairly sure. If the dress code says “black tie”, go burgundy.
+      </div>
+      <div style="display:flex;gap:4pt"><span class="chip">👍</span><span class="chip">👎</span><span class="chip">Ask a follow-up</span></div>
+    </div></div>
+    <figcaption><b>S5 · Tailored answer.</b> A clear pick, “why it fits you” from the taste traits, real crowd numbers, confidence and the condition that would change the answer.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">Pickbot</span><span>Ask the crowd</span></div>
+      <div class="msg bot" style="max-width:100%"><span class="who">Pickbot</span>Want real people to weigh in too? I’ll post this anonymously. Check it first:</div>
+      <div class="battle"><span class="tag" style="font-size:5.5pt">Anonymous · preview</span><div class="q" style="margin-top:3pt">Winter wedding, outdoor ceremony. Which dress?</div><div class="photos"><div class="ph ph1">Green</div><div class="ph ph2">Burgundy</div></div>
+        <div class="note">Shown first to: women 25–44 · Closes in 24 h</div></div>
+      <div class="lock">🔒 No name, username or location. Faces in photos are checked before posting.</div>
+      <div class="btn">Post anonymously</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4pt"><div class="btn ghost">Edit wording</div><div class="btn ghost">No thanks</div></div>
+    </div></div>
+    <figcaption><b>S6 · Human input.</b> Pickbot drafts the battle (title, two options, photos), the asker reviews and edits, then posts. Defaults target people like the asker.</figcaption>
+  </figure>
+
+</div>
+<div class="screens page-break" style="padding-top:4pt">
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="notif"><span class="ic"></span><span><b>crowdpick</b> · now<br>The crowd has spoken on your wedding dress question 👗 See how people like you voted.</span></div>
+      <div class="msg bot" style="max-width:100%;margin-top:4pt"><span class="who">The crowd is in · 212 votes</span>
+        <div class="res"><div class="rb"><span>Everyone</span><span class="t"><span style="width:72%"></span></span><b>72%</b></div><div class="rb lm"><span>Women 25–34</span><span class="t"><span style="width:81%"></span></span><b>81%</b></div></div>
+        <br>Green won, and people like you agreed even more strongly. You and I were on the same page. 🎉<br><br><b>Top reasons:</b> “stands out in photos”, “burgundy is everywhere in winter”.
+      </div>
+      <div class="btn">Tell us what you picked</div>
+      <div class="note" style="text-align:center">Closing the loop earns ⚡ and improves Pickbot for everyone.</div>
+    </div></div>
+    <figcaption><b>S7 · Results come back.</b> Notification (email now, push later), then a summary in the same thread with the crowd split and reasons. Ends by asking what they chose.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">crowd<i>p</i><em>i</em>ck</span><span>Vote</span></div>
+      <div class="meter"><div class="row"><span>Profile <b style="color:var(--nink)">22 / 30</b></span><b>8 more for tailored answers</b></div><div class="track"><span style="width:73%"></span></div></div>
+      <div class="deck"><div class="note">@brunchclub_mia · 2d left</div><div style="font:700 10pt Chakra">Is it rude to bring a plus-one who wasn’t invited?</div><div class="opts"><div class="oa">Rude</div><div class="ob">Fine</div></div><div class="note" style="text-align:center">Tap your pick</div></div>
+    </div></div>
+    <figcaption><b>S8 · Profile bar in the Vote deck.</b> Always visible until complete; tapping it explains what a complete profile unlocks. Disappears with a small celebration at 30.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="phone"><div class="screen">
+      <div class="bar"><span class="lg">You</span><span>Pickbot</span></div>
+      <div style="font:700 11pt Chakra">Your questions</div>
+      <div class="battle"><div class="q">Which dress for a winter wedding?</div><div class="note">Tailored · Crowd: 72% agree · <span style="color:var(--lime)">results in</span></div></div>
+      <div class="battle"><div class="q">Should I take the job in Austin?</div><div class="note">Tailored · Crowd voting, 64 votes · closes in 9 h</div></div>
+      <div class="battle"><div class="q">Gift for my mom under $50</div><div class="note">General · not posted</div></div>
+      <div class="meter" style="margin-top:auto"><div class="row"><span>Pickbot today</span><b>2 of 3 free answers left</b></div></div>
+    </div></div>
+    <figcaption><b>S9 · Pickbot history in You.</b> Every question, its answer type, and crowd status. Free answers left today (see §12).</figcaption>
+  </figure>
+</div>
+
+<!-- ============ 6. REQUIREMENTS ============ -->
+<h2 class="page-break"><span class="n">6</span>Detailed requirements</h2>
+<p class="small muted">Priority: <span class="pill p0">P0</span> launch · <span class="pill p1">P1</span> soon after · <span class="pill p2">P2</span> later</p>
+
+<h3>6.1 Asking</h3>
+<table class="t">
+  <tr><th style="width:8%">Pri</th><th>Requirement</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Plain-text questions up to 2,000 characters; up to 4 photos per message (JPEG/PNG/HEIC, resized before upload); links shown as cards. Follow-up messages in the same thread keep context.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Entry points: an <b>Ask</b> button in the header and on You; a “Not sure? Ask Pickbot” link after each battle result; the homepage “Learn your taste” section.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Every photo goes through the existing photo safety pipeline (<code>screenPhotos</code>: known-abuse hash match, explicit-content check) before Claude sees it. Text runs through the profanity filter and Claude’s own safety handling.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Scope guard: a fast classifier labels each question as decision / advice / off-topic / sensitive. Off-topic gets a short, friendly redirect; sensitive topics follow §10.</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>Voice input (browser speech-to-text) and paste-a-screenshot.</td></tr>
+</table>
+
+<h3>6.2 Demographics gate</h3>
+<table class="t">
+  <tr><th style="width:8%">Pri</th><th>Requirement</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Before the first answer, check the four core fields (sex, age range, relationship, ZIP). Ask only the missing ones, one per message, in that order, using the about-you card style (shuffled tap answers, skip, “never shown on your profile”).</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Each question explains the benefit in one line, e.g. “People in different life stages answer this very differently.”</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Answers are saved through the existing <code>answerAbout()</code> path (same table, same carry-over from guest to account).</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>Extended fields (kids, home, work) are asked only when the question classifier marks them relevant (e.g. parenting, moving, career).</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>ZIP prefilled from the IP guess where available (“Near Austin? Confirm your ZIP”).</td></tr>
+</table>
+
+<h3>6.3 General or tailored</h3>
+<table class="t">
+  <tr><th style="width:8%">Pri</th><th>Requirement</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>If the person has answered fewer than 30 battles, offer the choice with the exact count remaining and a time estimate (~10 seconds per battle).</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Tailored path: inline battles inside the chat, real open battles from the deck (votes count normally, points and all), preferring battles whose AI theme matches the question and that carry traits for the person’s weakest axes.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>“Stop and answer now” always available; the answer is then marked with how complete the profile was.</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>Smart threshold: if the axes relevant to this question are already well measured, skip the extra battles even below 30.</td></tr>
+</table>
+
+<h3>6.4 The answer</h3>
+<table class="t">
+  <tr><th style="width:8%">Pri</th><th>Requirement</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Structure: <b>My pick</b> (one clear choice, or “it depends on X” only when truly balanced) · <b>Why it fits you</b> (2–3 lines tied to the person’s traits and situation) · <b>People like you</b> (real crowd numbers on similar battles, when we have at least 20 votes) · <b>Confidence</b> and the one condition that would flip it.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Streams in word by word; first words within ~2 seconds.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Labelled “Tailored” or “General”. A general answer ends with “Want this tailored? N quick battles.”</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>👍 / 👎 on every answer, with an optional one-line reason.</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>Follow-ups (“what about shoes?”) in the same thread, reusing the profile and earlier photos.</td></tr>
+</table>
+
+<h3>6.5 Human input (the crowd)</h3>
+<table class="t">
+  <tr><th style="width:8%">Pri</th><th>Requirement</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>After every answer: “Want real people to weigh in?” If yes, Pickbot drafts a battle: a short title in the asker’s voice, two options, and the photos (if any).</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td><b>Anonymized:</b> the draft removes names, usernames, places finer than a city, workplaces, phone numbers, emails and other identifying details. Posted under a shared “Asked via Pickbot” identity, never the asker’s handle.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>The asker always sees and can edit the draft before posting. Nothing is posted without an explicit tap.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Photos: the normal photo safety pipeline. Photos showing children’s faces are not allowed in battles (existing children’s safety rule); Pickbot explains and suggests a text-only version.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Default targeting: people like the asker (same sex, nearby age ranges), via the existing <code>battle.tags.target</code>. Default length 24 hours, editable.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Posting requires an account (one-tap sign-up card if they’re a guest), so we can bring them back.</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>Boost: spend ⚡ to get the battle shown to more people sooner (existing boost mechanics).</td></tr>
+</table>
+
+<h3>6.6 Results coming back</h3>
+<table class="t">
+  <tr><th style="width:8%">Pri</th><th>Requirement</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>When the battle closes, or reaches 50 votes if sooner, Pickbot posts a summary into the thread: split for everyone and for people like the asker, top reasons, and whether the crowd agreed with Pickbot.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Notification: Activity alert + email through the existing <code>deliver()</code> pipeline (quiet hours, caps, unsubscribe). Push when web push ships.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Ends with “Tell us what you picked” (closing the loop, existing ⚡ reward), which also teaches Pickbot whether its advice landed.</td></tr>
+</table>
+
+<h3>6.7 Profile bar</h3>
+<table class="t">
+  <tr><th style="width:8%">Pri</th><th>Requirement</th></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>A slim bar at the top of the Vote deck, Ask and You: “Profile 22 / 30 · 8 more to unlock tailored answers”. Counts battles answered toward <code>tasteFullAt</code>; shows a “+ 2 about you” hint while core demographics are missing.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Updates instantly after each vote; small celebration and the taste-profile reveal at 30; then it disappears.</td></tr>
+  <tr><td><span class="pill p0">P0</span></td><td>Tapping it opens a short explainer: what a complete profile unlocks and that answers are never shown publicly.</td></tr>
+  <tr><td><span class="pill p1">P1</span></td><td>For guests: “Sign up to keep your profile” at the free-vote limit (ties into the one-tap sign-up card).</td></tr>
+</table>
+
+<!-- ============ 7. AI DESIGN ============ -->
+<h2 class="page-break"><span class="n">7</span>AI design (Claude)</h2>
+<div class="grid2">
+  <div class="card avoid">
+    <h4>Models</h4>
+    <ul>
+      <li><b>Answers:</b> Claude Opus 5.5 (<code>claude-opus-5-5</code>), the current default Claude model. Adaptive thinking, effort <code>medium</code> (its default), streaming. Refusal fallbacks enabled.</li>
+      <li><b>Cheaper option:</b> Claude Sonnet 5.5 (<code>claude-sonnet-5-5</code>) at half the price, if quality holds in testing. Our decision after the evaluation below.</li>
+      <li><b>Small jobs</b> (question classifier, battle draft, anonymization check, picking relevant battles): Claude Haiku 5.5 (<code>claude-haiku-5-5</code>).</li>
+    </ul>
+  </div>
+  <div class="card avoid">
+    <h4>What Claude receives</h4>
+    <ul>
+      <li>The question, photos and earlier turns of the thread.</li>
+      <li>Profile as ranges only: sex, age range, relationship, region (state/metro, not ZIP), relevant extended fields.</li>
+      <li>Taste axes with scores and the type name.</li>
+      <li>Crowd signals: up to 10 similar battles (by AI theme and traits) with overall and like-you splits and top reasons.</li>
+      <li><b>Never:</b> name, email, username, exact ZIP, other users’ data.</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Prompt structure</h3>
+<ol>
+  <li><b>System prompt (fixed, cached):</b> Pickbot’s role and voice (warm, direct, brief), the answer structure, how to use profile and crowd data, when to say “it depends”, safety rules for sensitive topics, never invent crowd numbers.</li>
+  <li><b>Profile block (per person, cached per thread):</b> demographics, taste axes, completeness.</li>
+  <li><b>Crowd block (per question):</b> similar battles and splits, retrieved by our server.</li>
+  <li><b>Conversation:</b> the question and follow-ups.</li>
+</ol>
+<p>The answer comes back as structured JSON (pick, why, crowd note, confidence, flip condition) rendered by the app. Battle drafts use a second structured call (title, option A, option B, removed details) that the asker reviews.</p>
+
+<h3>Cost per answer (estimate)</h3>
+<table class="t avoid">
+  <tr><th>Step</th><th>Model</th><th>Tokens (approx.)</th><th>Cost</th></tr>
+  <tr><td>Tailored answer</td><td>Opus 5.5 ($4 in / $20 out per million)</td><td>5k in (incl. 1 photo) · 2.5k out incl. thinking</td><td>~$0.07</td></tr>
+  <tr><td>Same, on Sonnet 5.5</td><td>Sonnet 5.5 ($2 / $10)</td><td>same</td><td>~$0.035</td></tr>
+  <tr><td>Classifier + battle draft + battle picker</td><td>Haiku 5.5 ($0.10 / $0.50)</td><td>~4k in · 0.6k out total</td><td>&lt; $0.001</td></tr>
+  <tr><td>Prompt caching of the fixed system prompt and profile</td><td></td><td></td><td>saves ~20–30%</td></tr>
+</table>
+<p class="small">At 3 free answers per user per day and ~1 answer per active user per day on average, AI cost is about <b>$2 per active user per month</b> on Opus 5.5 (about $1 on Sonnet 5.5). This is why §12 caps free use and adds a paid tier.</p>
+
+<h3>Quality evaluation before launch</h3>
+<ul>
+  <li>Build a set of 200 real-style questions (with and without photos, all profile states) and grade answers on: clear pick, fit to profile, correct use of crowd numbers, safety, tone.</li>
+  <li>Compare tailored vs general answers with people who have complete profiles (blind preference test).</li>
+  <li>After launch: 👍 rate and “crowd agreed with Pickbot” rate, tracked per model and prompt version.</li>
+</ul>
+
+<!-- ============ 8. DATA ============ -->
+<h2><span class="n">8</span>Data and architecture</h2>
+<table class="t">
+  <tr><th style="width:24%">Piece</th><th>Details</th></tr>
+  <tr><td><b>New tables</b></td><td><code>pickbot_thread</code> (owner, title, created, status) · <code>pickbot_message</code> (thread, role, text, photo refs, answer JSON, model, tokens, cost, rating) · <code>pickbot_battle</code> (thread → battle, when results were delivered).</td></tr>
+  <tr><td><b>Existing tables reused</b></td><td><code>profile_answer</code> and user profile fields (demographics), votes (taste profile), <code>battle</code> with <code>tags.target</code> and a new <code>tags.pickbot</code> marker (no link to the asker is visible to others), <code>email_log</code> for result emails.</td></tr>
+  <tr><td><b>Services</b></td><td><code>services/pickbot.ts</code> (thread flow, gates), <code>pickbot-rules.ts</code> (pure: which gate next, completeness, battle picker; unit-tested), <code>pickbot-ai.ts</code> (Claude calls, prompt assembly, structured output), <code>pickbot-crowd.ts</code> (similar battles + like-you splits).</td></tr>
+  <tr><td><b>API routes</b></td><td><code>POST /api/pickbot/ask</code> (streams), <code>POST /api/pickbot/answer-gate</code>, <code>POST /api/pickbot/draft-battle</code>, <code>POST /api/pickbot/post-battle</code>, <code>POST /api/pickbot/rate</code>. Rate-limited per person and IP.</td></tr>
+  <tr><td><b>Background</b></td><td>The hourly cron checks Pickbot battles that closed or reached 50 votes and posts the summary + sends the email (idempotent per battle).</td></tr>
+  <tr><td><b>Brain events</b></td><td><code>pickbot_asked</code>, <code>pickbot_gate_shown</code> / <code>_answered</code> / <code>_skipped</code>, <code>pickbot_choice</code> (general/tailored), <code>pickbot_answered</code> (model, latency, tokens), <code>pickbot_rated</code>, <code>pickbot_crowd_posted</code>, <code>pickbot_results_seen</code>. New Brain section: funnel, cost per answer, satisfaction, crowd agreement.</td></tr>
+  <tr><td><b>Config</b></td><td>Free answers per day, profile threshold (30), similar-battle count, results trigger (50 votes), model per step, all in the admin Config.</td></tr>
+</table>
+
+<!-- ============ 9. GUESTS ============ -->
+<h2><span class="n">9</span>Guests vs signed-in users</h2>
+<table class="t avoid">
+  <tr><th>Step</th><th>Guest</th><th>Signed in</th></tr>
+  <tr><td>Ask and get a general answer</td><td>1 question per device</td><td>Yes</td></tr>
+  <tr><td>Demographic questions</td><td>Yes (saved to the device, moved to the account on sign-up)</td><td>Yes</td></tr>
+  <tr><td>Quick battles for tailoring</td><td>Yes, within the free-vote limit</td><td>Yes</td></tr>
+  <tr><td>Tailored answer</td><td>Sign-up card first (“save your profile and get your tailored answer”)</td><td>Yes</td></tr>
+  <tr><td>Ask the crowd, get results back</td><td>Sign-up card first</td><td>Yes</td></tr>
+</table>
+
+<!-- ============ 10. SAFETY ============ -->
+<h2 class="page-break"><span class="n">10</span>Privacy, safety and policy</h2>
+<div class="grid2">
+  <div class="card avoid">
+    <h4>Privacy</h4>
+    <ul>
+      <li>Questions and answers are private to the asker. Admins see them only for safety review of reported content.</li>
+      <li>Only ranges go to Claude (age range, region, never name/email/username/exact ZIP). Anthropic’s API terms: no training on our data.</li>
+      <li>Crowd battles are anonymous by design; the asker reviews every word.</li>
+      <li>Settings: delete any thread; account deletion deletes all threads; data export includes them.</li>
+      <li>Privacy policy update: what Pickbot stores, what is sent to the AI provider, how long we keep it (proposed: 12 months).</li>
+    </ul>
+  </div>
+  <div class="card avoid">
+    <h4>Safety</h4>
+    <ul>
+      <li>18+ only (same as the product).</li>
+      <li><b>Sensitive topics</b> (health, legal, money, relationships with abuse signals): general information only, suggest a professional; abuse or self-harm signals get crisis resources (988 in the US) and no crowd posting.</li>
+      <li>Photos: existing safety pipeline; no children’s faces in crowd battles.</li>
+      <li>No manipulation: Pickbot never pushes purchases or sponsored options in answers; sponsored content stays clearly labelled in the deck.</li>
+      <li>Abuse limits: rate limits, the existing ban/report system, flagged threads to the moderation queue.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============ 11. EXPERIMENTS ============ -->
+<h2><span class="n">11</span>Experiments</h2>
+<ul>
+  <li><b>Pickbot holdout (10%):</b> stable group that doesn’t see Pickbot, to measure its real effect on votes, profile completion, sign-ups and D7 return.</li>
+  <li><b>Gate test:</b> “general or tailored” choice vs always offering tailored first. Measure tailored completion and satisfaction.</li>
+  <li><b>Profile bar test:</b> bar shown vs not shown in the deck (votes per visitor, profile completion).</li>
+  <li><b>Model test:</b> Opus 5.5 vs Sonnet 5.5 for answers (satisfaction, crowd agreement, cost).</li>
+</ul>
+<p>All four appear on the Brain page using the existing A/B framework (<code>experiment_assignment</code>, p-values).</p>
+
+<!-- ============ 12. MONETIZATION ============ -->
+<h2><span class="n">12</span>Monetization</h2>
+<table class="t avoid">
+  <tr><th>Plan</th><th>What you get</th><th>Price (proposal)</th></tr>
+  <tr><td><b>Free</b></td><td>3 Pickbot answers a day, tailored once the profile is complete; ask the crowd on 1 question a day.</td><td>$0</td></tr>
+  <tr><td><b>Pickbot Plus</b></td><td>Unlimited answers, priority crowd placement (more votes, faster), photo-heavy questions, answer history export.</td><td>$4.99 / month</td></tr>
+</table>
+<p>Unit economics: at ~$2 of AI cost per active free user per month, the free cap keeps cost under control; Plus at $4.99 leaves a healthy margin even for heavy users. Pickbot also lifts the levers in the Brain’s unit-economics panel: sign-up rate, visits per visitor, and votes per visitor.</p>
+
+<!-- ============ 13. ROLLOUT ============ -->
+<h2 class="page-break"><span class="n">13</span>Rollout plan</h2>
+<table class="t">
+  <tr><th style="width:16%">Phase</th><th>Scope</th><th style="width:16%">Estimate</th></tr>
+  <tr><td><b>0 · Profile bar</b></td><td>The profile bar in the deck, Ask and You (can ship first; it raises battles answered on its own).</td><td>2–3 days</td></tr>
+  <tr><td><b>1 · Pickbot alpha</b></td><td>Ask (text + photos), demographics gate, general/tailored choice, inline battles, tailored answer with crowd signals, ratings. Admins and testers only. Evaluation set and model comparison.</td><td>2 weeks</td></tr>
+  <tr><td><b>2 · Ask the crowd</b></td><td>Battle drafting and anonymization, review screen, posting under “Asked via Pickbot”, results summary + email, close-the-loop.</td><td>1–1.5 weeks</td></tr>
+  <tr><td><b>3 · Public launch</b></td><td>Guests and signed-in users, free cap, Pickbot holdout, Brain section, privacy policy update.</td><td>1 week</td></tr>
+  <tr><td><b>4 · Plus and push</b></td><td>Pickbot Plus payments; home-screen install and web push for results.</td><td>2 weeks</td></tr>
+</table>
+
+<!-- ============ 14. RISKS ============ -->
+<h2><span class="n">14</span>Risks and mitigations</h2>
+<table class="t">
+  <tr><th style="width:30%">Risk</th><th>Mitigation</th></tr>
+  <tr><td>The gates feel like homework and people leave before the answer.</td><td>One tap per question, a skip on every step, a general answer always available, the gate test in §11.</td></tr>
+  <tr><td>Tailored answers aren’t noticeably better than general ones.</td><td>Blind preference testing before launch; use real crowd numbers (our unique data), not just traits; tune the prompt on the evaluation set.</td></tr>
+  <tr><td>AI cost grows faster than revenue.</td><td>Daily free cap, Haiku for small jobs, prompt caching, model test vs Sonnet 5.5, Plus tier.</td></tr>
+  <tr><td>Privacy leak through crowd battles.</td><td>Automatic anonymization + mandatory human review by the asker + the existing photo pipeline.</td></tr>
+  <tr><td>Harmful or overconfident advice on serious topics.</td><td>Topic classifier, sensitive-topic rules, crisis resources, no crowd posting for those.</td></tr>
+  <tr><td>Crowd battles from Pickbot flood the deck.</td><td>Cap Pickbot battles per user per day; deck ranking (engagement and skip factors) already demotes weak battles.</td></tr>
+  <tr><td>Thin crowd data early on (few similar battles).</td><td>Show crowd numbers only with 20+ votes; otherwise say so and lean on the profile.</td></tr>
+</table>
+
+<!-- ============ 15. OPEN QUESTIONS ============ -->
+<h2><span class="n">15</span>Open questions</h2>
+<ol>
+  <li><b>Name and placement:</b> a fourth tab (“Ask”) or a button inside Vote and You?</li>
+  <li><b>Threshold:</b> keep 30 battles for “complete”, or use the smart threshold (relevant axes measured) from day one?</li>
+  <li><b>Guest allowance:</b> 1 free general answer per device, or none before sign-up?</li>
+  <li><b>Crowd identity:</b> one shared “Asked via Pickbot” poster, or a random anonymous handle per battle?</li>
+  <li><b>Model choice:</b> start on Opus 5.5 for quality, or Sonnet 5.5 for cost, before the model test?</li>
+  <li><b>Plus price and limits:</b> $4.99/month and 3 free answers a day are proposals to validate.</li>
+  <li><b>Sponsored options:</b> may brands ever appear in Pickbot answers (clearly labelled), or never?</li>
+</ol>
+
+</body>
+</html>

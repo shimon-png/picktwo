@@ -23,6 +23,12 @@ We use the X (Twitter) pixel to measure our ads on X. It tells X when someone vi
 
 We also use Vercel Web Analytics, our hosting provider's privacy-friendly visit counter. It counts page views without cookies and without identifying you.
 
+## Pickbot (AI answers)
+- When you ask Pickbot, we store your question, any photos you add and its answers in your account, private to you. We delete them after 12 months, and you can delete any question sooner, or all of them by deleting your account.
+- To answer, we send your question, photos and **ranges only** to our AI provider, Anthropic (Claude): your sex, age range, relationship status, region (not your ZIP), the six taste traits from your votes, and how groups of people voted on similar battles. Never your name, email, username or exact location. Anthropic doesn't train its models on this data.
+- Photos go through the same safety checks as battle photos before the AI sees them.
+- If you choose to ask the crowd, Pickbot drafts an anonymous battle and you check every word before anything is posted. It's posted as "Asked via Pickbot", never under your name, and other people can't see it came from you.
+
 ## How we use it
 - To run crowdpick.ai: show battles to relevant voters, calculate results, priority points and reputation.
 - To send you notifications you've enabled.
@@ -30,7 +36,7 @@ We also use Vercel Web Analytics, our hosting provider's privacy-friendly visit 
 
 ## Your choices
 - Change your data-sharing consent any time in Settings.
-- Download all your data from Settings.
+- Download all your data from Settings (including your Pickbot questions and answers).
 - Delete your account from Settings. Your votes remain only as anonymous counts so other people's results don't change.
 
 ## Children

@@ -288,6 +288,13 @@
       "when": 1795634819409,
       "tag": "0040_about_cards_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795640743425,
+      "tag": "0041_pickbot",
+      "breakpoints": true
     }
   ]
 }
