@@ -5,7 +5,7 @@ import { markSignupConversion } from "@/server/conversions";
 import { handler } from "@/server/api";
 import { requireUser } from "@/server/viewer";
 import { rateLimit } from "@/server/ratelimit";
-import { profileInput } from "@/lib/validators";
+import { profileInput, zipField } from "@/lib/validators";
 import { profileIncomplete } from "@/lib/profile";
 import { saveQuickProfile, suggestHandle } from "@/server/services/profile";
 import { getDeviceId } from "@/server/viewer";
@@ -15,7 +15,7 @@ import { deviceAnswers } from "@/server/services/about";
 const input = profileInput
   .pick({ handle: true, zipCode: true, sex: true, ageRange: true })
   .partial()
-  .extend({ zipCode: profileInput.shape.zipCode.optional().or(z.literal("")) });
+  .extend({ zipCode: zipField.optional().or(z.literal("")) });
 
 /** What the sign-up flow still needs from this user. */
 export const GET = handler(async () => {

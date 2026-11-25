@@ -48,10 +48,15 @@ export const POST = handler(async (req) => {
   if (taken) throw new AppError("CONFLICT", "That handle is taken");
   const loc = normalizeLocation(p);
   if (!loc.ok) throw new AppError("VALIDATION", loc.message);
-  const zip = lookupZip(p.zipCode, loc.country);
-  if (!zip.ok) throw new AppError("VALIDATION", zip.message);
+  // ZIP, sex and age are optional (one-tap sign-up, Nov 25 2026); blank clears them.
+  let zip: { code: string; country: string; region: string | null; city: string | null } | null = null;
+  if (p.zipCode) {
+    const z = lookupZip(p.zipCode, loc.country);
+    if (!z.ok) throw new AppError("VALIDATION", z.message);
+    zip = z;
+  }
   // No location picked yet: fill it in from the ZIP.
-  const place = loc.country ? loc : { country: zip.country, region: zip.region, city: zip.city };
+  const place = loc.country || !zip ? loc : { country: zip.country, region: zip.region, city: zip.city };
   const first = !user.onboardedAt;
   const demo = {
     kidsStatus: p.kidsStatus ?? (p.kidAges.length ? "YES" : null),
@@ -59,9 +64,9 @@ export const POST = handler(async (req) => {
     country: place.country,
     region: place.region,
     city: place.city,
-    zipCode: zip.code,
-    sex: p.sex,
-    ageRange: p.ageRange,
+    zipCode: zip?.code ?? null,
+    sex: p.sex || null,
+    ageRange: p.ageRange || null,
     interests: p.interests,
     ...(p.relationship !== undefined ? { relationship: p.relationship } : {}),
     ...(p.housing !== undefined ? { housing: p.housing } : {}),
@@ -79,9 +84,9 @@ export const POST = handler(async (req) => {
       country: place.country,
       region: place.region,
       city: place.city,
-      zipCode: zip.code,
-      sex: p.sex,
-      ageRange: p.ageRange,
+      zipCode: zip?.code ?? null,
+      sex: p.sex || null,
+      ageRange: p.ageRange || null,
       interests: p.interests,
       ...(p.relationship !== undefined ? { relationship: p.relationship } : {}),
       ...(p.housing !== undefined ? { housing: p.housing } : {}),
