@@ -14,6 +14,8 @@ import { db } from "@/server/db";
 import { battles, outcomes, votes } from "@/server/db/schema";
 import { HeroRotator } from "@/components/battle/HeroRotator";
 import { KnowYourTaste } from "@/components/home/KnowYourTaste";
+import { AskPickbot } from "@/components/home/AskPickbot";
+import { pickbotConfigured } from "@/server/services/pickbot-ai";
 import { Mark } from "@/components/layout/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { track } from "@/server/analytics";
@@ -28,6 +30,8 @@ export default async function HomePage() {
   if (user && profileIncomplete(user)) redirect(onboardingUrl());
   // Signed in: the Vote stack is home.
   if (user) redirect("/vote");
+  // The Ask (Pickbot) explainer only once Pickbot can answer.
+  const pickbot = pickbotConfigured();
 
   track("landing_viewed", {}, { deviceId: viewer.deviceId });
   const weekAgo = new Date(Date.now() - 7 * 86400_000);
@@ -77,7 +81,7 @@ export default async function HomePage() {
           <em className="text-b">Ask people like you.</em>
         </h1>
         <p className="mx-auto mt-4 max-w-sm text-[17px] leading-relaxed text-zinc-600">
-          Snap two options, get honest votes in minutes — from friends and parents who’ve been there.
+          Get honest votes in minutes from people like you, or ask Pickbot, our AI that learns your taste and answers for you.
         </p>
         <div className="mx-auto mt-6 flex max-w-sm flex-col gap-2.5 sm:flex-row">
           <Link href="/signin?callbackUrl=/post" data-track="ask_crowd" className="btn-cta flex-1 rounded-full py-3.5 text-base shadow-card">
@@ -144,6 +148,9 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* ---------- Ask Pickbot (the Ask tab) ---------- */}
+      {pickbot && <AskPickbot />}
 
       {/* ---------- Know your taste (about-you + taste profile explainer) ---------- */}
       <KnowYourTaste />

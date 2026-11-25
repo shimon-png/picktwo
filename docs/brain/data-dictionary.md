@@ -41,7 +41,7 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | `page_view` | browser, every route | 2026-11-23 | `path` |
 | `card_shown` | browser, each card that reaches the top of the Vote deck | 2026-11-23 | `battleId`, `pos` (1 = first card of this deck load), `kind` (text/photo/mixed), `prevKinds` (up to 3 previous kinds), `votesShown`, `ageHours`, `hasContext`, `titleLen`, `authorTier`, `cv` (content fingerprint), `signedIn`, `surface`, `arm` (`engine` = deck ranked with engagement score, `holdout` = old order; from 2026-11-23) |
 | `engaged` | browser, first tap/click or scroll past 120px on a page view (Shimon: bounce = never taps or scrolls) | 2026-11-23 | `how` (click/scroll), `path` |
-| `home_click` | browser, tap on an element with `data-track` (homepage buttons and cards) | 2026-11-23 | `target` (ask_crowd, start_voting, hero_card, deciding_see_all, deciding_card, story_card, bottom_ask, taste_start), `path` |
+| `home_click` | browser, tap on an element with `data-track` (homepage buttons and cards) | 2026-11-23 | `target` (ask_crowd, start_voting, hero_card, deciding_see_all, deciding_card, story_card, bottom_ask, taste_start, pickbot_start), `path` |
 | `profile_bar_tap` | browser, opening the profile bar (Vote deck or You) | 2026-11-25 | `place` (deck, you), `votes`, `left` (battles to the target), `missing` (core about-you questions unanswered) |
 | `profile_bar_tap` place `ask` | browser, the profile bar on Ask | 2026-11-26 | as above |
 | `pickbot_asked` | server, a Pickbot question or follow-up | 2026-11-26 | `threadId`, `photos`, `chars`, `scope`, `theme`, `crisis`, `followUp` (never the text) |
