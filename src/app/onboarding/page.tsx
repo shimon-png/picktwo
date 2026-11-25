@@ -18,7 +18,7 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
         <h1 className=" text-2xl font-medium">{returning ? "Finish your profile" : "Set up your profile"}</h1>
         <p className="text-zinc-600">
           {returning
-            ? "We now ask everyone for a ZIP code, sex and age range. It takes a few seconds and helps us match you with people like you."
+            ? "A ZIP code, sex and age range are optional, but they let us show you how people like you voted."
             : "Takes 30 seconds. This helps us show your battles to the right people."}
         </p>
       </div>

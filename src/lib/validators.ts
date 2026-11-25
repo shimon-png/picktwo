@@ -119,6 +119,9 @@ export const outcomeInput = z
 /** US ZIP (12345 / 12345-6789) or a general postal code (3–10 letters, digits, spaces, dashes). */
 export const ZIP_RE = /^(\d{5}(-\d{4})?|[A-Z0-9][A-Z0-9 -]{1,8}[A-Z0-9])$/;
 
+/** A real-looking ZIP / postal code (existence is checked by lookupZip on the server). */
+export const zipField = z.string().trim().toUpperCase().regex(ZIP_RE, "Enter a valid ZIP / postal code");
+
 export const profileInput = z.object({
   name: z.string().trim().min(1).max(50),
   handle: z
@@ -133,13 +136,10 @@ export const profileInput = z.object({
   housing: z.enum(["RENT", "OWN", "FAMILY"]).nullable().optional(),
   workStatus: z.enum(["STUDENT", "WORKING", "BOTH", "NEITHER"]).nullable().optional(),
   kidAges: z.array(z.enum(KID_AGE_IDS)).default([]),
-  zipCode: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .regex(ZIP_RE, "Enter a valid ZIP / postal code"),
-  sex: z.enum(SEX_IDS, { errorMap: () => ({ message: "Choose an option for sex" }) }),
-  ageRange: z.enum(AGE_RANGE_IDS, { errorMap: () => ({ message: "Choose your age range" }) }),
+  // Optional since the one-tap sign-up (Nov 25 2026): blank = not answered (or cleared in Settings).
+  zipCode: zipField.or(z.literal("")).optional(),
+  sex: z.enum(SEX_IDS, { errorMap: () => ({ message: "Choose an option for sex" }) }).or(z.literal("")).optional(),
+  ageRange: z.enum(AGE_RANGE_IDS, { errorMap: () => ({ message: "Choose your age range" }) }).or(z.literal("")).optional(),
   country: z.string().trim().max(60).optional().default(""),
   region: z.string().trim().max(80).optional().default(""),
   city: z.string().trim().max(80).optional().default(""),

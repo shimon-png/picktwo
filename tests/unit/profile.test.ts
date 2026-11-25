@@ -12,24 +12,25 @@ describe("profileIncomplete", () => {
   it.each(["zipCode", "sex", "ageRange"] as const)("is still complete without %s", (k) => expect(profileIncomplete({ ...done, [k]: null })).toBe(false));
 });
 
-describe("profileInput required fields", () => {
+describe("profileInput fields", () => {
   it("accepts a full profile", () => expect(profileInput.safeParse(base).success).toBe(true));
   it("accepts ZIP+4 and non-US postal codes", () => {
     for (const zipCode of ["10001-1234", "SW1A 1AA", "k1a 0b1"]) expect(profileInput.safeParse({ ...base, zipCode }).success).toBe(true);
   });
-  it("rejects bad or missing ZIP", () => {
-    for (const zipCode of ["", "1", "!!!!!", "12345678901"]) expect(profileInput.safeParse({ ...base, zipCode }).success).toBe(false);
+  it("rejects a bad ZIP; a blank or missing one is fine (optional since Nov 25)", () => {
+    for (const zipCode of ["1", "!!!!!", "12345678901"]) expect(profileInput.safeParse({ ...base, zipCode }).success).toBe(false);
+    expect(profileInput.safeParse({ ...base, zipCode: "" }).success).toBe(true);
     const noZip: Partial<typeof base> = { ...base };
     delete noZip.zipCode;
-    expect(profileInput.safeParse(noZip).success).toBe(false);
+    expect(profileInput.safeParse(noZip).success).toBe(true);
   });
-  it("requires sex from the allowed options", () => {
+  it("sex: one of the allowed options, or blank", () => {
     expect(profileInput.safeParse({ ...base, sex: "UNDISCLOSED" }).success).toBe(true);
-    expect(profileInput.safeParse({ ...base, sex: "" }).success).toBe(false);
+    expect(profileInput.safeParse({ ...base, sex: "" }).success).toBe(true);
     expect(profileInput.safeParse({ ...base, sex: "OTHER" }).success).toBe(false);
   });
-  it("requires an age range", () => {
-    expect(profileInput.safeParse({ ...base, ageRange: undefined }).success).toBe(false);
+  it("age range: one of the bands, or left out", () => {
+    expect(profileInput.safeParse({ ...base, ageRange: undefined }).success).toBe(true);
     expect(profileInput.safeParse({ ...base, ageRange: "AGE_12" }).success).toBe(false);
   });
 });
