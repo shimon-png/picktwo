@@ -27,8 +27,6 @@ jobs:
       E2E_RELAX_RATE_LIMITS: "true"
       # Pickbot answers come from a canned fake (no Claude API key in CI).
       PICKBOT_FAKE_AI: "true"
-      # Signed test webhooks for Pickbot Plus (no real Stripe account in CI).
-      STRIPE_WEBHOOK_SECRET: whsec_e2e
       NEXT_TELEMETRY_DISABLED: "1"
       # No X pixel in tests: no third-party script, no fake sign-up conversions in the ad account.
       NEXT_PUBLIC_X_PIXEL_ID: ""

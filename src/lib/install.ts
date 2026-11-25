@@ -1,6 +1,6 @@
 /**
  * "Add to home screen" (PRD phase 4): when to suggest it, per platform. Pure, used in the browser; tested in
- * tests/unit/plus-rules.test.ts.
+ * tests/unit/install.test.ts.
  */
 export type InstallPlatform = "ios" | "android" | "desktop";
 

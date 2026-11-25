@@ -85,7 +85,7 @@ export const users = pgTable("user", {
   relationship: text("relationship"),
   housing: text("housing"),
   workStatus: text("work_status"),
-  /** Pickbot Plus (PRD §12): paid until this time (Stripe subscription, kept in sync by the webhook). */
+  /** Pickbot Plus (PRD §12, payments not built yet): Plus until this time. Unused until Stripe is added. */
   plusUntil: ts("plus_until"),
   stripeCustomerId: text("stripe_customer_id"),
   interests: text("interests").array().notNull().default([]),

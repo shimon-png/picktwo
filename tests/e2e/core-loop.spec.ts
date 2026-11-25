@@ -1,4 +1,3 @@
-import { createHmac } from "node:crypto";
 import { test, expect, devices, type Page, type Browser } from "@playwright/test";
 import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules";
 import { ECONOMY_DEFAULTS } from "../../src/lib/constants";
@@ -561,32 +560,6 @@ test("Pickbot: ask → profile question → tailored → quick battles → answe
   await expect(page.getByTestId("pickbot-answer")).toHaveCount(2);
   await page.goto("/ask");
   await expect(page.getByRole("heading", { name: "Your questions" })).toBeVisible();
-});
-
-test("Pickbot Plus: a signed Stripe webhook turns Plus on and off (no real Stripe)", async ({ browser }) => {
-  const page = await newUser(browser, "plus");
-  const me = await (await page.request.get("/api/me/export")).json();
-  const userId = me.profile.id as string;
-  const secret = process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e";
-  const send = async (type: string, status: string) => {
-    const body = JSON.stringify({ id: `evt_${Date.now()}`, type, data: { object: { customer: "cus_e2e", status, current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, metadata: { userId } } } });
-    const t = Math.floor(Date.now() / 1000);
-    const sig = createHmac("sha256", secret).update(`${t}.${body}`).digest("hex");
-    return page.request.post("/api/stripe/webhook", { data: body, headers: { "content-type": "application/json", "stripe-signature": `t=${t},v1=${sig}` } });
-  };
-  // A bad signature is refused.
-  const bad = await page.request.post("/api/stripe/webhook", { data: "{}", headers: { "stripe-signature": "t=1,v1=00" } });
-  expect(bad.status()).toBe(403);
-  await page.goto("/plus");
-  await expect(page.getByRole("heading", { name: "Pickbot Plus" })).toBeVisible();
-  await expect(page.getByText(/You have Plus until/)).toHaveCount(0);
-  expect((await send("customer.subscription.created", "active")).ok()).toBe(true);
-  await page.reload();
-  await expect(page.getByText(/You have Plus until/)).toBeVisible();
-  await snap(page, "plus");
-  expect((await send("customer.subscription.deleted", "canceled")).ok()).toBe(true);
-  await page.reload();
-  await expect(page.getByText(/You have Plus until/)).toHaveCount(0);
 });
 
 test("home screen: iPhone gets the Add to Home Screen steps on a later visit, and Not now snoozes it", async ({ browser }) => {

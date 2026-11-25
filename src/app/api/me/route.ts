@@ -4,15 +4,12 @@ import { handler } from "@/server/api";
 import { requireUser } from "@/server/viewer";
 import { db } from "@/server/db";
 import { users, votes, battles, options, notifications, accounts, sessions, follows, devices, consentEvents, conversations, pickbotThreads, pushSubscriptions } from "@/server/db/schema";
-import { cancelPlus } from "@/server/services/plus";
 import { signOut } from "@/server/auth";
 import { POLICY_VERSION } from "@/lib/constants";
 
 /** Delete account (PRD 13.4): anonymise the user, keep votes as anonymous aggregates, soft-delete battles. */
 export const DELETE = handler(async () => {
   const user = await requireUser();
-  // Stop a Plus subscription first, so a deleted account is never billed again.
-  await cancelPlus(user);
   const myBattles = await db.select({ id: battles.id }).from(battles).where(eq(battles.authorId, user.id));
   const ids = myBattles.map((b) => b.id);
   const blobUrls = ids.length
