@@ -610,12 +610,14 @@ test("Ask Pickbot deck card: shows once, at the account's tested position (never
   for (let guard = 0; guard < 40 && !(await promo.isVisible()); guard++) {
     const about = p.getByRole("article", { name: /^About you/ });
     if (await about.isVisible()) {
-      await about.getByRole("button", { name: "Skip" }).click();
+      await about.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(about).toBeHidden({ timeout: 5000 }).catch(() => {});
       continue;
     }
-    const taste = p.getByRole("button", { name: /Keep voting|Back to voting|Continue/ }).first();
-    if (await p.getByRole("dialog").isVisible().catch(() => false)) {
-      await taste.click().catch(() => {});
+    const dialog = p.getByRole("dialog");
+    if (await dialog.isVisible().catch(() => false)) {
+      await dialog.getByRole("button", { name: "Keep voting" }).click();
+      await p.waitForTimeout(400);
       continue;
     }
     const btn = p.getByRole("button", { name: /^Vote for/ }).first();
@@ -637,13 +639,25 @@ test("Ask Pickbot deck card: shows once, at the account's tested position (never
   await p.waitForTimeout(5000);
   await p.evaluate(() => sessionStorage.clear());
   await p.goto("/vote");
-  for (let i = 0; i < at + 1; i++) {
+  for (let i = 0, guard = 0; i < at + 1 && guard < 40; guard++) {
+    // Close other special cards (about-you, taste reveal) the same way a person would.
+    const about = p.getByRole("article", { name: /^About you/ });
+    if (await about.isVisible()) {
+      await about.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(about).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const dialog = p.getByRole("dialog");
+    if (await dialog.isVisible().catch(() => false)) {
+      await dialog.getByRole("button", { name: "Keep voting" }).click();
+      await p.waitForTimeout(400);
+      continue;
+    }
     const btn = p.getByRole("button", { name: /^Vote for/ }).first();
     if (!(await btn.isVisible().catch(() => false))) break;
     await btn.click();
+    i++;
     await p.waitForTimeout(2300);
-    const about = p.getByRole("article", { name: /^About you/ });
-    if (await about.isVisible()) await about.getByRole("button", { name: "Skip" }).click();
   }
   await expect(promo).toHaveCount(0);
 });
