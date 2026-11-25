@@ -3,7 +3,7 @@ import Link from "next/link";
 import { beforeAfterStats, getBrainStats, pinnedNumbers, type BrainView, type PinnedDay } from "@/server/services/brain";
 import { change } from "@/server/services/before-after-rules";
 import { unitEconomicsStats } from "@/server/services/unit-economics";
-import { money } from "@/server/services/unit-economics-rules";
+import { money, unitEconomics } from "@/server/services/unit-economics-rules";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
@@ -33,7 +33,7 @@ function ueNote(ue: UeStats, view: BrainView) {
       : "= measured visits per visitor (ueLifetimeVisits 0); early on this undercounts people who will come back";
   return [
     "The most we can pay to acquire a visitor and break even = what a visitor brings in minus what serving them costs.",
-    `Measured from people who visited in this window (${view === "clean" ? "Clean" : "All data"} view): votes, visits and sign-ups, grouped by where they first came from.`,
+    `Measured from everyone who visited since ${ue.from} (all of it, whatever window is picked above; ueFrom in Config; ${view === "clean" ? "Clean" : "All data"} view): votes, visits and sign-ups, grouped by where they first came from.`,
     `Prices are assumptions in Config: ads ${money(a.ueAdCpm)} per 1,000 views, one every ${a.ueVotesPerAd} votes (ueAdCpm, ueVotesPerAd);`,
     `sponsored battles ${a.ueSponsoredSharePct}% of cards at ${money(a.ueSponsoredCpm)} per 1,000 votes (ueSponsoredSharePct, ueSponsoredCpm);`,
     `a signed-up user is worth ${money(a.ueSignupValue)} a year (ueSignupValue); lifetime visits ${lifetime}.`,
@@ -55,6 +55,17 @@ function ueTiles(ue: UeStats): [string, string, string][] {
       ue.cost.usage == null ? "finance data unavailable" : `${money(ue.cost.usage)} usage ÷ ${ue.cost.visitors.toLocaleString()} visitors this month`,
     ],
   ];
+}
+
+/** One day of the Day by day table through the same unit economics (prices + this month's usage cost per visitor). */
+function dayBreakEven(ue: UeStats, d: { visitors: number; visits: number; votes: number; signups: number }) {
+  if (!d.visitors) return <span key="be">—</span>;
+  const be = unitEconomics({ ...d, costPerVisitor: ue.cost.perVisitor }, ue.assumptions).breakEven;
+  return (
+    <span key="be" className={be > 0 ? "text-green" : "text-b"}>
+      {money(be)}
+    </span>
+  );
 }
 
 /** Fixed plan fees vs the per-visitor margin: how many visitors a month cover them. */
@@ -214,7 +225,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     aboutStats(view, days),
     beforeAfterStats(view),
     skipStats(view, days),
-    unitEconomicsStats(view, days),
+    unitEconomicsStats(view),
     pinnedNumbers(view),
   ]);
   const t = s.tiles;
@@ -307,9 +318,9 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         )}
       </div>
 
-      <Section title="Day by day" note="New York days, newest first. Tap any number to see who or what is behind it. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both. Votes per voter = votes ÷ people who voted that day; votes per visitor = votes ÷ everyone who visited.">
+      <Section title="Day by day" note="New York days, newest first. Tap any number to see who or what is behind it. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both. Votes per voter = votes ÷ people who voted that day; votes per visitor = votes ÷ everyone who visited. Break-even per visitor = that day's visitors, visits, votes and sign-ups run through Unit economics (same prices and serving cost).">
         <Rows
-          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Votes per voter", "Votes per visitor", "Battles posted"]}
+          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Votes per voter", "Votes per visitor", "Battles posted", "Break-even per visitor"]}
           rows={s.daily.map((d, i) => {
             const prev = s.daily[i + 1];
             const cell = (kind: BrainListKind, now: number, before: number | undefined) =>
@@ -330,12 +341,13 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
               <Ratio key="vpv" now={ratio(d.votes, d.voters)} prev={prev && ratio(prev.votes, prev.voters)} />,
               <Ratio key="vpvis" now={ratio(d.votes, d.visitors)} prev={prev && ratio(prev.votes, prev.visitors)} />,
               cell("battles", d.posts, prev?.posts),
+              dayBreakEven(ue, d),
             ];
           })}
         />
       </Section>
 
-      <Section title="Unit economics: what a visitor is worth" note={ueNote(ue, view)}>
+      <Section title={`Unit economics: what a visitor is worth · since ${ue.from}`} note={ueNote(ue, view)}>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           {ueTiles(ue).map(([label, value, sub], i) => (
             <div key={label} className={`rounded-xl p-3 ${i === 0 ? (ue.overall.breakEven > 0 ? "bg-green-soft" : "bg-b-soft") : "bg-surface"}`}>

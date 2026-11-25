@@ -12,6 +12,7 @@ import { getEconomy } from "./config";
 import { getFinance } from "./finance";
 import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 import { unitEconomics, whatIf, type UeAssumptions, type UeInputs } from "./unit-economics-rules";
+import { isoDay } from "./before-after-rules";
 
 /**
  * Serving cost per visitor, split the way it behaves: plan fees are fixed each month (they don't grow with one more
@@ -37,8 +38,11 @@ async function costPerVisitor(): Promise<{ perVisitor: number | null; spend: num
 
 type Person = { who: string; visits: number; first: Record<string, unknown> | null; votes: number; signed: boolean };
 
-export async function unitEconomicsStats(view: BrainView, days: number) {
+/** All data from economy `ueFrom` (a New York day, YYYYMMDD; default 2026-11-23, the start of real tracking) to now. */
+export async function unitEconomicsStats(view: BrainView) {
   const e = await getEconomy();
+  const from = isoDay(e.ueFrom);
+  const days = Math.max(1, Math.ceil((Date.now() - Date.parse(`${from}T00:00:00Z`)) / 86400_000) + 1);
   const scope = await brainScope(view, days);
   const { since, ev, vt, us } = scope;
   const people = await db.execute<Person>(sql`
@@ -83,6 +87,7 @@ export async function unitEconomicsStats(view: BrainView, days: number) {
   }
   const order: Source[] = ["x_campaign", "x_organic", "direct", "referral", "other_campaign", "unknown"];
   return {
+    from,
     assumptions: a,
     cost,
     overall: unitEconomics(inputs(all), a),
