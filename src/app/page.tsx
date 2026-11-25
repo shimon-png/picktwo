@@ -14,6 +14,7 @@ import { db } from "@/server/db";
 import { battles, outcomes, votes } from "@/server/db/schema";
 import { HeroRotator } from "@/components/battle/HeroRotator";
 import { KnowYourTaste } from "@/components/home/KnowYourTaste";
+import { Carousel } from "@/components/home/Carousel";
 import { Mark } from "@/components/layout/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { track } from "@/server/analytics";
@@ -111,13 +112,13 @@ export default async function HomePage() {
               Vote <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
-          <ul className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
-            {deciding.map((b) => (
-              <li key={b.id} className="w-[230px] shrink-0 snap-start">
-                <DecidingCard b={b} />
-              </li>
-            ))}
-          </ul>
+          <div className="mt-4">
+            <Carousel label="Deciding right now" itemClassName="w-[230px]">
+              {deciding.map((b) => (
+                <DecidingCard key={b.id} b={b} />
+              ))}
+            </Carousel>
+          </div>
         </section>
       )}
 
