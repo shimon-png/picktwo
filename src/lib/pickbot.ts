@@ -4,9 +4,8 @@
  * classifier and answer validators, cost math, the anonymity scrub for crowd drafts and the free-answer cap.
  * No I/O; tested in tests/unit/pickbot.test.ts.
  */
-import type { AboutQuestionId } from "./about";
+import { ABOUT_QUESTION_IDS, type AboutQuestionId } from "./about";
 import { THEMES } from "./brain-tags";
-import { CORE_ABOUT } from "./profile-progress";
 
 /** The shared poster of crowd battles made in Pickbot (Shimon, Nov 2026: one honest identity, not random handles). */
 export const PICKBOT_HANDLE = "askedviapickbot";
@@ -22,24 +21,28 @@ export type Classification = { scope: Scope; theme: Theme; extended: Extended[];
 
 /** Choices the asker made in a thread (thread.state). */
 export type ThreadState = {
+  /** Older threads only (the skip link and the general/tailored choice are gone since Nov 26). */
   skipGates?: boolean;
   choice?: "general" | "tailored";
+  /** "Not now" during the quick battles. */
   stopBattles?: boolean;
-  /** After a general answer: "Want this tailored?" → quick battles, then a fresh tailored answer. */
+  /** After a general answer: "Want a better answer?" → quick battles to the target, then a tailored answer. */
   retailor?: boolean;
 };
 
 export type Step =
   | { type: "off_topic" }
   | { type: "gate"; q: AboutQuestionId; index: number; total: number }
-  | { type: "choice"; left: number }
   | { type: "battles"; left: number }
   | { type: "answer"; kind: AnswerKind };
 export type AnswerKind = "tailored" | "general";
 
-/** The questions this thread needs: the four core ones, plus extended ones the classifier marked relevant. */
-export function neededQuestions(c: Pick<Classification, "extended">): AboutQuestionId[] {
-  return [...CORE_ABOUT, ...EXTENDED_FIELDS.filter((f) => c.extended.includes(f))];
+/**
+ * The profile cards Pickbot needs before any answer (Shimon, Nov 26 2026): every about-you card, no skipping. Race and
+ * party offer "Prefer not to say", which counts as answered.
+ */
+export function neededQuestions(): AboutQuestionId[] {
+  return [...ABOUT_QUESTION_IDS];
 }
 
 export function answerKind(votes: number, target: number): AnswerKind {
@@ -47,8 +50,11 @@ export function answerKind(votes: number, target: number): AnswerKind {
 }
 
 /**
- * The next step before an answer. Order (PRD §4): missing profile questions one at a time (skippable as a group),
- * then, under `target` battles, the general-or-tailored choice, then quick battles until the target or "stop".
+ * The next step before an answer (Shimon, Nov 26 2026):
+ *  1. every missing profile card, one at a time in the chat (no skip);
+ *  2. then the answer right away: "tailored" if the taste profile is complete (`target` battles), else "general";
+ *  3. after a general answer, "Want a better answer?" (`retailor`) → quick battles until `target` (stop any time),
+ *     then a fresh tailored answer.
  */
 export function nextStep(a: {
   c: Classification;
@@ -58,14 +64,11 @@ export function nextStep(a: {
   state: ThreadState;
 }): Step {
   if (a.c.scope === "off_topic") return { type: "off_topic" };
-  const needed = neededQuestions(a.c);
+  const needed = neededQuestions();
   const missing = needed.filter((q) => !a.known[q]);
-  if (!a.state.skipGates && missing.length) {
-    return { type: "gate", q: missing[0], index: needed.length - missing.length + 1, total: needed.length };
-  }
+  if (missing.length) return { type: "gate", q: missing[0], index: needed.length - missing.length + 1, total: needed.length };
   const left = Math.max(0, a.target - a.votes);
-  if (left > 0 && !a.state.choice) return { type: "choice", left };
-  if (left > 0 && a.state.choice === "tailored" && !a.state.stopBattles) return { type: "battles", left };
+  if (a.state.retailor && left > 0 && !a.state.stopBattles) return { type: "battles", left };
   return { type: "answer", kind: answerKind(a.votes, a.target) };
 }
 

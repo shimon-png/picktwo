@@ -8,7 +8,7 @@
  */
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
-import { battles, options, pickbotMessages, pickbotThreads, users, votes, type User } from "../db/schema";
+import { battles, options, pickbotMessages, pickbotThreads, profileAnswers, users, votes, type User } from "../db/schema";
 import { AppError } from "../errors";
 import { track } from "../analytics";
 import { isAdmin } from "../viewer";
@@ -141,21 +141,34 @@ export async function followUp(userIn: User | null, id: string, input: { text: s
   return { ok: true };
 }
 
+/**
+ * Every about-you answer the person has given: profile columns plus the answers kept only in profile_answer
+ * (education, race, party). "Prefer not to say" counts as answered.
+ */
+async function pickbotKnown(user: User): Promise<Partial<Record<AboutQuestionId, string>>> {
+  const [cols, rows] = await Promise.all([
+    knownAnswers({ user, deviceId: null }),
+    db
+      .select({ q: profileAnswers.question, a: profileAnswers.answer })
+      .from(profileAnswers)
+      .where(and(eq(profileAnswers.userId, user.id), eq(profileAnswers.status, "answered"))),
+  ]);
+  const out: Partial<Record<AboutQuestionId, string>> = { ...cols };
+  for (const r of rows) if (r.a && !out[r.q as AboutQuestionId]) out[r.q as AboutQuestionId] = r.a;
+  return out;
+}
+
 /** Where the thread stands: still collecting (a Step), an answer is due (incl. follow-ups), or done. */
 async function threadStep(user: User, t: Thread, msgs: Message[]): Promise<Step | { type: "done" }> {
   const lastQ = msgs.findLastIndex((m) => m.kind === "question");
   const lastA = msgs.findLastIndex((m) => m.kind === "answer");
   const e = await getEconomy();
-  if (lastA >= 0) {
-    if (t.state.retailor) {
-      // "Want this tailored?" after a general answer: quick battles to the target, then a fresh tailored answer.
-      const votes = await voteTotal({ user, deviceId: null });
-      return nextStep({ c: t.classification, known: {}, votes, target: e.tasteFullAt, state: { ...t.state, skipGates: true, choice: "tailored" } });
-    }
+  // After an answer: done, unless there's a follow-up waiting or the asker said yes to "Want a better answer?".
+  if (lastA >= 0 && !t.state.retailor) {
     if (lastQ > lastA) return { type: "answer", kind: (msgs[lastA].answer?.kind ?? "general") as AnswerKind };
     return { type: "done" };
   }
-  const [known, votes] = await Promise.all([knownAnswers({ user, deviceId: null }), voteTotal({ user, deviceId: null })]);
+  const [known, votes] = await Promise.all([pickbotKnown(user), voteTotal({ user, deviceId: null })]);
   return nextStep({ c: t.classification, known, votes, target: e.tasteFullAt, state: t.state });
 }
 
@@ -167,7 +180,7 @@ export async function threadView(userIn: User | null, id: string) {
   const e = await getEconomy();
   const [step, known, votes, left] = await Promise.all([
     threadStep(user, t, msgs),
-    knownAnswers({ user, deviceId: null }),
+    pickbotKnown(user),
     voteTotal({ user, deviceId: null }),
     answersLeftFor(user),
   ]);
@@ -241,39 +254,30 @@ async function quickBattles(user: User, t: Thread, left: number) {
   ).map(({ id, slug, title, imageA, imageB, labelA, labelB, votesA, votesB }) => ({ id, slug, title, imageA, imageB, labelA, labelB, votesA, votesB }));
 }
 
-/** A profile question answered (or skipped: answer null = "skip, just answer", which skips the rest too). */
+/** A profile card answered in the chat. Every card is needed before an answer, so there's no skip (Shimon, Nov 26). */
 export async function answerGate(userIn: User | null, id: string, input: { question: AboutQuestionId; answer: string | null; label: string | null; kidAges?: string[] }) {
   const user = await requireAccess(userIn);
   const t = await ownThread(user, id);
   const q = ABOUT_QUESTIONS[input.question];
+  if (input.answer == null) throw new AppError("VALIDATION", "Pick one of the answers");
   await addMessage(t.id, { role: "BOT", kind: "note", text: q.title, data: { gate: q.id } });
-  if (input.answer == null) {
-    await db.update(pickbotThreads).set({ state: { ...t.state, skipGates: true } }).where(eq(pickbotThreads.id, t.id));
-    await addMessage(t.id, { role: "USER", kind: "note", text: "Skip, just answer" });
-    track("pickbot_gate_skipped", { threadId: t.id, question: q.id }, { userId: user.id });
-    return { ok: true };
-  }
   await answerAbout({ user, deviceId: null }, { question: input.question, answer: input.answer, kidAges: input.kidAges, via: "pickbot" });
   await addMessage(t.id, { role: "USER", kind: "note", text: input.label ?? input.answer });
   track("pickbot_gate_answered", { threadId: t.id, question: q.id }, { userId: user.id });
   return { ok: true };
 }
 
-/** General vs tailored, and "stop and answer now" during quick battles. */
-export async function chooseStep(userIn: User | null, id: string, action: "general" | "tailored" | "stop" | "retailor") {
+/**
+ * "Want a better answer?" after a general answer: `retailor` starts the quick battles toward the full taste profile
+ * (a tailored answer follows at the target); `stop` = "Not now", back to the finished thread.
+ */
+export async function chooseStep(userIn: User | null, id: string, action: "retailor" | "stop") {
   const user = await requireAccess(userIn);
   const t = await ownThread(user, id);
-  const state: ThreadState =
-    action === "stop"
-      ? { ...t.state, stopBattles: true }
-      : action === "retailor"
-        ? { ...t.state, choice: "tailored", stopBattles: false, retailor: true }
-        : { ...t.state, choice: action };
+  const state: ThreadState = action === "stop" ? { ...t.state, retailor: false, stopBattles: false } : { ...t.state, retailor: true, stopBattles: false };
   await db.update(pickbotThreads).set({ state }).where(eq(pickbotThreads.id, t.id));
-  const text = { general: "General answer now", tailored: "Tailored to my personality", stop: "Stop and answer now", retailor: "Yes, tailor it" }[action];
-  await addMessage(t.id, { role: "USER", kind: "note", text });
-  if (action !== "stop") track("pickbot_choice", { threadId: t.id, choice: action }, { userId: user.id });
-  else track("pickbot_battles_stopped", { threadId: t.id }, { userId: user.id });
+  await addMessage(t.id, { role: "USER", kind: "note", text: action === "stop" ? "Not now" : "Yes, give me a better answer" });
+  track(action === "stop" ? "pickbot_battles_stopped" : "pickbot_choice", { threadId: t.id, choice: action }, { userId: user.id });
   return { ok: true };
 }
 

@@ -17,28 +17,24 @@ import {
 } from "@/lib/pickbot";
 
 const c = (o: Partial<Classification> = {}): Classification => ({ scope: "decision", theme: "fashion_beauty", extended: [], title: "Dress", crisis: false, ...o });
-const all = { sex: "F", age: "25-34", relationship: "SINGLE", zip: "10001" };
 
 describe("nextStep", () => {
-  it("asks missing profile questions one at a time, in order", () => {
-    expect(nextStep({ c: c(), known: {}, votes: 0, target: 30, state: {} })).toEqual({ type: "gate", q: "sex", index: 1, total: 4 });
-    expect(nextStep({ c: c(), known: { sex: "F", age: "x" }, votes: 0, target: 30, state: {} })).toEqual({ type: "gate", q: "relationship", index: 3, total: 4 });
+  const all = { sex: "F", age: "25-34", relationship: "SINGLE", zip: "10001", kids: "NO", education: "BA", housing: "RENT", race: "PREFER_NOT", party: "PREFER_NOT", work: "WORKING" };
+  it("asks every missing profile card, one at a time, before any answer (no skip)", () => {
+    expect(neededQuestions()).toEqual(["sex", "age", "relationship", "zip", "kids", "education", "housing", "race", "party", "work"]);
+    expect(nextStep({ c: c(), known: {}, votes: 50, target: 30, state: {} })).toEqual({ type: "gate", q: "sex", index: 1, total: 10 });
+    expect(nextStep({ c: c(), known: { ...all, education: undefined }, votes: 50, target: 30, state: { skipGates: true } })).toEqual({ type: "gate", q: "education", index: 10, total: 10 });
   });
-  it("adds extended questions only when relevant", () => {
-    expect(neededQuestions(c({ extended: ["kids"] }))).toEqual(["sex", "age", "relationship", "zip", "kids"]);
-    expect(nextStep({ c: c({ extended: ["kids"] }), known: all, votes: 40, target: 30, state: {} })).toEqual({ type: "gate", q: "kids", index: 5, total: 5 });
+  it("then answers right away: general under the target, tailored at it", () => {
+    expect(nextStep({ c: c(), known: all, votes: 18, target: 30, state: {} })).toEqual({ type: "answer", kind: "general" });
+    expect(nextStep({ c: c(), known: all, votes: 30, target: 30, state: {} })).toEqual({ type: "answer", kind: "tailored" });
   });
-  it("skipping the questions moves on", () => {
-    expect(nextStep({ c: c(), known: {}, votes: 40, target: 30, state: { skipGates: true } })).toEqual({ type: "answer", kind: "tailored" });
+  it("'Want a better answer?' means quick battles to the target, then a tailored answer", () => {
+    expect(nextStep({ c: c(), known: all, votes: 18, target: 30, state: { retailor: true } })).toEqual({ type: "battles", left: 12 });
+    expect(nextStep({ c: c(), known: all, votes: 30, target: 30, state: { retailor: true } })).toEqual({ type: "answer", kind: "tailored" });
+    expect(nextStep({ c: c(), known: all, votes: 18, target: 30, state: { retailor: true, stopBattles: true } })).toEqual({ type: "answer", kind: "general" });
   });
-  it("offers general or tailored under the target, then quick battles", () => {
-    expect(nextStep({ c: c(), known: all, votes: 18, target: 30, state: {} })).toEqual({ type: "choice", left: 12 });
-    expect(nextStep({ c: c(), known: all, votes: 18, target: 30, state: { choice: "tailored" } })).toEqual({ type: "battles", left: 12 });
-    expect(nextStep({ c: c(), known: all, votes: 30, target: 30, state: { choice: "tailored" } })).toEqual({ type: "answer", kind: "tailored" });
-    expect(nextStep({ c: c(), known: all, votes: 18, target: 30, state: { choice: "tailored", stopBattles: true } })).toEqual({ type: "answer", kind: "general" });
-    expect(nextStep({ c: c(), known: all, votes: 18, target: 30, state: { choice: "general" } })).toEqual({ type: "answer", kind: "general" });
-  });
-  it("off-topic questions get no gates", () => {
+  it("off-topic questions get no cards", () => {
     expect(nextStep({ c: c({ scope: "off_topic" }), known: {}, votes: 0, target: 30, state: {} })).toEqual({ type: "off_topic" });
   });
   it("answer kind and time estimate", () => {

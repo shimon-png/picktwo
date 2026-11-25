@@ -5,11 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Lock, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { api, toast } from "@/lib/client";
 import { cn, pct } from "@/lib/utils";
-import { CONFIDENCE_LABEL, battlesTime, partialField, type Answer, type AnswerKind } from "@/lib/pickbot";
+import { CONFIDENCE_LABEL, partialField, type Answer, type AnswerKind } from "@/lib/pickbot";
 import type { ThreadView } from "@/server/services/pickbot";
 import { AskComposer } from "./AskComposer";
 import { PushButton } from "@/components/app/PushButton";
-import { shuffled } from "@/lib/about";
+import { cardOrder } from "@/lib/about";
 
 type Msg = ThreadView["messages"][number];
 type Similar = { slug: string; title: string; a: string; b: string; votesA: number; votesB: number; likeA: number | null; likeB: number | null };
@@ -23,6 +23,9 @@ const WHY: Record<string, string> = {
   kids: "Kids change a lot of decisions.",
   housing: "Renting or owning changes the math.",
   work: "Your days shape what makes sense.",
+  education: "School years shape a lot of choices.",
+  race: "Background changes what people pick. Prefer not to say is fine.",
+  party: "Views shape some choices. Prefer not to say is fine.",
 };
 
 const END = "\u0000";
@@ -106,6 +109,9 @@ export function PickbotThread({ initial }: { initial: ThreadView }) {
 
   const lastAnswerIdx = v.messages.findLastIndex((m) => m.kind === "answer");
   const hasDraft = v.messages.some((m) => m.kind === "draft");
+  const lastAnswer = lastAnswerIdx >= 0 ? v.messages[lastAnswerIdx] : null;
+  // "Not now" to the better-answer offer after the latest answer (kept in the thread, so it holds after a reload).
+  const saidNotNow = v.messages.slice(lastAnswerIdx + 1).some((m) => m.role === "USER" && m.kind === "note" && m.text === "Not now");
   const draftMsg = v.messages.findLast((m) => m.kind === "draft");
   const done = v.step.type === "done";
 
@@ -150,31 +156,11 @@ export function PickbotThread({ initial }: { initial: ThreadView }) {
           crowd={v.crowd}
           onOutcome={(c) => post("outcome", { chosen: c })}
           busy={busy}
-          canTailor={done && i === lastAnswerIdx && v.progress.left > 0}
+          canTailor={false}
         />
       ))}
 
       {v.step.type === "gate" && v.gate && <Gate v={v} busy={busy} onAnswer={(answer, label) => post("gate", { question: v.gate!.q, answer, label })} />}
-
-      {v.step.type === "choice" && (
-        <div className="space-y-2">
-          <Bot>
-            One more thing. You’ve voted on {v.progress.votes} of {v.progress.target} battles, so I only know part of your taste.
-          </Bot>
-          <div className="grid gap-2">
-            <button type="button" disabled={busy} className="card px-4 py-3 text-left" onClick={() => post("step", { action: "tailored" })}>
-              <b className="block text-[15px]">Tailored to my personality</b>
-              <span className="text-[13px] text-ink/60">
-                {v.step.left} quick battle{v.step.left === 1 ? "" : "s"} ({battlesTime(v.step.left)}), then my answer
-              </span>
-            </button>
-            <button type="button" disabled={busy} className="card px-4 py-3 text-left" onClick={() => post("step", { action: "general" })}>
-              <b className="block text-[15px]">General answer now</b>
-              <span className="text-[13px] text-ink/60">based on what you’ve told me so far</span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {v.step.type === "battles" && <QuickBattles key={v.step.left} v={v} onDone={refresh} onStop={() => post("step", { action: "stop" })} />}
 
@@ -201,6 +187,24 @@ export function PickbotThread({ initial }: { initial: ThreadView }) {
       )}
 
       {done && !v.crowd && draftMsg && <DraftReview key={draftMsg.id} m={draftMsg} threadId={v.thread.id} onPosted={refresh} />}
+
+      {done && lastAnswer?.answer?.kind === "general" && v.progress.left > 0 && !saidNotNow && (v.crowd || declined || !v.crowdAllowed) && (
+        <div className="space-y-2" data-testid="pickbot-better">
+          <Bot>
+            Want a better answer, tailored to your personality? Answer {v.progress.left} more battle{v.progress.left === 1 ? "" : "s"}. I need {v.progress.target} answered for the full
+            personality test to give good results.
+          </Bot>
+          <TasteBar votes={v.progress.votes} target={v.progress.target} />
+          <div className="flex gap-2">
+            <button type="button" className="btn-primary" disabled={busy} onClick={() => post("step", { action: "retailor" })}>
+              Yes, let’s go
+            </button>
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => post("step", { action: "stop" })}>
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {v.crowd && !v.messages.some((m) => m.kind === "results") && (
         <div className="card flex items-center justify-between gap-3 px-4 py-3 text-[13px]">
@@ -471,16 +475,22 @@ function AnswerView({
   );
 }
 
-function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (answer: string | null, label: string | null) => void }) {
+function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (answer: string, label: string) => void }) {
   const g = v.gate!;
+  // The intro line shows before the first card asked in this thread (earlier cards may already be answered).
+  const first = !v.messages.some((m) => m.kind === "note" && m.role === "BOT" && (m.data as { gate?: string } | null)?.gate);
   const step = v.step as { index: number; total: number };
   // Shuffled after mount (same order on the server and the first client render, then mixed).
   const [opts, setOpts] = useState(g.options);
-  useEffect(() => setOpts(shuffled(g.options)), [g.options]);
+  useEffect(() => setOpts(cardOrder(g.options)), [g.options]);
   const [zip, setZip] = useState("");
   return (
     <div className="space-y-2" data-testid="pickbot-gate">
-      {step.index === 1 && <Bot>To give you an answer that fits you, I need {step.total} quick things first. Each takes one tap.</Bot>}
+      {step.index <= 1 || first ? (
+        <Bot>
+          Before I answer, I need to know you a little: {step.total - step.index + 1} quick tap{step.total - step.index + 1 === 1 ? "" : "s"}. Your answers are what make my advice fit you.
+        </Bot>
+      ) : null}
       <div className="card space-y-3 px-4 py-4">
         <div className="flex items-center justify-between">
           <p className="display text-[22px] text-ink">{g.title}</p>
@@ -511,14 +521,9 @@ function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (
           </div>
         )}
         <p className="text-[13px] text-ink/60">Why I ask: {WHY[g.q]}</p>
-        <div className="flex items-center justify-between text-[12px]">
-          <span className="flex items-center gap-1 text-ink/45">
-            <Lock className="size-3" /> Never shown on your profile
-          </span>
-          <button type="button" disabled={busy} className="text-accent" onClick={() => onAnswer(null, null)}>
-            Skip, just answer
-          </button>
-        </div>
+        <p className="flex items-center gap-1 text-[12px] text-ink/45">
+          <Lock className="size-3" /> Never shown on your profile
+        </p>
       </div>
     </div>
   );
@@ -527,6 +532,7 @@ function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (
 function QuickBattles({ v, onDone, onStop }: { v: ThreadView; onDone: () => void; onStop: () => void }) {
   const [i, setI] = useState(0);
   const [left, setLeft] = useState((v.step as { left: number }).left);
+  const [votes, setVotes] = useState(v.progress.votes);
   const [shown, setShown] = useState<{ a: number; b: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const b = v.quick[i];
@@ -541,6 +547,7 @@ function QuickBattles({ v, onDone, onStop }: { v: ThreadView; onDone: () => void
       const r = await api<{ results: { a: number; b: number } }>(`/api/battles/${b.slug}/vote`, { body: { side, source: "pickbot" } });
       setShown(r.results);
       setLeft((n) => Math.max(0, n - 1));
+      setVotes((n) => n + 1);
       setTimeout(() => {
         setShown(null);
         setBusy(false);
@@ -555,9 +562,7 @@ function QuickBattles({ v, onDone, onStop }: { v: ThreadView; onDone: () => void
   };
   return (
     <div className="space-y-2" data-testid="pickbot-battles">
-      <Bot>
-        <b>{left} more to go.</b> Your tailored answer unlocks after {left === 1 ? "this one" : `${left} quick battles`}. Each vote also counts in the Vote deck.
-      </Bot>
+      <TasteBar votes={votes} target={v.progress.target} />
       <div className="card space-y-3 px-4 py-4">
         <p className="text-[16px] font-medium leading-snug text-ink">{b.title}</p>
         <div className="grid grid-cols-2 gap-2">
@@ -584,9 +589,12 @@ function QuickBattles({ v, onDone, onStop }: { v: ThreadView; onDone: () => void
           })}
         </div>
       </div>
-      <button type="button" className="text-[13px] text-accent" onClick={onStop}>
-        Stop and answer now
-      </button>
+      <p className="flex items-center justify-between text-[12px] text-ink/50">
+        <span>Each vote also counts in the Vote deck.</span>
+        <button type="button" className="text-accent" onClick={onStop}>
+          Not now
+        </button>
+      </p>
     </div>
   );
 }
@@ -676,4 +684,24 @@ function ageSpan(ids: string[]): string {
   const lo = Math.min(...nums);
   const hi = Math.max(...nums);
   return ids.some((i) => i.endsWith("PLUS")) ? `${lo}+` : `${lo}–${hi}`;
+}
+
+/** Battles answered toward the full personality test (all votes ever, not just this chat). */
+function TasteBar({ votes, target }: { votes: number; target: number }) {
+  const n = Math.min(votes, target);
+  const left = Math.max(0, target - votes);
+  return (
+    <div className="card space-y-2 px-4 py-3" data-testid="pickbot-taste-bar">
+      <div className="flex items-baseline justify-between">
+        <b className="text-[14px] text-ink">Personality test</b>
+        <span className="text-[13px] tabular-nums text-ink/70">
+          {n} / {target} battles
+        </span>
+      </div>
+      <div className="h-2.5 overflow-hidden rounded-full bg-ink/10" role="progressbar" aria-valuenow={n} aria-valuemin={0} aria-valuemax={target} aria-label="Battles answered">
+        <div className="h-full rounded-full bg-green transition-[width] duration-500" style={{ width: `${(n / target) * 100}%` }} />
+      </div>
+      <p className="text-[12px] text-ink/55">{left ? `${left} more for your tailored answer` : "Done! Getting your tailored answer…"}</p>
+    </div>
+  );
 }
