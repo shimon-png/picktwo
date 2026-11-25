@@ -1,4 +1,5 @@
-import { BadgeCheck, Users } from "lucide-react";
+import { BadgeCheck, Lock, UserRound, Users } from "lucide-react";
+import type { LikeYou } from "@/lib/like-you";
 import { cn } from "@/lib/utils";
 
 type Score = { a: number; b: number; total: number };
@@ -10,15 +11,31 @@ type Score = { a: number; b: number; total: number };
 // Literal colours on photos: the Arcade theme remaps `white` to the night panel.
 const ON_PHOTO = { strong: { color: "rgba(255,255,255,.95)" }, soft: { color: "rgba(255,255,255,.75)" }, track: { background: "rgba(255,255,255,.25)" } };
 
-export function ResultBars({ side, everyone, experts, onPhoto }: { side: "A" | "B"; everyone: Score | null; experts?: Score | null; onPhoto: boolean }) {
+export function ResultBars({
+  side,
+  everyone,
+  experts,
+  likeYou,
+  onUnlock,
+  onPhoto,
+}: {
+  side: "A" | "B";
+  everyone: Score | null;
+  experts?: Score | null;
+  /** "People like you" (lib/like-you.ts): a lime row, or a locked row that reopens the missing about-you card. */
+  likeYou?: LikeYou | null;
+  onUnlock?: (q: "sex" | "age") => void;
+  onPhoto: boolean;
+}) {
   const rows = [
     everyone && { key: "all", title: "Everyone", icon: <Users className="size-3.5" aria-hidden />, s: everyone },
+    likeYou?.kind === "score" && { key: "you", title: likeYou.label, icon: <UserRound className="size-3.5" aria-hidden />, s: likeYou, lime: true },
     experts && experts.total > 0 && { key: "pro", title: "Experts", icon: <BadgeCheck className="size-3.5 text-amber-300" aria-hidden />, s: experts },
-  ].filter(Boolean) as { key: string; title: string; icon: React.ReactNode; s: Score }[];
-  if (!rows.length) return null;
+  ].filter(Boolean) as { key: string; title: string; icon: React.ReactNode; s: Score; lime?: boolean }[];
+  if (!rows.length && likeYou?.kind !== "locked") return null;
   return (
     <span className="mt-2 flex flex-col gap-2" aria-live="polite">
-      {rows.map(({ key, title, icon, s }) => {
+      {rows.map(({ key, title, icon, s, lime }) => {
         const p = side === "A" ? s.a : s.b;
         return (
           <span key={key} className="block">
@@ -29,7 +46,7 @@ export function ResultBars({ side, everyone, experts, onPhoto }: { side: "A" | "
             </span>
             <span className={cn("mt-1 block h-2 overflow-hidden rounded-full", !onPhoto && "bg-black/10")} style={onPhoto ? ON_PHOTO.track : undefined}>
               <span
-                className={cn("block h-full rounded-full transition-[width] duration-700 ease-out", side === "A" ? "bg-a" : "bg-b")}
+                className={cn("block h-full rounded-full transition-[width] duration-700 ease-out", lime ? "bg-cta" : side === "A" ? "bg-a" : "bg-b")}
                 style={{ width: `${p}%` }}
               />
             </span>
@@ -39,6 +56,19 @@ export function ResultBars({ side, everyone, experts, onPhoto }: { side: "A" | "
           </span>
         );
       })}
+      {likeYou?.kind === "locked" && (
+        <span className={cn("flex items-center gap-1.5 text-[12px] font-medium", !onPhoto && "text-zinc-600")} style={onPhoto ? ON_PHOTO.strong : undefined}>
+          <Lock className="size-3.5" aria-hidden />
+          People like you
+          {onUnlock ? (
+            <button type="button" data-nodrag className="ml-auto text-cta underline underline-offset-2" onClick={() => onUnlock(likeYou.question)}>
+              {likeYou.label}
+            </button>
+          ) : (
+            <span className="ml-auto">{likeYou.label}</span>
+          )}
+        </span>
+      )}
     </span>
   );
 }

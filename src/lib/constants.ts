@@ -132,6 +132,9 @@ export const ECONOMY_DEFAULTS = {
   aboutKidsAt: 20,
   aboutHousingAt: 25,
   aboutWorkAt: 35,
+  /** "People like you" result bar: smallest group (sex × age, else sex) shown, and how long the deck shows a result with it (ms). */
+  likeYouMinVotes: 20,
+  likeYouResultMs: 2200,
   /** Votes between two about-you cards (2 = never two in a row, two battles between). */
   aboutMinGap: 2,
   /** A skipped question comes back once, this many votes later. */

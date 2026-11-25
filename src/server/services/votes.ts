@@ -5,7 +5,7 @@ import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { awardPoints, votePointsToday } from "./points";
 import { gateArm } from "./gate-test";
-import { aboutAfterVote, moveDeviceAnswers } from "./about";
+import { aboutAfterVote, likeYouFor, moveDeviceAnswers } from "./about";
 import { gateDecision, type GateArm } from "./gate-test-rules";
 import { getEconomy } from "./config";
 import { voteQualityIssue, isValidReason } from "./priority";
@@ -236,8 +236,11 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
       { userId: user?.id, deviceId: viewer.deviceId },
     );
   // About-you card next in the Vote deck (only the deck shows them; never together with the sign-up prompt).
-  const about = res.isNew && input.source === "feed" && !res.gatePrompt ? await aboutAfterVote(viewer) : null;
-  return { ...res, about };
+  const [about, likeYou] = await Promise.all([
+    res.isNew && input.source === "feed" && !res.gatePrompt ? aboutAfterVote(viewer) : null,
+    likeYouFor(b.id, viewer),
+  ]);
+  return { ...res, about, likeYou };
 }
 
 export async function skipBattle(slug: string, viewer: { user: User | null; deviceId: string | null }) {

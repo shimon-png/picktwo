@@ -86,12 +86,13 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
     }
   }
 
-  async function finish(e: React.FormEvent) {
-    e.preventDefault();
+  async function finish(e?: React.FormEvent) {
+    e?.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await api("/api/me/quick-profile", { body: { handle, sex, ageRange, zipCode: zip } });
+      // Sex, age and ZIP are optional since the one-tap sign-up (the Vote deck asks later).
+      await api("/api/me/quick-profile", { body: { handle, sex: sex || undefined, ageRange: ageRange || undefined, zipCode: zip.trim() || undefined } });
       done();
     } catch (err) {
       const e = err as Error & { code?: string };
@@ -210,7 +211,9 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
           onSubmit={(e) => {
             e.preventDefault();
             setError(null);
-            setStep("about");
+            // Already answered in the Vote deck (about-you cards): nothing left to ask.
+            if (sex && ageRange && zip) finish();
+            else setStep("about");
           }}
           className="space-y-3"
         >
@@ -244,14 +247,14 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
         <form onSubmit={finish} className="space-y-4">
           <p className="text-sm text-zinc-600">This helps us match you with people like you.</p>
           <ChipGroup
-            label={<>Sex <span className="text-b">*</span></>}
+            label="Sex (optional)"
             options={SEX_OPTIONS.map((o) => ({ id: o.id, label: o.label }))}
             value={sex ? [sex] : []}
             onChange={(v) => setSex(v[0] ?? "")}
             single
           />
           <ChipGroup
-            label={<>Your age <span className="text-b">*</span></>}
+            label="Your age (optional)"
             options={AGE_RANGES.map((o) => ({ id: o.id, label: o.label }))}
             value={ageRange ? [ageRange] : []}
             onChange={(v) => setAgeRange(v[0] ?? "")}
@@ -259,11 +262,10 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
           />
           <div>
             <label htmlFor="signup-zip" className="label">
-              ZIP code <span className="text-b">*</span>
+              ZIP code (optional)
             </label>
             <input
               id="signup-zip"
-              required
               autoComplete="postal-code"
               className="input"
               placeholder="10001"
@@ -274,7 +276,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
             />
             <ZipHint check={zipCheck} />
           </div>
-          <button className="btn-cta w-full py-3" disabled={busy || !sex || !ageRange || !zipOk}>
+          <button className="btn-cta w-full py-3" disabled={busy || (!!zip.trim() && !zipOk)}>
             {busy ? "Finishing…" : finishLabel}
           </button>
           <button type="button" className="w-full text-sm text-zinc-500" onClick={() => setStep("username")}>

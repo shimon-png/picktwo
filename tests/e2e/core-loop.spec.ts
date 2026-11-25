@@ -1,6 +1,7 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules";
 import { ECONOMY_DEFAULTS } from "../../src/lib/constants";
+import { inHoldout } from "../../src/server/services/ranking";
 
 /** Free votes before the sign-up gate, and group B's dialog repeat (default config). */
 const FREE = ECONOMY_DEFAULTS.guestVoteLimit;
@@ -34,7 +35,9 @@ const salt = Math.random().toString(36).slice(2, 8);
 async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm) {
   const n = ++guests; // a new browser every call
   let id = "";
-  for (let i = 0; !id || pickArm(id, 50) !== arm; i++) id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
+  // …and outside the about-you cards holdout, so the deck asks its questions.
+  for (let i = 0; !id || pickArm(id, 50) !== arm || inHoldout(`about:${id}`, ECONOMY_DEFAULTS.aboutHoldoutPct); i++)
+    id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "pt_vid", value: id, url: baseURL ?? "http://localhost:3000" }]);
   await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
@@ -260,6 +263,33 @@ test("sign-up gate test, group B: a closable dialog after the free votes and eve
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("about-you cards: a question after vote 2, answers stick, skip works (Nov 25)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control");
+  const page = await ctx.newPage();
+  await page.goto("/vote");
+  const pickOne = async () => {
+    const title = (await page.locator("article.deck-card h1").first().innerText()).trim();
+    await expect(async () => {
+      await page.getByRole("button", { name: /^Vote for/ }).first().click();
+      await expect(page.locator("article.deck-card h1").first()).not.toHaveText(title, { timeout: 4000 });
+    }).toPass({ timeout: 20_000 });
+  };
+  await pickOne();
+  await pickOne();
+  const card = page.getByRole("article", { name: /About you/ });
+  await expect(card.getByText("I'm a…")).toBeVisible();
+  await card.getByRole("button", { name: "Woman" }).click();
+  await expect(card).toHaveCount(0);
+  await pickOne();
+  await pickOne();
+  await expect(card.getByRole("button", { name: "25–34" })).toBeVisible(); // six equal slices, shuffled
+  await expect(card.getByRole("button")).toHaveCount(7); // 6 answers + Skip
+  await card.getByRole("button", { name: "Skip" }).click();
+  await expect(card).toHaveCount(0);
+  const me = await page.request.get("/api/signup-prefill").then((r) => r.json());
+  expect(me).toMatchObject({ sex: "FEMALE", ageRange: null });
+});
+
 test("non-admin cannot post as another user", async ({ browser }) => {
   const p = await newUser(browser, "notadmin");
   const res = await p.request.post("/api/battles", {
@@ -293,24 +323,24 @@ test("guest gate: free votes, then sign up with an emailed code (needs DEV_LOGIN
   test.skip(votes.length < FREE + 1, "not enough open battles");
   expect(votes.slice(0, FREE).every((v) => v.status === 200)).toBe(true);
   expect(votes[FREE].status).toBe(401); // one past the free votes: the wall
+  // About-you answers given as a guest prefill the one-tap sign-up card and land on the account.
+  for (const [question, answer] of [["sex", "FEMALE"], ["age", "AGE_35_44"]])
+    expect((await page.request.post("/api/me/about", { data: { question, answer } })).ok()).toBe(true);
   await page.reload();
   const gate = page.getByRole("region", { name: "Sign up to keep voting" });
-  await expect(gate.getByText("Step 1 of 4")).toBeVisible();
+  await expect(gate.getByText("You’re all set. Just confirm.")).toBeVisible();
+  await expect(gate.getByText(`Save your ${FREE} picks`)).toBeVisible();
+  await expect(gate.getByText("Woman · 35–44")).toBeVisible();
   await gate.getByLabel("Your email").fill(`gate-${stamp}@test.dev`);
+  await expect(gate.getByText(`@gate`)).toBeVisible(); // username follows the email
   await gate.getByRole("button", { name: "Email me a code" }).click();
   const code = (await gate.getByText(/Dev mode: your code is/).innerText()).match(/\d{6}/)![0];
   await gate.getByLabel("Code").fill(code);
   await gate.getByRole("button", { name: "Verify" }).click();
-  await expect(gate.getByText("Step 3 of 4")).toBeVisible();
-  await gate.getByLabel(/Pick a username/).fill(`gate_${stamp}`.slice(0, 20));
-  await gate.getByRole("button", { name: "Continue" }).click();
-  await expect(gate.getByText("Step 4 of 4")).toBeVisible();
-  await gate.getByRole("button", { name: "Female", exact: true }).click();
-  await gate.getByRole("button", { name: "35–44" }).click();
-  await gate.getByLabel(/ZIP code/).fill("94110");
-  await gate.getByRole("button", { name: "Finish and keep voting" }).click();
   await page.waitForURL(/\/vote/);
   await expect(page.getByText(/to High priority|Top priority/)).toBeVisible();
+  const me = await page.request.get("/api/me/quick-profile").then((r) => r.json());
+  expect(me).toMatchObject({ complete: true, sex: "FEMALE", ageRange: "AGE_35_44" });
   // Guest votes carried over: none of the voted battles come back.
   const after = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];
   const votedSlugs = new Set(votes.slice(0, FREE).map((v) => v.slug));

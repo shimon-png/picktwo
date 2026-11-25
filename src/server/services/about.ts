@@ -10,11 +10,13 @@ import { db } from "../db";
 import { devices, profileAnswers, users, type KidAge, type User } from "../db/schema";
 import { getEconomy } from "./config";
 import { inHoldout } from "./ranking";
-import { lookupZip } from "./zip";
+import { lookupZip, zipPlace } from "./zip";
+import { generateHandle } from "@/lib/handles";
 import { track, trackProfileChanges } from "../analytics";
 import { AppError } from "../errors";
 import { ABOUT_QUESTIONS, isValidAboutAnswer, nextAboutCard, type AboutQuestionId, type AboutSchedule } from "@/lib/about";
 import { KID_AGE_IDS } from "@/lib/constants";
+import { likeYouView, type LikeYou, type LikeYouVote } from "@/lib/like-you";
 
 type Viewer = { user: User | null; deviceId: string | null };
 
@@ -186,4 +188,56 @@ export async function moveDeviceAnswers(userId: string, deviceId: string) {
     await db.update(users).set(patch).where(eq(users.id, userId));
     trackProfileChanges(userId, u, patch as Record<string, unknown>, "about_carry_over");
   }
+}
+
+/**
+ * "People like you" bar for one battle (lib/like-you.ts): votes grouped by the voter's sex and age range (account
+ * profile, else the guest's card answers). Real votes only (no seed or flagged votes). Never throws.
+ */
+export async function likeYouFor(battleId: string, v: Viewer): Promise<LikeYou | null> {
+  try {
+    const e = await getEconomy();
+    const known = await knownAnswers(v);
+    const skippedRows =
+      v.user || v.deviceId
+        ? await db
+            .select({ q: profileAnswers.question })
+            .from(profileAnswers)
+            .where(and(ownerCond(v), eq(profileAnswers.status, "skipped")))
+        : [];
+    const skipped = { sex: skippedRows.some((r) => r.q === "sex"), age: skippedRows.some((r) => r.q === "age") };
+    if (!known.sex && !skipped.sex) return null;
+    const rows = await db.execute<LikeYouVote>(sql`
+      SELECT v.side, COALESCE(u.sex, da.sex) AS sex, COALESCE(u.age_range, da.age) AS age
+      FROM vote v
+      LEFT JOIN "user" u ON u.id = v.user_id
+      LEFT JOIN LATERAL (
+        SELECT max(pa.answer) FILTER (WHERE pa.question = 'sex') AS sex, max(pa.answer) FILTER (WHERE pa.question = 'age') AS age
+        FROM profile_answer pa WHERE v.device_id IS NOT NULL AND pa.device_id = v.device_id AND pa.status = 'answered'
+      ) da ON true
+      WHERE v.battle_id = ${battleId} AND NOT v.flagged AND COALESCE(v.source, '') <> 'seed'`);
+    return likeYouView([...rows], { sex: known.sex, age: known.age }, skipped, e.likeYouMinVotes);
+  } catch (err) {
+    console.error("[about] like you", err);
+    return null;
+  }
+}
+
+/**
+ * Everything the one-tap sign-up card (vote 15) can fill in before the person has an account: votes so far, a
+ * username in the suggested style, sex and age from their cards, and a ZIP from their card or else the IP guess.
+ */
+export async function signupPrefill(deviceId: string | null) {
+  const a = deviceId ? await deviceAnswers(deviceId) : {};
+  const [d] = deviceId ? await db.select().from(devices).where(eq(devices.id, deviceId)) : [];
+  const zip = a.zip ?? (d?.ipCountry === "US" && d.ipZip && /^\d{5}$/.test(d.ipZip) ? d.ipZip : null);
+  return {
+    votes: deviceId ? await voteCount({ user: null, deviceId }) : 0,
+    handle: generateHandle(),
+    sex: a.sex ?? null,
+    ageRange: a.age ?? null,
+    zipCode: zip,
+    zipFromIp: !a.zip && !!zip,
+    place: zipPlace(zip),
+  };
 }
