@@ -182,6 +182,8 @@ export const ECONOMY_DEFAULTS = {
   engagementWeight: 2,
   /** Percent of people (by account/device) who keep the old deck order, to measure the engine's lift. */
   engagementHoldoutPct: 10,
+  /** How much the deck's vote-vs-skip rate moves the order (Shimon, Nov 25 2026): battles people vote on rise, ones they skip sink. 0 = off. Same holdout as engagementWeight. */
+  skipWeight: 1.5,
   /** Data brain Phase 4: win-back emails to people drifting away. 0 = off (default), 1 = on. */
   winbackEmails: 0,
   /** Percent of lapsing people who get no email (stable per account), to measure whether the emails bring people back. */

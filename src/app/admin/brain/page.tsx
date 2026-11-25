@@ -1,3 +1,4 @@
+import { skipStats } from "@/server/services/skip-stats";
 import Link from "next/link";
 import { beforeAfterStats, getBrainStats, type BrainView } from "@/server/services/brain";
 import { change } from "@/server/services/before-after-rules";
@@ -104,7 +105,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab, ba] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -114,6 +115,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     passiveStats(view, days),
     aboutStats(view, days),
     beforeAfterStats(view),
+    skipStats(view, days),
   ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
@@ -150,6 +152,8 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     ["People who voted", n("voters"), "voters"],
     ["Median time to pick", secs(t.median_pick_ms)],
     ["Skips", n("skips")],
+    // Of deck cards people decided on (voted or skipped), the share they skipped.
+    ["Deck skip rate", pct(sk.total.skipped, sk.total.voted + sk.total.skipped)],
     ["Hit sign-up wall", n("gates"), "gates"],
     ["Sign-ups", n("signups"), "signups"],
     ["Vote changes", n("changed")],
@@ -536,6 +540,41 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           ]}
         />
       </Section>
+
+      <Section
+        title="Voted vs skipped"
+        note={`Every Vote deck card a person saw in this window (person × battle, counted once) ends one way: voted, skipped, or neither (they left, reloaded or switched tab while it was on top). Skip rate = skipped ÷ (voted + skipped). The deck uses the same signal: battles people vote on move up, ones they skip move down (economy skipWeight; the 10% engagement holdout keeps the old order).`}
+      >
+        <Rows
+          head={["Card type", "Cards seen", "Voted", "Skipped", "Neither", "Skip rate", "Left on it"]}
+          rows={[
+            ...sk.byKind.map((r) => [r.kind, r.seen, r.voted, r.skipped, r.neither, pct(r.skipped, r.voted + r.skipped), pct(r.neither, r.seen)]),
+            ["Total", sk.total.seen, sk.total.voted, sk.total.skipped, sk.total.neither, pct(sk.total.skipped, sk.total.voted + sk.total.skipped), pct(sk.total.neither, sk.total.seen)],
+          ]}
+        />
+      </Section>
+
+      <Section title="Skips by deck position" note="Where in the deck load the card first appeared (1 = first card). A rising skip rate deeper in the deck means people get pickier or run into weaker battles.">
+        <Rows
+          head={["Position", "Cards seen", "Voted", "Skipped", "Neither", "Skip rate"]}
+          rows={sk.byPos.map((r) => [r.bucket, r.seen, r.voted, r.skipped, r.neither, pct(r.skipped, r.voted + r.skipped)])}
+        />
+      </Section>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Section title="Most skipped battles" note={`Battles seen by 5+ people in this window (${sk.battlesRated} so far), highest skip rate first. Candidates to rewrite, relaunch with a better photo, or hide.`}>
+          <Rows
+            head={["Battle", "Seen", "Skip rate"]}
+            rows={sk.mostSkipped.map((b) => [battleLink(b.slug, b.title), b.seen, pct(b.skipped, b.voted + b.skipped)])}
+          />
+        </Section>
+        <Section title="Least skipped battles" note="Same rule, lowest skip rate first. What these have in common is what to post more of.">
+          <Rows
+            head={["Battle", "Seen", "Skip rate"]}
+            rows={sk.leastSkipped.map((b) => [battleLink(b.slug, b.title), b.seen, pct(b.skipped, b.voted + b.skipped)])}
+          />
+        </Section>
+      </div>
 
       <Section title="Where votes were made" note={`Every counted vote, by the screen it was made on. The total matches the "Votes by real people" tile.`}>
         <Rows

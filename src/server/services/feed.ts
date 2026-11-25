@@ -4,7 +4,7 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, diversify, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, type ViewerProfile } from "./ranking";
+import { feedScore, diversify, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, type ViewerProfile } from "./ranking";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 import { matchesTarget } from "./targeting";
 
@@ -90,6 +90,10 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   // Data brain Phase 3: rank by engagement too, except for a stable holdout group (the comparison for lift).
   const arm: "engine" | "holdout" = inHoldout(viewerKey, economy.engagementHoldoutPct) ? "holdout" : "engine";
   const eWeight = arm === "engine" ? economy.engagementWeight : 0;
+  // Vote deck decisions per battle (votes made in the deck vs skips), for the skip signal.
+  const sWeight = arm === "engine" ? economy.skipWeight : 0;
+  const decisions = sWeight ? await deckDecisions(rows.map((r) => r.b.id)) : new Map<string, { votes: number; skips: number }>();
+  const avgPick = averagePickRate([...decisions.values()]);
   const loops = await openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy);
   const scored = rows.map((r) => {
     const boostActive = !!r.b.boostUntil && r.b.boostUntil > now && r.b.boostVotesLeft > 0;
@@ -105,7 +109,9 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       hoursSincePublish: (now.getTime() - r.b.createdAt.getTime()) / 3600_000,
       priorityFactor: pf,
     });
-    const score = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
+    const engaged = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
+    const d = decisions.get(r.b.id);
+    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight);
     return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
   // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet.
@@ -120,4 +126,18 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     ...(picked[i].row.b.tags?.featured ? { featured: true } : {}),
     ...(opts.debug ? { debug: { priorityFactor: picked[i].pf, openLoops: picked[i].openLoops } } : {}),
   })) as FeedItem[];
+}
+
+/** Per battle: votes made in the Vote deck and skips (all time, real people only: seed votes have source 'seed'). */
+async function deckDecisions(ids: string[]) {
+  const out = new Map<string, { votes: number; skips: number }>();
+  if (!ids.length) return out;
+  const list = sql.join(ids.map((i) => sql`${i}`), sql`, `);
+  const rows = await db.execute<{ id: string; votes: number; skips: number }>(sql`
+    SELECT x.id,
+      (SELECT count(*)::int FROM vote v WHERE v.battle_id = x.id AND v.source = 'feed' AND NOT v.flagged) AS votes,
+      (SELECT count(*)::int FROM skip s WHERE s.battle_id = x.id) AS skips
+    FROM (SELECT unnest(ARRAY[${list}]::text[]) AS id) x`);
+  for (const r of rows) out.set(r.id, { votes: Number(r.votes), skips: Number(r.skips) });
+  return out;
 }
