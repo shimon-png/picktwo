@@ -5,6 +5,7 @@ import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { awardPoints, votePointsToday } from "./points";
 import { gateArm } from "./gate-test";
+import { aboutAfterVote, moveDeviceAnswers } from "./about";
 import { gateDecision, type GateArm } from "./gate-test-rules";
 import { getEconomy } from "./config";
 import { voteQualityIssue, isValidReason } from "./priority";
@@ -234,7 +235,9 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
       { battleId: b.id, from: changedFrom, to: input.side, source: input.source, ...input.meta },
       { userId: user?.id, deviceId: viewer.deviceId },
     );
-  return res;
+  // About-you card next in the Vote deck (only the deck shows them; never together with the sign-up prompt).
+  const about = res.isNew && input.source === "feed" && !res.gatePrompt ? await aboutAfterVote(viewer) : null;
+  return { ...res, about };
 }
 
 export async function skipBattle(slug: string, viewer: { user: User | null; deviceId: string | null }) {
@@ -320,4 +323,6 @@ export async function linkDevice(userId: string, deviceId: string) {
       WHERE s.device_id = ${deviceId} AND s.user_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM skip s2 WHERE s2.battle_id = s.battle_id AND s2.user_id = ${userId})`);
   });
+  // About-you answers given as a guest fill the new account's profile (sign-up then skips them).
+  await moveDeviceAnswers(userId, deviceId).catch((e) => console.error("[about] carry over", e));
 }

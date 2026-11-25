@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { doneIds, markDone, unmarkDone } from "@/lib/seen";
 import { SignupGate } from "@/components/auth/SignupGate";
+import { AboutCard, type AboutCardPayload } from "./AboutCard";
 import { cn, pct, timeLeft, titleSizeClass } from "@/lib/utils";
 import { AVATAR_TONES, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
@@ -20,7 +21,7 @@ import { cardKind, contentHash, currentSessionId, logEvent } from "@/lib/events"
 type Side = "A" | "B";
 type PickMethod = "tap" | "swipe" | "key";
 const other = (s: Side): Side => (s === "A" ? "B" : "A");
-type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null; softGate?: boolean; gatePrompt?: boolean };
+type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null; softGate?: boolean; gatePrompt?: boolean; about?: AboutCardPayload | null };
 
 /**
  * Two ways to pick (Alex, Nov 21 2026): tap the photo you want, or swipe away the one you don't.
@@ -63,6 +64,9 @@ export function SwipeDeck({
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
   const [soft, setSoft] = useState(initialSoft);
   const [prompt, setPrompt] = useState(false);
+  // About-you card (lib/about.ts): the server says after a vote; it shows as the next card once the result is done.
+  const [about, setAbout] = useState<AboutCardPayload | null>(null);
+  const pendingAbout = useRef<AboutCardPayload | null>(null);
   const [voted, setVoted] = useState<Side | null>(null);
   const [result, setResult] = useState<{ a: number; b: number; total: number } | null>(null);
   const [fly, setFly] = useState<-1 | 1 | 0>(0);
@@ -175,6 +179,7 @@ export function SwipeDeck({
       if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
       if (r.softGate != null) setSoft(r.softGate);
       if (r.gatePrompt) setPrompt(true);
+      if (r.about) pendingAbout.current = r.about;
       setResult(r.results);
       setPP(r.ppBalance);
       if (r.ppBalance != null) setPp(r.ppBalance);
@@ -266,7 +271,7 @@ export function SwipeDeck({
   // Every pick (tap, swipe-away, ← / →): the pick fills the card, its scores show for
   // RESULT_MS, then the next battle.
   async function pick(side: Side, method: PickMethod, dir: -1 | 1 = side === "A" ? -1 : 1) {
-    if (!card || voted || fly || roll) return;
+    if (!card || voted || fly || roll || about) return;
     const started = Date.now();
     const ok = await vote(side, method);
     if (!ok) {
@@ -280,6 +285,11 @@ export function SwipeDeck({
     setTimeout(() => buzz(10), 120);
     setTimeout(() => {
       advance(dir);
+      if (pendingAbout.current) {
+        const a = pendingAbout.current;
+        pendingAbout.current = null;
+        setTimeout(() => setAbout(a), FLY_MS);
+      }
       if (isRollMilestone(n)) {
         setRoll(n);
         buzz(30);
@@ -297,7 +307,7 @@ export function SwipeDeck({
   }
 
   function skip() {
-    if (!card || voted || fly || thrown || roll) return;
+    if (!card || voted || fly || thrown || roll || about) return;
     markDone(card.id);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
     advance(-1);
@@ -426,6 +436,7 @@ export function SwipeDeck({
       )}
       <div className="relative h-[calc(100dvh-15.35rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
         {roll != null && <RollCard count={roll} onDone={() => setRoll(null)} />}
+        {about && <AboutCard key={about.id} card={about} onDone={() => setAbout(null)} />}
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}
