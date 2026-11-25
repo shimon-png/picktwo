@@ -1,6 +1,6 @@
 import { skipStats } from "@/server/services/skip-stats";
 import Link from "next/link";
-import { beforeAfterStats, getBrainStats, type BrainView } from "@/server/services/brain";
+import { beforeAfterStats, getBrainStats, pinnedNumbers, type BrainView, type PinnedDay } from "@/server/services/brain";
 import { change } from "@/server/services/before-after-rules";
 import { unitEconomicsStats } from "@/server/services/unit-economics";
 import { money, unitEconomics } from "@/server/services/unit-economics-rules";
@@ -13,7 +13,8 @@ import { gateTestResults } from "@/server/services/gate-test";
 import { ARM_LABELS, type GateCell } from "@/server/services/gate-test-rules";
 import { LoadZipIncome, RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 import { passiveStats, type GroupRow } from "@/server/services/passive-stats";
-import { aboutStats } from "@/server/services/about-stats";
+import { aboutStats, type ArmNumbers } from "@/server/services/about-stats";
+import { ABOUT_QUESTIONS } from "@/lib/about";
 import type { BrainListKind } from "@/server/services/brain-lists";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,53 @@ const gateRow = (day: React.ReactNode, group: string, c: GateCell): React.ReactN
 ];
 const secs = (ms: number | null | undefined) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)}s`);
 
+const QUESTION_LABELS: Record<string, string> = {
+  sex: "Sex",
+  age: "Age",
+  relationship: "Relationship",
+  zip: "ZIP (v1 only)",
+  kids: "Kids",
+  education: "Education",
+  housing: "Home (rent / own)",
+  race: "Race / ethnicity",
+  party: "Party",
+  work: "Work",
+};
+const perVisitor = (a: ArmNumbers | { visitors: number; votes: number }) => (a.visitors ? (a.votes / a.visitors).toFixed(2) : "—");
+/** Plain-language read of the no-cards group vs the cards group on votes per visitor. */
+function verdict(holdout: { visitors: number; votes: number }, cards: { visitors: number; votes: number }, p: number | null) {
+  if (!holdout.visitors || !cards.visitors) return "Not enough data yet";
+  const h = holdout.votes / holdout.visitors;
+  const c = cards.votes / cards.visitors;
+  const lift = h ? (c - h) / h : 0;
+  const side = `Cards ${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}% vs no cards`;
+  if (p == null) return `${side} · not enough data yet`;
+  return p < 0.05 ? `${side} · real difference (p = ${p.toFixed(3)})` : `${side} · could be chance (p = ${p.toFixed(2)})`;
+}
+
+/** Pinned big numbers (Alex, Nov 25): today so far, yesterday underneath. */
+function PinnedRow({ today, yesterday }: { today: PinnedDay; yesterday: PinnedDay }) {
+  const r = (x: number | null) => (x == null ? "—" : x.toFixed(2));
+  const items: [string, string | number, string | number][] = [
+    ["Votes per visitor", r(today.votesPerVisitor), r(yesterday.votesPerVisitor)],
+    ["Voters per visitor", r(today.votersPerVisitor), r(yesterday.votersPerVisitor)],
+    ["New voters", today.newVoters, yesterday.newVoters],
+    ["New sign-ups", today.signups, yesterday.signups],
+    ["New battles posted", today.posts, yesterday.posts],
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" aria-label="Pinned numbers, today">
+      {items.map(([label, now, before], i) => (
+        <div key={label} className={`card p-4 ${i === 0 ? "col-span-2 sm:col-span-1" : ""}`}>
+          <div className="text-xs text-zinc-500">{label} · today</div>
+          <div className="font-display text-[40px] font-semibold leading-none tabular-nums">{now}</div>
+          <div className="mt-1 text-xs text-zinc-500">Yesterday {before}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="card space-y-2 p-4">
@@ -166,7 +214,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -178,6 +226,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     beforeAfterStats(view),
     skipStats(view, days),
     unitEconomicsStats(view),
+    pinnedNumbers(view),
   ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
@@ -247,6 +296,8 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           : "All data: everything we have, including the 5,000 seed votes, seed battles and admin test activity (bots still left out)."}{" "}
         Hypotheses and requests live in the repo under docs/brain/.
       </p>
+
+      <PinnedRow today={pins.today} yesterday={pins.yesterday} />
 
       <div className={`card p-3 text-sm ${failed.length ? "ring-1 ring-b" : ""}`}>
         {failed.length === 0 ? (
@@ -445,20 +496,57 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section
         title="About-you cards"
-        note={`One-tap questions in the Vote deck (sex after vote 2, age 4, relationship 7, ZIP 12; with an account: kids 20, home 25, work 35; numbers in Config). ${ab.holdoutPct}% of people never see a card, so the second table shows what cards cost or add in votes per visitor.`}
+        note={`One-tap questions in the Vote deck, no account needed: sex after vote 2, age 4, relationship 7, kids 9, education 11, home 13, race/ethnicity 16, party 19 (race and party have "Prefer not to say", which counts as answered); with an account, work 35. Numbers in Config. ZIP is no longer asked (since cards v2): it comes from the IP. ${ab.holdoutPct}% of people never see a card, so comparing them with everyone else shows what cards cost or add.`}
       >
+        <div className="grid gap-2 md:grid-cols-2">
+          <div className="rounded-xl bg-surface p-3">
+            <div className="text-xs text-zinc-500">Votes per visitor, no-cards group → sees cards (this window)</div>
+            <div className="text-2xl tabular-nums">
+              {perVisitor(ab.arms.holdout)} → {perVisitor(ab.arms.cards)}
+            </div>
+            <div className="text-xs text-zinc-500">
+              {verdict(ab.arms.holdout, ab.arms.cards, ab.holdoutP)}
+            </div>
+          </div>
+          <div className="rounded-xl bg-surface p-3">
+            <div className="text-xs text-zinc-500">Card answers per visitor who sees cards (this window)</div>
+            <div className="text-2xl tabular-nums">
+              {ab.arms.cards.visitors ? (ab.questions.reduce((t, q) => t + q.answered, 0) / ab.arms.cards.visitors).toFixed(2) : "—"}
+            </div>
+            <div className="text-xs text-zinc-500">How many demographics we learn per visitor, on top of what the IP and phone give us.</div>
+          </div>
+        </div>
+        {ab.versions.length > 0 && (
+          <>
+            <h3 className="pt-2 font-sans text-sm font-medium">Cards v1 vs v2</h3>
+            <p className="text-xs text-zinc-500">
+              v1 = sex, age, relationship, ZIP (from {nyTime(ab.versions[0].from)}). v2 = no ZIP card; kids, education, home, race, party without
+              an account (starts by itself at the first new question shown{ab.versions[1] ? `: ${nyTime(ab.versions[1].from)}` : ", not yet"}). Whole
+              version, not the day window. Goal: v2 keeps or raises votes per visitor AND learns more per visitor. The no-cards rows show what
+              the same days looked like without cards.
+            </p>
+            <Rows
+              head={["Version", "Group", "Visitors", "Votes per visitor", "Voters per visitor", "Answers per visitor", "Answered 1+", "Holdout vs cards"]}
+              rows={ab.versions.flatMap((v) =>
+                (["cards", "holdout"] as const).map((k) => [
+                  <b key="v">{v.version}</b>,
+                  k === "cards" ? "Sees cards" : `No cards (${ab.holdoutPct}%)`,
+                  v[k].visitors,
+                  perVisitor(v[k]),
+                  v[k].visitors ? (v[k].voters / v[k].visitors).toFixed(2) : "—",
+                  k === "cards" ? (v[k].visitors ? (v[k].answers / v[k].visitors).toFixed(2) : "—") : "—",
+                  k === "cards" ? pct(v[k].answered, v[k].visitors) : "—",
+                  k === "cards" ? <span key="p" className="text-xs">{verdict(v.holdout, v.cards, v.votesP)}</span> : "",
+                ]),
+              )}
+            />
+          </>
+        )}
         <Rows
           head={["Question", "Shown", "Answered", "Skipped", "Answer rate"]}
-          rows={ab.questions.map((r) => [r.id === "zip" ? "ZIP" : r.id[0].toUpperCase() + r.id.slice(1), r.shown, r.answered, r.skipped, pct(r.answered, r.shown)])}
-        />
-        <Rows
-          head={["Group", "Visitors", "Votes", "Votes per visitor"]}
-          rows={(["cards", "holdout"] as const).map((k) => [
-            k === "cards" ? "Sees cards" : `Holdout (${ab.holdoutPct}%, no cards)`,
-            ab.arms[k].visitors,
-            ab.arms[k].votes,
-            ab.arms[k].visitors ? (ab.arms[k].votes / ab.arms[k].visitors).toFixed(2) : "—",
-          ])}
+          rows={ab.questions
+            .filter((r) => r.shown > 0 || ABOUT_QUESTIONS[r.id].inDeck)
+            .map((r) => [QUESTION_LABELS[r.id] ?? r.id, r.shown, r.answered, r.skipped, pct(r.answered, r.shown)])}
         />
       </Section>
 

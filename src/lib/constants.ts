@@ -123,14 +123,18 @@ export const ECONOMY_DEFAULTS = {
   gateTestPct: 50,
   /**
    * About-you cards in the Vote deck (lib/about.ts): the vote number each question is first asked after (0 = off).
-   * Guests: sex, age, relationship, ZIP. With an account: kids, housing, work.
+   * No account needed: sex, age, relationship, kids, education, home, race/ethnicity, party (Alex, Nov 25: ZIP is
+   * no longer asked; it comes from the IP). With an account: work. The ZIP card stays off (0).
    */
   aboutSexAt: 2,
   aboutAgeAt: 4,
   aboutRelationshipAt: 7,
-  aboutZipAt: 12,
-  aboutKidsAt: 20,
-  aboutHousingAt: 25,
+  aboutZipAt: 0,
+  aboutKidsAt: 9,
+  aboutEducationAt: 11,
+  aboutHousingAt: 13,
+  aboutRaceAt: 16,
+  aboutPartyAt: 19,
   aboutWorkAt: 35,
   /** "People like you" result bar: smallest group (sex × age, else sex) shown, and how long the deck shows a result with it (ms). */
   likeYouMinVotes: 20,

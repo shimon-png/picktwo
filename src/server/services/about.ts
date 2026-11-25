@@ -20,8 +20,12 @@ import { likeYouView, type LikeYou, type LikeYouVote } from "@/lib/like-you";
 
 type Viewer = { user: User | null; deviceId: string | null };
 
-/** Which user column holds each answer (guests keep answers on their browser rows only). */
-const USER_FIELD = {
+/**
+ * Which user column holds each answer (guests keep answers on their browser rows only). Education, race/ethnicity
+ * and party have no profile column: they live only in profile_answer (race and party are sensitive data, so they
+ * stay out of the profile, the export of profile fields and anything shown to other people).
+ */
+const USER_FIELD: Partial<Record<AboutQuestionId, keyof User>> = {
   sex: "sex",
   age: "ageRange",
   relationship: "relationship",
@@ -29,7 +33,7 @@ const USER_FIELD = {
   kids: "kidsStatus",
   housing: "housing",
   work: "workStatus",
-} as const satisfies Record<AboutQuestionId, keyof User>;
+};
 
 const ownerCond = (v: Viewer) => (v.user ? eq(profileAnswers.userId, v.user.id) : eq(profileAnswers.deviceId, v.deviceId!));
 
@@ -145,8 +149,8 @@ export async function answerAbout(
   else await db.insert(profileAnswers).values({ userId: v.user?.id ?? null, deviceId: v.user ? null : v.deviceId, question: q.id, answer, status, via, atVotes: await voteCount(v) });
 
   const kidAges = (input.kidAges ?? []).filter((k): k is KidAge => (KID_AGE_IDS as readonly string[]).includes(k));
-  if (answer && v.user) {
-    const field = USER_FIELD[q.id];
+  const field = USER_FIELD[q.id];
+  if (answer && v.user && field) {
     const patch: Partial<User> = { [field]: answer };
     if (q.id === "zip" && !v.user.country) Object.assign(patch, place);
     if (q.id === "kids") patch.kidAges = answer === "YES" ? kidAges : [];
@@ -178,6 +182,7 @@ export async function moveDeviceAnswers(userId: string, deviceId: string) {
   const patch: Partial<User> = {};
   for (const [q, a] of Object.entries(answers) as [AboutQuestionId, string][]) {
     const f = USER_FIELD[q];
+    if (!f) continue;
     if (u[f] == null || u[f] === "") (patch as Record<string, unknown>)[f] = a;
   }
   if (answers.zip && !u.zipCode && !u.country) {

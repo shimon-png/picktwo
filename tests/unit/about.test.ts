@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isValidAboutAnswer, nextAboutCard, shuffled, type AboutQuestionId, type AboutSchedule, type AboutState } from "@/lib/about";
+import { PREFER_NOT, PARTY_OPTIONS, RACE_OPTIONS, cardOrder, isValidAboutAnswer, nextAboutCard, shuffled, type AboutQuestionId, type AboutSchedule, type AboutState } from "@/lib/about";
 import { ECONOMY_DEFAULTS } from "@/lib/constants";
 
 const sched = ECONOMY_DEFAULTS as unknown as AboutSchedule;
@@ -24,11 +24,14 @@ function play(n: number, signedInFrom = Infinity, skip: AboutQuestionId[] = []) 
 }
 
 describe("nextAboutCard", () => {
-  it("follows the plan for a guest: sex 2, age 4, relationship 7, ZIP 12; nothing else before sign-up", () => {
-    expect(play(40)).toEqual(["2:sex", "4:age", "7:relationship", "12:zip"]);
+  it("follows the plan for a guest (Alex, Nov 25): no ZIP card; kids, education, home, race, party without an account", () => {
+    expect(play(40)).toEqual(["2:sex", "4:age", "7:relationship", "9:kids", "11:education", "13:housing", "16:race", "19:party"]);
   });
-  it("adds kids, housing, work once signed in", () => {
-    expect(play(40, 16)).toEqual(["2:sex", "4:age", "7:relationship", "12:zip", "20:kids", "25:housing", "35:work"]);
+  it("adds work once signed in", () => {
+    expect(play(40, 16)).toEqual(["2:sex", "4:age", "7:relationship", "9:kids", "11:education", "13:housing", "16:race", "19:party", "35:work"]);
+  });
+  it("the ZIP card never shows, even if Config still schedules it", () => {
+    expect(nextAboutCard(st({ votes: 12, answered: new Set<AboutQuestionId>(["sex", "age", "relationship", "kids", "education", "housing"]) }), { ...sched, aboutZipAt: 12 })).toBeNull();
   });
   it("never two in a row: a due card waits for the gap", () => {
     expect(nextAboutCard(st({ votes: 5, lastAskAt: 4 }), sched)).toBeNull();
@@ -36,7 +39,7 @@ describe("nextAboutCard", () => {
   });
   it("a skipped question comes back once, 10 votes later, then never", () => {
     const seq = play(40, Infinity, ["sex"]);
-    expect(seq.filter((x) => x.endsWith(":sex"))).toEqual(["2:sex", "12:sex"]);
+    expect(seq.filter((x) => x.endsWith(":sex"))).toEqual(["2:sex", "13:sex"]) // due at 12, but education was shown at 11, so it waits for the gap;
   });
   it("already-known answers are never asked; 0 turns a question off", () => {
     expect(nextAboutCard(st({ votes: 2, answered: new Set<AboutQuestionId>(["sex"]) }), sched)).toBeNull();
@@ -53,6 +56,19 @@ describe("answers + shuffle", () => {
     expect(isValidAboutAnswer("relationship", "TAKEN")).toBe(true);
     expect(isValidAboutAnswer("zip", "78704")).toBe(true);
     expect(isValidAboutAnswer("zip", "<script>")).toBe(false);
+    expect(isValidAboutAnswer("education", "BACHELORS")).toBe(true);
+    expect(isValidAboutAnswer("race", PREFER_NOT)).toBe(true);
+    expect(isValidAboutAnswer("party", "INDEPENDENT")).toBe(true);
+    expect(isValidAboutAnswer("party", "WHITE")).toBe(false);
+  });
+  it("card order: shuffled, but Prefer not to say always last", () => {
+    for (let i = 0; i < 200; i++) {
+      for (const opts of [RACE_OPTIONS, PARTY_OPTIONS] as readonly (readonly { id: string; label: string }[])[]) {
+        const o = cardOrder(opts);
+        expect(o).toHaveLength(opts.length);
+        expect(o[o.length - 1].id).toBe(PREFER_NOT);
+      }
+    }
   });
   it("shuffle keeps every answer and spreads first place evenly", () => {
     const items = ["a", "b", "c", "d", "e", "f"];
