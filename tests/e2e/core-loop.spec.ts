@@ -36,7 +36,12 @@ async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateA
   const n = ++guests; // a new browser every call
   let id = "";
   // …and outside the about-you cards holdout, so the deck asks its questions.
-  for (let i = 0; !id || pickArm(id, 50) !== arm || inHoldout(`about:${id}`, ECONOMY_DEFAULTS.aboutHoldoutPct); i++)
+  // …and outside the about-you cards and profile bar holdouts, so the deck asks its questions and shows the bar.
+  for (
+    let i = 0;
+    !id || pickArm(id, 50) !== arm || inHoldout(`about:${id}`, ECONOMY_DEFAULTS.aboutHoldoutPct) || inHoldout(`pbar:${id}`, ECONOMY_DEFAULTS.profileBarHoldoutPct);
+    i++
+  )
     id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "pt_vid", value: id, url: baseURL ?? "http://localhost:3000" }]);
@@ -261,6 +266,28 @@ test("sign-up gate test, group B: a closable dialog after the free votes and eve
   }).toPass({ timeout: 20_000 });
   await page.getByRole("button", { name: "Not now, keep voting" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("profile bar: counts deck votes, explains itself, asks a missing question (Pickbot Phase 0)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control");
+  const p = await ctx.newPage();
+  await p.goto("/vote");
+  const bar = p.getByTestId("profile-bar");
+  await expect(bar.getByText("Profile 0/30")).toBeVisible();
+  await expect(bar.getByText("+4 about you")).toBeVisible();
+  await p.getByRole("button", { name: /^Vote for/ }).first().click();
+  await expect(bar.getByText("Profile 1/30")).toBeVisible();
+  await bar.getByRole("button", { name: /Profile 1\/30/ }).click();
+  await expect(bar.getByText("29 more battles to your full profile")).toBeVisible();
+  await expect(bar.getByText("A complete profile unlocks")).toBeVisible();
+  await snap(p, "profile-bar-open");
+  await bar.getByRole("button", { name: "Answer" }).first().click();
+  const card = p.getByRole("article", { name: /About you: I'm a…/ });
+  await card.getByRole("button", { name: "Woman" }).click();
+  await expect(card).toBeHidden();
+  await expect(bar.getByText("+3 about you")).toBeVisible();
+  await snap(p, "profile-bar");
+  await ctx.close();
 });
 
 test("about-you cards: a question after vote 2, answers stick, skip works (Nov 25)", async ({ browser, baseURL }) => {
