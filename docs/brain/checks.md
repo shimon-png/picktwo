@@ -35,3 +35,12 @@ The Brain page runs `brainChecks()` on every load and shows any rule that fails.
 ### Follow-up (Nov 24 2026, Alex: "the two numbers don't add to 700")
 - Text vs photo "Voted" (443 + 221 = 664) only counted votes on cards the same person had been shown in the Vote deck. The 36 others were votes made on the homepage card, battle pages / shared links or Discover (no deck view), plus deck votes where the view was logged under the guest device and the vote under the new account.
 - Fix: Text vs photo now has an **All votes** column (every counted vote, by whether the battle has photos) that adds up to the votes tile, and a new **Where votes were made** table (place × text/photo, total = tile). The deck columns match person × battle across device → account and only count deck votes. New self-check: places total = votes tile.
+
+## Number re-audit (Nov 25 2026)
+
+Fixed:
+- "Hit sign-up wall" counted times the wall showed, while its list counted people. Group B of the gate test sees the closable dialog again every few votes, so the tile ran high. Now it counts people (tile renamed "People who hit the sign-up wall").
+- Next-day return called everyone "new" on the first day of the window (the 24h view was all new). "First seen" now looks back to the clean start.
+- The old "By theme" table only covered battles posted by real people (seed battles had no AI tag), i.e. a few battles while most votes are on seed content. Replaced by "Which themes work", which covers every battle.
+- "By stakes" vote rate matched votes from any time and seed votes; now the same window and scope as the votes tile, and seed battles count once they have an AI tag.
+- New live checks: theme votes = Votes tile, theme skips = Skips tile, theme cards seen = Text vs photo cards seen.

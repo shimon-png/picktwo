@@ -145,7 +145,7 @@ export function TagBattles({ remaining }: { remaining: number }) {
   }
   return (
     <button className="chip !py-1 text-xs" onClick={run} disabled={busy || remaining === 0}>
-      {busy ? "Tagging…" : remaining ? `Tag next 25 of ${remaining} untagged` : "All battles tagged"}
+      {busy ? "Tagging…" : remaining ? `Tag next ${Math.min(100, remaining)} of ${remaining} untagged` : "All battles tagged"}
     </button>
   );
 }

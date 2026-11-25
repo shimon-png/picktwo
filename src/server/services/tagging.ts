@@ -74,7 +74,7 @@ export async function untaggedCount(): Promise<number> {
 }
 
 /** Tag up to `limit` untagged battles (newest first), a few at a time. */
-export async function tagUntagged(limit = 25): Promise<{ tagged: number; failed: number; remaining: number; enabled: boolean }> {
+export async function tagUntagged(limit = 25, parallel = 5): Promise<{ tagged: number; failed: number; remaining: number; enabled: boolean }> {
   if (!taggingEnabled()) return { tagged: 0, failed: 0, remaining: await untaggedCount(), enabled: false };
   const rows = await db
     .select({ id: battles.id })
@@ -84,8 +84,8 @@ export async function tagUntagged(limit = 25): Promise<{ tagged: number; failed:
     .limit(limit);
   let tagged = 0;
   let failed = 0;
-  for (let i = 0; i < rows.length; i += 5) {
-    const out = await Promise.all(rows.slice(i, i + 5).map((r) => tagBattle(r.id)));
+  for (let i = 0; i < rows.length; i += parallel) {
+    const out = await Promise.all(rows.slice(i, i + parallel).map((r) => tagBattle(r.id)));
     out.forEach((t) => (t ? tagged++ : failed++));
   }
   return { tagged, failed, remaining: await untaggedCount(), enabled: true };
