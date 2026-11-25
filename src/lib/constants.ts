@@ -135,6 +135,9 @@ export const ECONOMY_DEFAULTS = {
   /** "People like you" result bar: smallest group (sex × age, else sex) shown, and how long the deck shows a result with it (ms). */
   likeYouMinVotes: 20,
   likeYouResultMs: 2200,
+  /** Taste profile (lib/taste-profile.ts): first two traits show at this many votes, all six (and the type name) at the second. */
+  tasteFirstAt: 10,
+  tasteFullAt: 30,
   /** Votes between two about-you cards (2 = never two in a row, two battles between). */
   aboutMinGap: 2,
   /** A skipped question comes back once, this many votes later. */

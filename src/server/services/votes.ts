@@ -6,6 +6,7 @@ import { assertCleanText } from "../moderation";
 import { awardPoints, votePointsToday } from "./points";
 import { gateArm } from "./gate-test";
 import { aboutAfterVote, likeYouFor, moveDeviceAnswers } from "./about";
+import { tasteProfileFor, voteTotal } from "./taste-profile";
 import { gateDecision, type GateArm } from "./gate-test-rules";
 import { getEconomy } from "./config";
 import { voteQualityIssue, isValidReason } from "./priority";
@@ -236,11 +237,25 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
       { userId: user?.id, deviceId: viewer.deviceId },
     );
   // About-you card next in the Vote deck (only the deck shows them; never together with the sign-up prompt).
-  const [about, likeYou] = await Promise.all([
-    res.isNew && input.source === "feed" && !res.gatePrompt ? aboutAfterVote(viewer) : null,
-    likeYouFor(b.id, viewer),
-  ]);
-  return { ...res, about, likeYou };
+  // Deck extras after a new vote: a taste-profile moment wins over an about-you card (which simply waits a vote).
+  const inDeck = res.isNew && input.source === "feed" && !res.gatePrompt;
+  const [taste, likeYou] = await Promise.all([inDeck ? tasteMilestone(viewer, economy) : null, likeYouFor(b.id, viewer)]);
+  const about = inDeck && !taste ? await aboutAfterVote(viewer) : null;
+  return { ...res, about, likeYou, taste };
+}
+
+/** Taste profile moments in the deck: the first traits at tasteFirstAt votes, the full wheel at tasteFullAt. */
+async function tasteMilestone(viewer: VoteViewer, economy: Awaited<ReturnType<typeof getEconomy>>) {
+  try {
+    const n = await voteTotal(viewer);
+    if (n !== economy.tasteFirstAt && n !== economy.tasteFullAt) return null;
+    const t = await tasteProfileFor(viewer);
+    if (!t || !t.axes.length) return null;
+    return { milestone: n, full: n >= economy.tasteFullAt, signedIn: !!viewer.user, name: t.name, axes: t.axes.map(({ id, left, right, score, crowd, why }) => ({ id, left, right, score, crowd, why })) };
+  } catch (e) {
+    console.error("[taste] milestone", e);
+    return null;
+  }
 }
 
 export async function skipBattle(slug: string, viewer: { user: User | null; deviceId: string | null }) {
