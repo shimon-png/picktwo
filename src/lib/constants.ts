@@ -135,8 +135,11 @@ export const ECONOMY_DEFAULTS = {
   /** "People like you" result bar: smallest group (sex × age, else sex) shown, and how long the deck shows a result with it (ms). */
   likeYouMinVotes: 20,
   likeYouResultMs: 2200,
-  /** Brain "Before vs after": the New York day a product change went live (YYYYMMDD). Default: the about-you launch. */
-  beforeAfterFrom: 20261125,
+  /**
+   * Brain "Before vs after": when a product change went live, New York time, as YYYYMMDDHHmm (that day is split
+   * into a Before and an After row) or YYYYMMDD (that day counts as neither side). Default: the about-you go-live.
+   */
+  beforeAfterFrom: 202611251123,
   /** Taste profile (lib/taste-profile.ts): first two traits show at this many votes, all six (and the type name) at the second. */
   tasteFirstAt: 10,
   tasteFullAt: 30,
