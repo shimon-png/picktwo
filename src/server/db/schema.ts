@@ -138,6 +138,29 @@ export const devices = pgTable("device", {
   id: text("id").primaryKey(),
   userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: now("created_at"),
+  // Passive signals (services/passive.ts), from the browser's first real visit; never shown to anyone.
+  /** Vercel IP geolocation: country (ISO-2), state/region code, city, ZIP. Metro-level guesses; never overwrite a typed ZIP. */
+  ipCountry: text("ip_country"),
+  ipRegion: text("ip_region"),
+  ipCity: text("ip_city"),
+  ipZip: text("ip_zip"),
+  /** parseDevice(ua): ios / android / desktop / other, browser, in-app browser (x, instagram, tiktok, …). */
+  platform: text("platform"),
+  browser: text("browser"),
+  inApp: text("in_app"),
+  /** Screen "WxH@dpr", Android model from client hints, and deviceTier(): budget / mid / flagship / unknown. */
+  screen: text("screen"),
+  model: text("model"),
+  tier: text("tier"),
+  seenAt: ts("seen_at"),
+});
+
+/** Census ACS 5-year by ZIP area (ZCTA): median household income (B19013) and share of renter households (B25003). */
+export const zipIncome = pgTable("zip_income", {
+  zip: text("zip").primaryKey(),
+  medianIncome: integer("median_income"),
+  renterPct: doublePrecision("renter_pct"),
+  year: integer("year").notNull(),
 });
 
 /** A/B test groups (services/gate-test.ts). One row per experiment × unit (a browser's device id); never changes. */
