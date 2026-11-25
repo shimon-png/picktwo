@@ -2,8 +2,6 @@
 import { useEffect, useState } from "react";
 import { BellRing, Check } from "lucide-react";
 import { api, toast } from "@/lib/client";
-import { platformFrom } from "@/lib/install";
-import { InstallPrompt, isStandalone } from "./InstallPrompt";
 
 const KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
@@ -13,15 +11,13 @@ function keyBytes(b64: string) {
 }
 
 /**
- * "Notify me when the results are in" (web push). Hidden when push isn't set up or the browser can't do it. On an
- * iPhone outside the home-screen app, push isn't available, so it shows the install steps instead.
+ * "Notify me when the results are in" (web push). Hidden when push isn't set up or the browser can't do it (on
+ * iPhone, Safari only allows push for sites added to the home screen).
  */
 export function PushButton({ label = "Notify me when the results are in" }: { label?: string }) {
-  const [state, setState] = useState<"hidden" | "ios-install" | "ready" | "on">("hidden");
+  const [state, setState] = useState<"hidden" | "ready" | "on">("hidden");
   useEffect(() => {
     if (!KEY) return;
-    const ios = platformFrom(navigator.userAgent) === "ios";
-    if (ios && !isStandalone()) return setState("ios-install");
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
     navigator.serviceWorker.ready
       .then((r) => r.pushManager.getSubscription())
@@ -29,7 +25,6 @@ export function PushButton({ label = "Notify me when the results are in" }: { la
       .catch(() => {});
   }, []);
   if (state === "hidden") return null;
-  if (state === "ios-install") return <InstallPrompt place="push" force reason="Get a notification when the results are in" />;
   if (state === "on")
     return (
       <p className="flex items-center gap-1.5 text-[13px] text-ink/60">

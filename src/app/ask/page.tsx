@@ -9,7 +9,6 @@ import { profileProgressFor } from "@/server/services/profile-progress";
 import { ProfileBar } from "@/components/taste/ProfileBar";
 import { AskComposer } from "@/components/pickbot/AskComposer";
 import { PickbotHistory } from "@/components/pickbot/History";
-import { InstallPrompt } from "@/components/app/InstallPrompt";
 
 export const metadata = { title: "Ask Pickbot" };
 export const dynamic = "force-dynamic";
@@ -57,7 +56,6 @@ export default async function AskPage() {
         )}
       </p>
       {left === 0 && <div className="card px-4 py-3 text-[14px]">You’ve used today’s free answers. Come back tomorrow for more.</div>}
-      <InstallPrompt place="ask" />
       <PickbotHistory rows={threads} />
     </div>
   );

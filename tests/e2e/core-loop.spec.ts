@@ -1,4 +1,4 @@
-import { test, expect, devices, type Page, type Browser } from "@playwright/test";
+import { test, expect, type Page, type Browser } from "@playwright/test";
 import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules";
 import { ECONOMY_DEFAULTS } from "../../src/lib/constants";
 import { inHoldout } from "../../src/server/services/ranking";
@@ -560,24 +560,4 @@ test("Pickbot: ask → profile question → tailored → quick battles → answe
   await expect(page.getByTestId("pickbot-answer")).toHaveCount(2);
   await page.goto("/ask");
   await expect(page.getByRole("heading", { name: "Your questions" })).toBeVisible();
-});
-
-test("home screen: iPhone gets the Add to Home Screen steps on a later visit, and Not now snoozes it", async ({ browser }) => {
-  const ctx = await browser.newContext({ ...devices["iPhone 14"] });
-  await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
-  const p = await ctx.newPage();
-  await login(p, `ios-${stamp}@test.dev`);
-  await onboard(p, `ios_${stamp}`.slice(0, 20));
-  await p.goto("/you");
-  await expect(p.getByTestId("install-prompt")).toHaveCount(0); // first visit: not yet
-  await p.evaluate(() => sessionStorage.clear()); // a new visit
-  await p.goto("/you");
-  const card = p.getByTestId("install-prompt");
-  await expect(card.getByText("Add to Home Screen")).toBeVisible();
-  await snap(p, "install-ios");
-  await card.getByRole("button", { name: "Not now" }).click();
-  await p.evaluate(() => sessionStorage.clear());
-  await p.goto("/you");
-  await expect(p.getByTestId("install-prompt")).toHaveCount(0);
-  await ctx.close();
 });
