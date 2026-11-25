@@ -583,6 +583,53 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         title="Pickbot"
         note={`Ask tab (docs/plans/pickbot-prd.html). ${pk.open ? "Open to every signed-in person" : "Admins only (Config pickbotOpen = 0)"}; answers by ${pk.model}; ${pk.holdoutPct}% of accounts never get it. People = distinct people who did each step in the window.`}
       >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Link href={listHref("askers")} className="card block p-3 transition hover:ring-1 hover:ring-accent">
+            <div className="text-xs text-zinc-500">People who asked ›</div>
+            <div className="text-2xl font-medium">{pk.usage.askers}</div>
+          </Link>
+          <div className="card p-3">
+            <div className="text-xs text-zinc-500">Questions (not follow-ups)</div>
+            <div className="text-2xl font-medium">{pk.usage.questions}</div>
+          </div>
+          <div className="card p-3">
+            <div className="text-xs text-zinc-500">Questions per asker</div>
+            <div className="text-2xl font-medium">{pk.usage.askers ? (pk.usage.questions / pk.usage.askers).toFixed(1) : "—"}</div>
+          </div>
+          <div className="card p-3">
+            <div className="text-xs text-zinc-500">Asked again on another day</div>
+            <div className="text-2xl font-medium">{pct(pk.usage.repeat, pk.usage.askers)}</div>
+          </div>
+        </div>
+        <p className="text-xs text-zinc-500">
+          Got an answer: {pk.usage.answeredPeople} of {pk.usage.askers} askers ({pct(pk.usage.answeredPeople, pk.usage.askers)}); the rest stopped at the profile cards or
+          the question was off-topic. Questions are private: the Brain shows topics and counts, never the words.
+        </p>
+        <Rows
+          head={["Day", "Askers", "Questions", "Follow-ups", "Answers", "Tailored", "👍 / 👎", "Crowd posts", "Results back", "AI cost"]}
+          rows={pk.daily.map((d) => [
+            d.day,
+            d.askers ? (
+              <Link key="a" href={listHref("askers", d.day)} className="underline decoration-ink/20 underline-offset-2 hover:decoration-accent">
+                {d.askers}
+              </Link>
+            ) : (
+              0
+            ),
+            d.questions,
+            d.followups,
+            d.answers,
+            d.tailored,
+            `${d.up} / ${d.down}`,
+            d.crowd,
+            d.results,
+            usd(d.cost, 2),
+          ])}
+        />
+        <Rows
+          head={["What people ask about", "Kind", "Questions", "People"]}
+          rows={pk.themes.map((t) => [t.theme.replaceAll("_", " "), t.scope.replace("_", "-"), t.questions, t.people])}
+        />
         <Rows head={["Step", "People", "Times"]} rows={pk.funnel.map((f) => [f.label, f.people, f.events])} />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {(
@@ -590,7 +637,10 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
               ["Answers", pk.totalAnswers],
               ["AI cost", usd(pk.totalCost, 2)],
               ["Cost per answer", pk.totalAnswers ? usd(pk.totalCost / pk.totalAnswers, 3) : "—"],
-              ["Chose tailored", pct(pk.choice.tailored ?? 0, (pk.choice.tailored ?? 0) + (pk.choice.general ?? 0))],
+              [
+                "Took the better-answer offer",
+                pct(pk.choice.retailor ?? 0, (pk.choice.retailor ?? 0) + (pk.funnel.find((f) => f.name === "pickbot_battles_stopped")?.events ?? 0)),
+              ],
               ["👍 rate", pct(pk.ratings.reduce((t, r) => t + r.up, 0), pk.ratings.reduce((t, r) => t + r.up + r.down, 0))],
               ["Crowd agreed with Pickbot", pct(pk.agree.yes, pk.agree.yes + pk.agree.no)],
             ] as [string, React.ReactNode][]
@@ -679,7 +729,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
                     {[j.sex, j.ageRange, j.zip3 && `ZIP ${j.zip3}xx`].filter(Boolean).join(" · ") || "no profile"}
                   </span>
                   <span className="ml-auto text-xs tabular-nums">
-                    votes {j.votesBefore} before / <b>{j.votesAfter} after</b> · posts {j.posts} · back days {j.returnDays}
+                    votes {j.votesBefore} before / <b>{j.votesAfter} after</b> · posts {j.posts} · Pickbot {j.asks.length} · back days {j.returnDays}
                   </span>
                 </summary>
                 <div className="mt-2 space-y-1 pl-1 text-xs">

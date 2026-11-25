@@ -7,6 +7,21 @@ import { AGE_RANGES, SEX_OPTIONS } from "@/lib/constants";
 import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 
 export type JourneyVote = { at: string; title: string; slug: string; picked: string; after: boolean; method: string | null };
+/**
+ * One Pickbot question, without its words (questions are private to the asker; admins see the topic and what
+ * happened, never the text).
+ */
+export type JourneyAsk = {
+  at: string;
+  theme: string;
+  scope: string;
+  answers: number;
+  tailored: number;
+  followUps: number;
+  rating: "UP" | "DOWN" | null;
+  crowd: { slug: string; votes: number; resultsBack: boolean } | null;
+  costUsd: number;
+};
 export type Journey = {
   /** User id, or the guest's device id: the key for /admin/journey/person/[who]. */
   who: string;
@@ -28,6 +43,9 @@ export type Journey = {
   returnDays: number;
   lastSeen: string | null;
   votes: JourneyVote[];
+  /** Pickbot (accounts only): every question, newest first, plus the profile cards answered inside Pickbot. */
+  asks: JourneyAsk[];
+  pickbotCards: number;
 };
 
 /**
@@ -82,6 +100,31 @@ async function buildJourney(u: UserRow | null, deviceId: string | null): Promise
         WHERE e.name IN ('session_start', 'page_view') AND (e.user_id = ${uid} OR e.device_id IN ${devs})
           AND (e.created_at AT TIME ZONE 'America/New_York')::date > (COALESCE(${signed}::timestamptz, (SELECT min(e2.created_at) FROM analytics_event e2 WHERE e2.user_id = ${uid} OR e2.device_id IN ${devs})) AT TIME ZONE 'America/New_York')::date) AS return_days,
       (SELECT max(e.created_at)::text FROM analytics_event e WHERE e.user_id = ${uid} OR e.device_id IN ${devs}) AS last_seen`);
+  const asks = await db.execute<{
+    at: string;
+    theme: string | null;
+    scope: string | null;
+    answers: number;
+    tailored: number;
+    followups: number;
+    rating: "UP" | "DOWN" | null;
+    slug: string | null;
+    votes: number | null;
+    results: boolean;
+    cost: number;
+  }>(sql`
+    SELECT t.created_at::text AS at, t.classification->>'theme' AS theme, t.classification->>'scope' AS scope,
+      count(m.id) FILTER (WHERE m.kind = 'answer')::int AS answers,
+      count(m.id) FILTER (WHERE m.kind = 'answer' AND m.answer->>'kind' = 'tailored')::int AS tailored,
+      GREATEST(count(m.id) FILTER (WHERE m.kind = 'question') - 1, 0)::int AS followups,
+      (array_agg(m.rating ORDER BY m.created_at DESC) FILTER (WHERE m.rating IS NOT NULL))[1]::text AS rating,
+      b.slug, (b.votes_a + b.votes_b) AS votes, t.results_at IS NOT NULL AS results,
+      COALESCE(sum(m.cost_usd), 0)::float8 AS cost
+    FROM pickbot_thread t LEFT JOIN pickbot_message m ON m.thread_id = t.id LEFT JOIN battle b ON b.id = t.battle_id
+    WHERE t.user_id = ${uid}
+    GROUP BY t.id, b.slug, b.votes_a, b.votes_b ORDER BY t.created_at DESC LIMIT 100`);
+  const [cards] = await db.execute<{ n: number }>(sql`
+    SELECT count(*)::int AS n FROM profile_answer WHERE user_id = ${uid} AND via = 'pickbot' AND status = 'answered'`);
   const p = (touch?.props ?? null) as Record<string, unknown> | null;
   const first = (p?.first && typeof p.first === "object" ? p.first : p) as Record<string, unknown> | null;
   const source = classifySource(p);
@@ -103,6 +146,18 @@ async function buildJourney(u: UserRow | null, deviceId: string | null): Promise
     returnDays: facts.return_days,
     lastSeen: facts.last_seen,
     votes: [...votes],
+    asks: [...asks].map((a) => ({
+      at: a.at,
+      theme: a.theme ?? "?",
+      scope: a.scope ?? "?",
+      answers: Number(a.answers),
+      tailored: Number(a.tailored),
+      followUps: Number(a.followups),
+      rating: a.rating,
+      crowd: a.slug ? { slug: a.slug, votes: Number(a.votes ?? 0), resultsBack: a.results } : null,
+      costUsd: Number(a.cost),
+    })),
+    pickbotCards: Number(cards?.n ?? 0),
   } satisfies Journey;
 }
 

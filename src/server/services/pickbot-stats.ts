@@ -13,12 +13,12 @@ import { meansP } from "./gate-test-rules";
 const STEPS = [
   ["pickbot_asked", "Asked a question"],
   ["pickbot_gate_answered", "Answered a profile question"],
-  ["pickbot_gate_skipped", "Skipped the profile questions"],
-  ["pickbot_choice", "Chose general or tailored"],
   ["pickbot_answered", "Got an answer"],
   ["pickbot_rated", "Rated an answer"],
   ["pickbot_crowd_drafted", "Drafted a crowd battle"],
   ["pickbot_crowd_posted", "Posted to the crowd"],
+  ["pickbot_choice", "Said yes to a better (tailored) answer"],
+  ["pickbot_battles_stopped", "Said not now to a better answer"],
   ["pickbot_results_delivered", "Got crowd results back"],
   ["pickbot_outcome", "Said what they picked"],
 ] as const;
@@ -67,6 +67,57 @@ export async function pickbotStats(view: BrainView, days: number) {
     arms[k].votes += Number(p.votes);
     each[k].push(Number(p.votes));
   }
+  // Day by day (New York days), the same event scope.
+  const daily = await db.execute<{
+    day: string;
+    askers: number;
+    questions: number;
+    followups: number;
+    answers: number;
+    tailored: number;
+    up: number;
+    down: number;
+    crowd: number;
+    results: number;
+    cost: number;
+  }>(sql`
+    SELECT to_char((e.created_at AT TIME ZONE 'America/New_York')::date, 'YYYY-MM-DD') AS day,
+      count(DISTINCT ${WHO_E}) FILTER (WHERE e.name = 'pickbot_asked')::int AS askers,
+      count(*) FILTER (WHERE e.name = 'pickbot_asked' AND COALESCE(e.props->>'followUp', 'false') <> 'true')::int AS questions,
+      count(*) FILTER (WHERE e.name = 'pickbot_asked' AND e.props->>'followUp' = 'true')::int AS followups,
+      count(*) FILTER (WHERE e.name = 'pickbot_answered')::int AS answers,
+      count(*) FILTER (WHERE e.name = 'pickbot_answered' AND e.props->>'kind' = 'tailored')::int AS tailored,
+      count(*) FILTER (WHERE e.name = 'pickbot_rated' AND e.props->>'rating' = 'UP')::int AS up,
+      count(*) FILTER (WHERE e.name = 'pickbot_rated' AND e.props->>'rating' = 'DOWN')::int AS down,
+      count(*) FILTER (WHERE e.name = 'pickbot_crowd_posted')::int AS crowd,
+      count(*) FILTER (WHERE e.name = 'pickbot_results_delivered')::int AS results,
+      COALESCE(sum((e.props->>'costUsd')::float8) FILTER (WHERE e.name = 'pickbot_answered'), 0)::float8 AS cost
+    FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+    WHERE e.name LIKE 'pickbot_%' AND e.created_at > ${since} AND ${ev}
+    GROUP BY 1 ORDER BY 1 DESC`);
+  // What people ask about (the classifier's theme and scope; never the text).
+  const themes = await db.execute<{ theme: string; scope: string; questions: number; people: number }>(sql`
+    SELECT COALESCE(e.props->>'theme', '?') AS theme, COALESCE(e.props->>'scope', '?') AS scope,
+      count(*)::int AS questions, count(DISTINCT ${WHO_E})::int AS people
+    FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+    WHERE e.name = 'pickbot_asked' AND COALESCE(e.props->>'followUp', 'false') <> 'true' AND e.created_at > ${since} AND ${ev}
+    GROUP BY 1, 2 ORDER BY 3 DESC LIMIT 30`);
+  // Coming back: of the people who asked in the window, how many have asked on 2+ different days (ever).
+  const [repeat] = await db.execute<{ askers: number; repeat: number; questions: number; answeredPeople: number }>(sql`
+    WITH a AS (
+      SELECT DISTINCT ${WHO_E} AS who FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+      WHERE e.name = 'pickbot_asked' AND e.created_at > ${since} AND ${ev}
+    ),
+    days AS (
+      SELECT e.user_id AS who, count(DISTINCT (e.created_at AT TIME ZONE 'America/New_York')::date)::int AS n
+      FROM analytics_event e WHERE e.name = 'pickbot_asked' AND e.user_id IN (SELECT who FROM a) GROUP BY 1
+    )
+    SELECT (SELECT count(*)::int FROM a) AS askers,
+      (SELECT count(*)::int FROM days WHERE n >= 2) AS repeat,
+      (SELECT count(*)::int FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+        WHERE e.name = 'pickbot_asked' AND COALESCE(e.props->>'followUp', 'false') <> 'true' AND e.created_at > ${since} AND ${ev}) AS questions,
+      (SELECT count(DISTINCT ${WHO_E})::int FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+        WHERE e.name = 'pickbot_answered' AND e.created_at > ${since} AND ${ev}) AS "answeredPeople"`);
   const totalAnswers = [...answers].reduce((t, r) => t + Number(r.n), 0);
   const totalCost = [...answers].reduce((t, r) => t + Number(r.cost), 0);
   return {
@@ -81,6 +132,26 @@ export async function pickbotStats(view: BrainView, days: number) {
     holdoutP: meansP(each.holdout, each.pickbot),
     holdoutPct: e.pickbotHoldoutPct,
     open: !!e.pickbotOpen,
+    daily: [...daily].map((r) => ({
+      day: r.day,
+      askers: Number(r.askers),
+      questions: Number(r.questions),
+      followups: Number(r.followups),
+      answers: Number(r.answers),
+      tailored: Number(r.tailored),
+      up: Number(r.up),
+      down: Number(r.down),
+      crowd: Number(r.crowd),
+      results: Number(r.results),
+      cost: Number(r.cost),
+    })),
+    themes: [...themes].map((r) => ({ theme: r.theme, scope: r.scope, questions: Number(r.questions), people: Number(r.people) })),
+    usage: {
+      askers: Number(repeat?.askers ?? 0),
+      repeat: Number(repeat?.repeat ?? 0),
+      questions: Number(repeat?.questions ?? 0),
+      answeredPeople: Number(repeat?.answeredPeople ?? 0),
+    },
     model: e.pickbotModelOpus ? "Opus 5.5" : "Sonnet 5.5",
   };
 }
