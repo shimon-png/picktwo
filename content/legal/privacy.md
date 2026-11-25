@@ -29,6 +29,10 @@ We also use Vercel Web Analytics, our hosting provider's privacy-friendly visit 
 - Photos go through the same safety checks as battle photos before the AI sees them.
 - If you choose to ask the crowd, Pickbot drafts an anonymous battle and you check every word before anything is posted. It's posted as "Asked via Pickbot", never under your name, and other people can't see it came from you.
 
+## Payments and notifications
+- If you get Pickbot Plus, Stripe handles the payment. We keep only a Stripe customer reference and when your Plus ends; we never see your card number.
+- If you turn on notifications, your browser gives us a push address so we can tell you when results are in. Turn them off any time in your browser or phone settings.
+
 ## How we use it
 - To run crowdpick.ai: show battles to relevant voters, calculate results, priority points and reputation.
 - To send you notifications you've enabled.

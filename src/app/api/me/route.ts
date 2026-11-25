@@ -3,13 +3,16 @@ import { del } from "@vercel/blob";
 import { handler } from "@/server/api";
 import { requireUser } from "@/server/viewer";
 import { db } from "@/server/db";
-import { users, votes, battles, options, notifications, accounts, sessions, follows, devices, consentEvents, conversations, pickbotThreads } from "@/server/db/schema";
+import { users, votes, battles, options, notifications, accounts, sessions, follows, devices, consentEvents, conversations, pickbotThreads, pushSubscriptions } from "@/server/db/schema";
+import { cancelPlus } from "@/server/services/plus";
 import { signOut } from "@/server/auth";
 import { POLICY_VERSION } from "@/lib/constants";
 
 /** Delete account (PRD 13.4): anonymise the user, keep votes as anonymous aggregates, soft-delete battles. */
 export const DELETE = handler(async () => {
   const user = await requireUser();
+  // Stop a Plus subscription first, so a deleted account is never billed again.
+  await cancelPlus(user);
   const myBattles = await db.select({ id: battles.id }).from(battles).where(eq(battles.authorId, user.id));
   const ids = myBattles.map((b) => b.id);
   const blobUrls = ids.length
@@ -28,8 +31,9 @@ export const DELETE = handler(async () => {
     await tx.delete(follows).where(eq(follows.followingId, user.id));
     // Direct messages go with the account (cascades to direct_message).
     await tx.delete(conversations).where(or(eq(conversations.userA, user.id), eq(conversations.userB, user.id)));
-    // Pickbot questions go with the account (anonymous crowd battles stay).
+    // Pickbot questions and push addresses go with the account (anonymous crowd battles stay).
     await tx.delete(pickbotThreads).where(eq(pickbotThreads.userId, user.id));
+    await tx.delete(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id));
     await tx.update(devices).set({ userId: null }).where(eq(devices.userId, user.id));
     await tx.insert(consentEvents).values({ userId: user.id, type: "account_deleted", value: true, version: POLICY_VERSION });
     await tx

@@ -536,6 +536,20 @@ export const pickbotMessages = pgTable(
   (t) => [index("pickbot_message_thread").on(t.threadId, t.createdAt)],
 );
 
+/** Web push (PRD phase 4): one row per browser that allowed notifications. Removed when the push service says it's gone. */
+export const pushSubscriptions = pgTable(
+  "push_subscription",
+  {
+    id: id(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: now("created_at"),
+  },
+  (t) => [uniqueIndex("push_subscription_endpoint").on(t.endpoint), index("push_subscription_user").on(t.userId)],
+);
+
 // Every lifecycle email we decide about: one row per (user, kind, ref), so nothing sends twice.
 // status: QUEUED (waiting for sendAfter, e.g. quiet hours or a batch), SENT, SKIPPED (prefs/caps/budget), FAILED.
 export const emailLog = pgTable(

@@ -4,6 +4,7 @@ import { tasteProfileFor } from "@/server/services/taste-profile";
 import { TasteSection } from "@/components/taste/TasteSection";
 import { ProfileBar } from "@/components/taste/ProfileBar";
 import { PickbotHistory } from "@/components/pickbot/History";
+import { InstallPrompt } from "@/components/app/InstallPrompt";
 import { answersLeftFor, listThreads, pickbotAccess } from "@/server/services/pickbot";
 import { profileProgressFor } from "@/server/services/profile-progress";
 import { redirect } from "next/navigation";
@@ -161,6 +162,7 @@ export default async function YouPage() {
       </section>
 
       {progress && !progress.complete && <ProfileBar p={progress} place="you" />}
+      <InstallPrompt place="you" />
       {pickbot && (
         <section className="space-y-2">
           <div className="flex items-baseline justify-between">

@@ -86,7 +86,7 @@ export const voteInput = z.object({
 });
 
 /** Event names the browser may log through POST /api/events. Keep docs/brain/data-dictionary.md in sync. */
-export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "device_hints", "about_card_shown", "taste_shared", "engaged", "home_click", "profile_bar_tap"] as const;
+export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "device_hints", "about_card_shown", "taste_shared", "engaged", "home_click", "profile_bar_tap", "app_installed", "install_prompt_shown", "install_prompt_tap"] as const;
 export type ClientEventName = (typeof CLIENT_EVENTS)[number];
 const safeId = z.string().regex(/^[A-Za-z0-9_-]{6,40}$/);
 export const clientEventsInput = z.object({

@@ -23,6 +23,7 @@ import { notify } from "./notifications";
 import { deliver } from "./mailer";
 import { zipPlace } from "./zip";
 import { similarBattles } from "./pickbot-crowd";
+import { sendPush } from "./push";
 import { classifyQuestion, draftCrowdBattle, pickbotConfigured, streamAnswer, type CrowdDraft, type ProfileForAi, type Turn } from "./pickbot-ai";
 import {
   answerModel,
@@ -548,6 +549,7 @@ export async function deliverPickbotResults(now = new Date()) {
       votesB: summary.votesB,
       agreed: summary.agreed,
     });
+    await sendPush(owner.id, { title: "The crowd answered", body: summary.line, url: `/ask/${t.id}`, tag: `pickbot:${t.id}` });
     track("pickbot_results_delivered", { threadId: t.id, battleId: b.id, votes: summary.total, agreed: summary.agreed, closed }, { userId: owner.id });
     n++;
   }

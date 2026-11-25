@@ -9,6 +9,7 @@ import { profileProgressFor } from "@/server/services/profile-progress";
 import { ProfileBar } from "@/components/taste/ProfileBar";
 import { AskComposer } from "@/components/pickbot/AskComposer";
 import { PickbotHistory } from "@/components/pickbot/History";
+import { InstallPrompt } from "@/components/app/InstallPrompt";
 
 export const metadata = { title: "Ask Pickbot" };
 export const dynamic = "force-dynamic";
@@ -51,10 +52,22 @@ export default async function AskPage() {
         <Lock className="size-3.5" /> Your questions stay private unless you choose to ask the crowd.
         {left != null && !isPlus(user) && (
           <span className="ml-auto">
-            {left} of {e.pickbotFreePerDay} free answers left today
+            {left} of {e.pickbotFreePerDay} free answers left today ·{" "}
+            <Link href="/plus" className="text-accent">
+              Plus
+            </Link>
           </span>
         )}
       </p>
+      {left === 0 && (
+        <div className="card flex items-center justify-between gap-3 px-4 py-3 text-[14px]">
+          <span>You’ve used today’s free answers.</span>
+          <Link href="/plus" className="btn-primary !py-1.5 text-[14px]">
+            Get Plus
+          </Link>
+        </div>
+      )}
+      <InstallPrompt place="ask" />
       <PickbotHistory rows={threads} />
     </div>
   );
