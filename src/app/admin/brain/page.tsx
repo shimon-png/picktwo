@@ -630,6 +630,32 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           head={["What people ask about", "Kind", "Questions", "People"]}
           rows={pk.themes.map((t) => [t.theme.replaceAll("_", " "), t.scope.replace("_", "-"), t.questions, t.people])}
         />
+        <p className="pt-2 text-sm font-medium">“Ask Pickbot” card in the Vote deck: which position works best</p>
+        <p className="text-xs text-zinc-500">
+          {pk.promoOn ? "On" : "Off (Config pickbotPromo = 0)"}. Each signed-in person who hasn’t asked Pickbot yet sees it once, after a stable random number of
+          picks in one deck visit (never the first 3). Active = used the deck in the window; reached = got that far in one visit. The fairest
+          comparison is <b>asked per active person</b>: it counts people who never got far enough too.
+        </p>
+        <Rows
+          head={["After pick", "Active", "Reached", "Saw it", "Tapped", "Asked (7 days)", "Tap rate", "Asked / saw", "Asked / active"]}
+          rows={pk.promo.map((r) => {
+            const best = Math.max(...pk.promo.map((x) => (x.active >= 20 ? x.asked / x.active : 0)));
+            const rate = r.active ? r.asked / r.active : 0;
+            return [
+              r.at,
+              r.active,
+              r.reached,
+              r.saw,
+              r.tapped,
+              r.asked,
+              pct(r.tapped, r.saw),
+              pct(r.asked, r.saw),
+              <span key="b" className={r.active >= 20 && rate === best && best > 0 ? "font-semibold text-green" : undefined}>
+                {pct(r.asked, r.active)}
+              </span>,
+            ];
+          })}
+        />
         <Rows head={["Step", "People", "Times"]} rows={pk.funnel.map((f) => [f.label, f.people, f.events])} />
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {(

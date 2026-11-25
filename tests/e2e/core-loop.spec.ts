@@ -2,6 +2,7 @@ import { test, expect, type Page, type Browser } from "@playwright/test";
 import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules";
 import { ECONOMY_DEFAULTS } from "../../src/lib/constants";
 import { inHoldout } from "../../src/server/services/ranking";
+import { promoPosition } from "../../src/lib/pickbot-promo";
 
 /** Free votes before the sign-up gate, and group B's dialog repeat (default config). */
 const FREE = ECONOMY_DEFAULTS.guestVoteLimit;
@@ -583,4 +584,66 @@ test("Pickbot: every profile card first → answer → ask the crowd → better 
   await expect(page.getByTestId("pickbot-answer")).toHaveCount(3);
   await page.goto("/ask");
   await expect(page.getByRole("heading", { name: "Your questions" })).toBeVisible();
+});
+
+test("Ask Pickbot deck card: shows once, at the account's tested position (never the first 3)", async ({ browser }) => {
+  test.setTimeout(240_000);
+  // Find an account with Pickbot access and an early position, so the test doesn't vote 20 times.
+  let page: Page | null = null;
+  let at = 0;
+  for (let i = 0; i < 8 && !page; i++) {
+    const p = await newUser(browser, `promo${i}`);
+    const me = await (await p.request.get("/api/me/export")).json();
+    const pos = promoPosition(me.profile.id);
+    await p.goto("/ask");
+    if (pos <= 6 && (await p.getByLabel("Ask Pickbot").isVisible())) {
+      page = p;
+      at = pos;
+    }
+  }
+  test.skip(!page, "no account with an early position");
+  const p = page!;
+  expect(at).toBeGreaterThan(3);
+  await p.goto("/vote");
+  const promo = p.getByTestId("pickbot-promo");
+  let picks = 0;
+  for (let guard = 0; guard < 40 && !(await promo.isVisible()); guard++) {
+    const about = p.getByRole("article", { name: /^About you/ });
+    if (await about.isVisible()) {
+      await about.getByRole("button", { name: "Skip" }).click();
+      continue;
+    }
+    const taste = p.getByRole("button", { name: /Keep voting|Back to voting|Continue/ }).first();
+    if (await p.getByRole("dialog").isVisible().catch(() => false)) {
+      await taste.click().catch(() => {});
+      continue;
+    }
+    const btn = p.getByRole("button", { name: /^Vote for/ }).first();
+    if (!(await btn.isVisible())) {
+      await p.waitForTimeout(400);
+      continue;
+    }
+    await btn.click();
+    picks++;
+    await p.waitForTimeout(2300);
+    if (picks < at) await expect(promo).toHaveCount(0);
+  }
+  await expect(promo.getByText("Ask Pickbot your question and get answers from our AI")).toBeVisible();
+  expect(picks).toBeGreaterThanOrEqual(at);
+  await snap(p, "pickbot-promo");
+  await promo.getByRole("button", { name: "Keep voting" }).click();
+  await expect(promo).toHaveCount(0);
+  // Once per person: let the events flush, then a new visit never shows it again.
+  await p.waitForTimeout(5000);
+  await p.evaluate(() => sessionStorage.clear());
+  await p.goto("/vote");
+  for (let i = 0; i < at + 1; i++) {
+    const btn = p.getByRole("button", { name: /^Vote for/ }).first();
+    if (!(await btn.isVisible().catch(() => false))) break;
+    await btn.click();
+    await p.waitForTimeout(2300);
+    const about = p.getByRole("article", { name: /^About you/ });
+    if (await about.isVisible()) await about.getByRole("button", { name: "Skip" }).click();
+  }
+  await expect(promo).toHaveCount(0);
 });

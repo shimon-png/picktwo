@@ -38,6 +38,7 @@ import {
   type ThreadState,
 } from "@/lib/pickbot";
 import { profileProgress } from "@/lib/profile-progress";
+import { promoPosition } from "@/lib/pickbot-promo";
 import { ABOUT_QUESTIONS, type AboutQuestionId } from "@/lib/about";
 import { likeYouLabel } from "@/lib/like-you";
 import { AGE_RANGE_IDS } from "@/lib/constants";
@@ -57,6 +58,26 @@ export async function pickbotAccess(user: User | null): Promise<Access> {
   if (!e.pickbotOpen) return { ok: false, reason: "closed" };
   if (inHoldout(`pickbot:${user.id}`, e.pickbotHoldoutPct)) return { ok: false, reason: "holdout" };
   return { ok: true };
+}
+
+/**
+ * The "Ask Pickbot" deck card for this person: their tested position, or null when it shouldn't show (signed out,
+ * no Pickbot access, turned off, already shown once, or they've already asked Pickbot).
+ */
+export async function pickbotPromoFor(user: User | null): Promise<{ at: number } | null> {
+  if (!user) return null;
+  try {
+    const e = await getEconomy();
+    if (!e.pickbotPromo || !(await pickbotAccess(user)).ok) return null;
+    const [r] = await db.execute<{ seen: boolean; asked: boolean }>(sql`
+      SELECT EXISTS (SELECT 1 FROM analytics_event WHERE name = 'pickbot_promo_shown' AND user_id = ${user.id}) AS seen,
+        EXISTS (SELECT 1 FROM pickbot_thread WHERE user_id = ${user.id}) AS asked`);
+    if (r?.seen || r?.asked) return null;
+    return { at: promoPosition(user.id) };
+  } catch (err) {
+    console.error("[pickbot promo]", err);
+    return null;
+  }
 }
 
 /** Whether to show the Ask tab: same rule as access, but quiet for the signed-out (they see it and get sign-up). */

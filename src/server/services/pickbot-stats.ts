@@ -9,6 +9,7 @@ import { brainScope, WHO_E, WHO_V, type BrainView } from "./brain";
 import { getEconomy } from "./config";
 import { inHoldout } from "./ranking";
 import { meansP } from "./gate-test-rules";
+import { PROMO_POSITIONS, promoPosition } from "@/lib/pickbot-promo";
 
 const STEPS = [
   ["pickbot_asked", "Asked a question"],
@@ -118,6 +119,35 @@ export async function pickbotStats(view: BrainView, days: number) {
         WHERE e.name = 'pickbot_asked' AND COALESCE(e.props->>'followUp', 'false') <> 'true' AND e.created_at > ${since} AND ${ev}) AS questions,
       (SELECT count(DISTINCT ${WHO_E})::int FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
         WHERE e.name = 'pickbot_answered' AND e.created_at > ${since} AND ${ev}) AS "answeredPeople"`);
+  // "Ask Pickbot" deck card, by tested position: signed-in people who used the deck in the window (minus those who
+  // had asked Pickbot before it), how far they got in one deck visit, and what the card did.
+  const promoPeople = await db.execute<{ who: string; reach: number; saw: boolean; tapped: boolean; dismissed: boolean; asked: boolean }>(sql`
+    WITH deck AS (
+      SELECT e.user_id AS who, max(COALESCE((e.props->>'pos')::int, 0)) AS reach
+      FROM analytics_event e LEFT JOIN device d ON d.id = e.device_id
+      WHERE e.name = 'card_shown' AND e.user_id IS NOT NULL AND e.created_at > ${since} AND ${ev} GROUP BY 1
+    ),
+    shown AS (
+      SELECT user_id AS who, min(created_at) AS at FROM analytics_event WHERE name = 'pickbot_promo_shown' AND user_id IS NOT NULL GROUP BY 1
+    )
+    SELECT deck.who, deck.reach, shown.at IS NOT NULL AS saw,
+      EXISTS (SELECT 1 FROM analytics_event t WHERE t.name = 'pickbot_promo_tap' AND t.user_id = deck.who) AS tapped,
+      EXISTS (SELECT 1 FROM analytics_event t WHERE t.name = 'pickbot_promo_dismissed' AND t.user_id = deck.who) AS dismissed,
+      EXISTS (SELECT 1 FROM analytics_event a WHERE a.name = 'pickbot_asked' AND a.user_id = deck.who AND shown.at IS NOT NULL
+        AND a.created_at >= shown.at AND a.created_at < shown.at + interval '7 days') AS asked
+    FROM deck LEFT JOIN shown ON shown.who = deck.who
+    WHERE NOT EXISTS (SELECT 1 FROM analytics_event b WHERE b.name = 'pickbot_asked' AND b.user_id = deck.who
+      AND b.created_at < COALESCE(shown.at, ${since}::timestamptz))`);
+  const promo = PROMO_POSITIONS.map((at) => ({ at, active: 0, reached: 0, saw: 0, tapped: 0, dismissed: 0, asked: 0 }));
+  for (const p of promoPeople) {
+    const row = promo.find((r) => r.at === promoPosition(p.who))!;
+    row.active++;
+    if (Number(p.reach) >= row.at + 1) row.reached++;
+    if (p.saw) row.saw++;
+    if (p.tapped) row.tapped++;
+    if (p.dismissed) row.dismissed++;
+    if (p.asked) row.asked++;
+  }
   const totalAnswers = [...answers].reduce((t, r) => t + Number(r.n), 0);
   const totalCost = [...answers].reduce((t, r) => t + Number(r.cost), 0);
   return {
@@ -132,6 +162,8 @@ export async function pickbotStats(view: BrainView, days: number) {
     holdoutP: meansP(each.holdout, each.pickbot),
     holdoutPct: e.pickbotHoldoutPct,
     open: !!e.pickbotOpen,
+    promo,
+    promoOn: !!e.pickbotPromo,
     daily: [...daily].map((r) => ({
       day: r.day,
       askers: Number(r.askers),

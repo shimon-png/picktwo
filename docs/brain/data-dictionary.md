@@ -53,6 +53,7 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | `pickbot_crowd_drafted` / `pickbot_crowd_posted` | server, crowd draft made / posted | 2026-11-26 | `threadId`, `removed`; posted: `battleId`, `photos`, `targeted`, `hours`, `inReview` |
 | `pickbot_results_delivered` | server (hourly), crowd results sent back | 2026-11-26 | `threadId`, `battleId`, `votes`, `agreed`, `closed` |
 | `pickbot_outcome` / `pickbot_thread_deleted` | server, the asker said what they picked / deleted a thread | 2026-11-26 | `threadId`, `chosen` |
+| `pickbot_promo_shown` / `pickbot_promo_tap` / `pickbot_promo_dismissed` | browser, the one-time "Ask Pickbot" card in the Vote deck | 2026-11-26 | `at` (tested position: picks before it shows), `picks` (picks this visit when it showed) |
 | `push_subscribed` / `push_sent` | server, a browser allowed notifications / a push went out | 2026-11-26 | sent: `tag`, `devices` |
 | `signup_gate_shown` | browser, guest hits the free-vote limit. From 2026-11-24 logged by the gate itself on every surface (deck, home, battle page, discover), and each time group B's dialog opens | 2026-11-23 | `pos`, `battleId`; from 2026-11-24 also `place` (deck/home/battle/discover), `arm` (control/soft) |
 | `signup_gate_closed` | browser, guest closes the sign-up sheet/dialog | 2026-11-24 | `place`, `arm`, `pos` |

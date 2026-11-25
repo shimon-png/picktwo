@@ -9,6 +9,8 @@ import { AboutCard, type AboutCardPayload } from "./AboutCard";
 import type { LikeYou } from "@/lib/like-you";
 import { TasteReveal, type TasteMilestone } from "@/components/taste/TasteReveal";
 import { ProfileBar } from "@/components/taste/ProfileBar";
+import { PickbotPromoCard } from "./PickbotPromoCard";
+import { promoDue } from "@/lib/pickbot-promo";
 import { withAnswer, withVote, type ProfileProgress } from "@/lib/profile-progress";
 import { cn, pct, timeLeft, titleSizeClass } from "@/lib/utils";
 import { AVATAR_TONES, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
@@ -55,6 +57,7 @@ export function SwipeDeck({
   softGate: initialSoft = false,
   likeYouMs = RESULT_MS,
   progress: initialProgress = null,
+  pickbotPromo = null,
 }: {
   initial: BattleCard[];
   signedIn: boolean;
@@ -69,6 +72,8 @@ export function SwipeDeck({
   likeYouMs?: number;
   /** Profile bar (Pickbot Phase 0); null = holdout or unknown viewer, no bar. */
   progress?: ProfileProgress | null;
+  /** One-time "Ask Pickbot" card: after `at` picks this visit (lib/pickbot-promo.ts); null = not for this person. */
+  pickbotPromo?: { at: number } | null;
 }) {
   const [queue, setQueue] = useState(initial);
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
@@ -103,6 +108,8 @@ export function SwipeDeck({
   }, [progress?.complete]);
   const showBar = !!progress && (!progress.complete || celebrate);
   const [session, setSession] = useState({ votes: 0, points: 0 });
+  const [promo, setPromo] = useState<{ at: number; picks: number } | null>(null);
+  const promoShown = useRef(false);
   // "You're on a roll" card: picks this tab session (survives switching tabs), and the milestone on screen.
   const rollCount = useRef(0);
   const [roll, setRoll] = useState<number | null>(null);
@@ -304,7 +311,7 @@ export function SwipeDeck({
   // Every pick (tap, swipe-away, ← / →): the pick fills the card, its scores show for
   // RESULT_MS, then the next battle.
   async function pick(side: Side, method: PickMethod, dir: -1 | 1 = side === "A" ? -1 : 1) {
-    if (!card || voted || fly || roll || about || taste) return;
+    if (!card || voted || fly || roll || about || taste || promo) return;
     const started = Date.now();
     likeYouShown.current = false;
     const ok = await vote(side, method);
@@ -319,6 +326,7 @@ export function SwipeDeck({
     setTimeout(() => buzz(10), 120);
     setTimeout(() => {
       advance(dir);
+      const special = !!pendingAbout.current || !!pendingTaste.current;
       if (pendingAbout.current) {
         const a = pendingAbout.current;
         pendingAbout.current = null;
@@ -333,6 +341,12 @@ export function SwipeDeck({
         setRoll(n);
         buzz(30);
       }
+      // The Ask Pickbot card waits for a pick with no other special card (about-you, taste, roll) coming up.
+      const busy = special || isRollMilestone(n);
+      if (pickbotPromo && promoDue({ picks: n, at: pickbotPromo.at, shown: promoShown.current, busy })) {
+        promoShown.current = true;
+        setTimeout(() => setPromo({ at: pickbotPromo.at, picks: n }), FLY_MS);
+      }
     }, Math.max(0, (likeYouShown.current ? likeYouMs : RESULT_MS) - (Date.now() - started)));
   }
 
@@ -346,7 +360,7 @@ export function SwipeDeck({
   }
 
   function skip() {
-    if (!card || voted || fly || thrown || roll || about) return;
+    if (!card || voted || fly || thrown || roll || about || promo) return;
     markDone(card.id);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
     advance(-1);
@@ -489,6 +503,7 @@ export function SwipeDeck({
           />
         )}
         {taste && <TasteReveal t={taste} onDone={() => setTaste(null)} />}
+        {promo && !about && !taste && <PickbotPromoCard at={promo.at} picks={promo.picks} onDone={() => setPromo(null)} />}
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}
