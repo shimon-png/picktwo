@@ -18,6 +18,9 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
 
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "—");
+/** "14 days", "1.5 days", "40 min", "6 h" for how much time a Before / After side covers. */
+const spanLabel = (days: number) =>
+  days >= 1 ? `${Math.round(days * 10) / 10} day${Math.round(days * 10) / 10 === 1 ? "" : "s"}` : days * 24 >= 1 ? `${Math.round(days * 24)} h` : `${Math.round(days * 1440)} min`;
 const pctN = (x: number) => `${(100 * x).toFixed(1)}%`;
 const gateRow = (day: React.ReactNode, group: string, c: GateCell): React.ReactNode[] => [
   day,
@@ -234,11 +237,11 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
       </Section>
 
       <Section
-        title={`Before vs after the change · ${ba.changeDay}`}
-        note={`The about-you launch (cards in the deck, "people like you", one-tap sign-up, taste profile) went live on ${ba.changeDay}. Same counting as Day by day (${view === "clean" ? "Clean" : "All data"} view). Averages are per day; the launch day itself counts as neither side. To compare around a different change, set beforeAfterFrom (YYYYMMDD) in Config.`}
+        title={`Before vs after the change · ${ba.changeDay}${ba.changeTime ? ` ${ba.changeTime}` : ""}`}
+        note={`The about-you launch (cards in the deck, "people like you", one-tap sign-up, taste profile) went live on ${ba.changeDay}${ba.changeTime ? ` at ${ba.changeTime} New York time. That day is split in two rows: until ${ba.changeTime} counts as Before, from ${ba.changeTime} as After` : "; that day counts as neither side"}. Same counting as Day by day (${view === "clean" ? "Clean" : "All data"} view). Averages are per day; partial days (the split day's halves and today so far) count as that fraction of a day. While a side covers only a few hours its per-day numbers are scaled up from very little data, so they swing a lot; the ratios (votes per visitor, sign-up rate) settle sooner. To compare around a different change, set beforeAfterFrom in Config (YYYYMMDDHHmm New York time, or YYYYMMDD).`}
       >
         <Rows
-          head={["Per day", `Before (${ba.before.days} days)`, `After (${ba.after.days} day${ba.after.days === 1 ? "" : "s"})`, "Change"]}
+          head={["Per day", `Before (${spanLabel(ba.before.span)})`, `After (${spanLabel(ba.after.span)})`, "Change"]}
           rows={(
             [
               ["Visitors", ba.before.visitors, ba.after.visitors, (x: number) => x.toFixed(1)],
@@ -250,11 +253,11 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
               ["Sign-up rate (of visitors)", ba.before.signupRate, ba.after.signupRate, (x: number) => `${(100 * x).toFixed(1)}%`],
             ] as const
           ).map(([label, b, a, fmt]) => {
-            const c = ba.after.days && ba.before.days ? change(b, a) : null;
+            const c = ba.after.span > 0 && ba.before.span > 0 ? change(b, a) : null;
             return [
               label,
-              ba.before.days ? fmt(b) : "—",
-              ba.after.days ? fmt(a) : "—",
+              ba.before.span > 0 ? fmt(b) : "—",
+              ba.after.span > 0 ? fmt(a) : "—",
               c == null ? "—" : <span key="c" className={c > 0 ? "text-green" : c < 0 ? "text-b" : ""}>{`${c > 0 ? "+" : c < 0 ? "−" : ""}${Math.abs(Math.round(c * 100))}%`}</span>,
             ];
           })}
@@ -262,7 +265,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         <Rows
           head={["Day", "Period", "Visitors", "Votes", "Voters", "Votes per visitor", "Votes per voter", "Sign-ups", "Sign-up rate"]}
           rows={ba.rows.map((d) => [
-            d.day,
+            d.label,
             d.period === "launch" ? <b key="p">Launch day</b> : d.period === "after" ? <span key="p" className="text-green">After</span> : "Before",
             d.visitors,
             d.votes,
@@ -273,7 +276,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
             pct(d.signups, d.visitors),
           ])}
         />
-        {ba.after.days === 0 && <p className="text-xs text-zinc-500">No full day after the change yet: the After column fills in from tomorrow (New York time).</p>}
+        {ba.after.span === 0 && <p className="text-xs text-zinc-500">Nothing after the change yet.</p>}
       </Section>
 
       <Section

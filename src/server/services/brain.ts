@@ -3,7 +3,7 @@ import { db } from "../db";
 import { users } from "../db/schema";
 import { or, eq, isNotNull } from "drizzle-orm";
 import { isAdmin } from "../viewer";
-import { beforeAfter, isoDay } from "./before-after-rules";
+import { parseChange, periodOf, summarize, type BaRow } from "./before-after-rules";
 import { getEconomy } from "./config";
 import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 
@@ -232,8 +232,10 @@ type Scope = Awaited<ReturnType<typeof brainScope>>;
 export type DayRow = { day: string; visitors: number; visits: number; signups: number; votes: number; voters: number; posts: number };
 
 /** Day by day (New York days, newest first): visitors, visits, sign-ups, votes, people who voted, battles posted. */
-export async function dailyNumbers(scope: Scope): Promise<DayRow[]> {
+/** `until` (ISO) cuts every count off at that moment, e.g. to split a day in two (Before vs after). */
+export async function dailyNumbers(scope: Scope, until?: string): Promise<DayRow[]> {
   const { since, ev, vt, bt, us } = scope;
+  const upTo = (col: SQL) => (until ? sql`AND ${col} < ${until}` : sql``);
   const day = (col: SQL) => sql`to_char((${col} AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD')`;
   const rows = await db.execute<DayRow>(sql`
     WITH days AS (
@@ -242,19 +244,19 @@ export async function dailyNumbers(scope: Scope): Promise<DayRow[]> {
     ),
     s AS (
       SELECT ${day(sql`e.created_at`)} AS day, count(*)::int AS visits, count(DISTINCT ${WHO_E})::int AS visitors
-      FROM ${EV_FROM} WHERE e.name = 'session_start' AND e.created_at > ${since} AND ${ev} GROUP BY 1
+      FROM ${EV_FROM} WHERE e.name = 'session_start' AND e.created_at > ${since} ${upTo(sql`e.created_at`)} AND ${ev} GROUP BY 1
     ),
     g AS (
       SELECT ${day(sql`u.onboarded_at`)} AS day, count(*)::int AS signups
-      FROM "user" u WHERE u.onboarded_at > ${since} AND ${us} GROUP BY 1
+      FROM "user" u WHERE u.onboarded_at > ${since} ${upTo(sql`u.onboarded_at`)} AND ${us} GROUP BY 1
     ),
     v AS (
       SELECT ${day(sql`v.created_at`)} AS day, count(*)::int AS votes, count(DISTINCT ${WHO_V})::int AS voters
-      FROM ${V_FROM} WHERE v.created_at > ${since} AND NOT v.flagged AND ${vt} GROUP BY 1
+      FROM ${V_FROM} WHERE v.created_at > ${since} ${upTo(sql`v.created_at`)} AND NOT v.flagged AND ${vt} GROUP BY 1
     ),
     p AS (
       SELECT ${day(sql`b.created_at`)} AS day, count(*)::int AS posts
-      FROM battle b WHERE b.created_at > ${since} AND ${bt} GROUP BY 1
+      FROM battle b WHERE b.created_at > ${since} ${upTo(sql`b.created_at`)} AND ${bt} GROUP BY 1
     )
     SELECT days.day, COALESCE(s.visitors, 0) AS visitors, COALESCE(s.visits, 0) AS visits, COALESCE(g.signups, 0) AS signups,
       COALESCE(v.votes, 0) AS votes, COALESCE(v.voters, 0) AS voters, COALESCE(p.posts, 0) AS posts
@@ -306,14 +308,45 @@ async function visitsBySource(scope: Scope): Promise<VisitSourceRow[]> {
 }
 
 /**
- * Before vs after a product change (economy `beforeAfterFrom`, a New York day as YYYYMMDD; default the about-you
- * launch, Nov 25 2026): the same day-by-day numbers for up to 14 days before and every day since, with per-day
- * averages for each side (before-after-rules.ts, tested).
+ * Before vs after a product change (economy `beforeAfterFrom`, New York time as YYYYMMDDHHmm, or a whole day as
+ * YYYYMMDD; default the about-you go-live, Nov 25 2026 11:23): the same day-by-day numbers for up to 14 days
+ * before and every day since. With a time, the change day is split into an "until" and a "from" row on either
+ * side; partial days (those halves and today so far) count as fractions of a day in the averages
+ * (before-after-rules.ts, tested).
  */
 export async function beforeAfterStats(view: BrainView) {
   const e = await getEconomy();
-  const changeDay = isoDay(e.beforeAfterFrom);
+  const { day: changeDay, time } = parseChange(e.beforeAfterFrom);
   const days = Math.max(1, Math.ceil((Date.now() - Date.parse(`${changeDay}T00:00:00Z`)) / 86400_000) + 15);
-  const daily = await dailyNumbers(await brainScope(view, days));
-  return beforeAfter(daily, changeDay);
+  const scope = await brainScope(view, days);
+  // Epoch milliseconds from Postgres (New York day starts and the go-live minute), so JS never parses its text.
+  const ms = (x: SQL) => sql`(extract(epoch from ${x}) * 1000)::float8`;
+  const [t] = await db.execute<{ day_start: number; split: number | null; today: string; today_start: number }>(sql`
+    SELECT ${ms(sql`to_date(${changeDay}, 'YYYY-MM-DD')::timestamp AT TIME ZONE ${TZ}`)} AS day_start,
+      ${time ? ms(sql`(${changeDay} || ' ' || ${time})::timestamp AT TIME ZONE ${TZ}`) : sql`NULL`} AS split,
+      to_char((now() AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD') AS today,
+      ${ms(sql`(now() AT TIME ZONE ${TZ})::date::timestamp AT TIME ZONE ${TZ}`)} AS today_start`);
+  const DAY = 86400_000;
+  const now = Date.now();
+  const todayWeight = Math.min(1, Math.max(0.01, (now - Number(t.today_start)) / DAY));
+  const daily = await dailyNumbers(scope);
+  const rows: BaRow[] = daily
+    .filter((d) => !time || d.day !== changeDay)
+    .map((d) => ({ ...d, label: d.day, period: periodOf(d.day, changeDay), weight: d.day === t.today ? todayWeight : 1 }));
+  if (time && t.split != null) {
+    const dayStart = Number(t.day_start);
+    const split = Number(t.split);
+    const splitIso = new Date(split).toISOString();
+    const startIso = new Date(Math.max(dayStart, Date.parse(scope.since))).toISOString();
+    const [beforeHalf, afterHalf] = await Promise.all([
+      dailyNumbers({ ...scope, since: startIso }, splitIso),
+      split < now ? dailyNumbers({ ...scope, since: splitIso }) : Promise.resolve([] as DayRow[]),
+    ]);
+    const pick = (list: DayRow[]) => list.find((d) => d.day === changeDay);
+    const b = pick(beforeHalf);
+    const a = pick(afterHalf);
+    if (b) rows.push({ ...b, label: `${changeDay} until ${time}`, period: "before", weight: Math.max(0.01, (split - dayStart) / DAY) });
+    if (a) rows.push({ ...a, label: `${changeDay} from ${time}`, period: "after", weight: Math.max(0.01, (Math.min(now, dayStart + DAY) - split) / DAY) });
+  }
+  return { changeDay, changeTime: time, ...summarize(rows) };
 }
