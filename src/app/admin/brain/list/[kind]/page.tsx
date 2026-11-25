@@ -11,7 +11,9 @@ const nyTime = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const PLACES: Record<string, string> = { feed: "Vote deck", home: "Homepage card", discover: "Discover", search: "Search", profile: "Profile", seed: "Seed (fake)" };
 
-function Person({ who, handle }: { who: string; handle: string | null }) {
+function Person({ who, handle }: { who: string | null; handle: string | null }) {
+  // A vote or visit can outlive its owner (deleted account): nothing to open.
+  if (!who) return <span className="text-zinc-500">Deleted account</span>;
   return (
     <Link href={`/admin/journey/person/${encodeURIComponent(who)}`} className="underline-offset-2 hover:underline">
       {handle ? `@${handle}` : `Guest ·${who.slice(-5)}`}
