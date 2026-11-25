@@ -144,6 +144,18 @@ export const ECONOMY_DEFAULTS = {
    * into a Before and an After row) or YYYYMMDD (that day counts as neither side). Default: the about-you go-live.
    */
   beforeAfterFrom: 202611251123,
+  /**
+   * Brain "Unit economics" assumptions (unit-economics-rules.ts), in US dollars. Ad CPM = $ per 1,000 ad views,
+   * one ad every ueVotesPerAd votes; sponsored battles = ueSponsoredSharePct % of cards at ueSponsoredCpm $ per
+   * 1,000 votes; ueSignupValue = $ a signed-up user brings in a year; ueLifetimeVisits 0 = use the measured visits
+   * per visitor.
+   */
+  ueAdCpm: 4,
+  ueVotesPerAd: 5,
+  ueSponsoredSharePct: 10,
+  ueSponsoredCpm: 20,
+  ueSignupValue: 1.5,
+  ueLifetimeVisits: 0,
   /** Taste profile (lib/taste-profile.ts): first two traits show at this many votes, all six (and the type name) at the second. */
   tasteFirstAt: 10,
   tasteFullAt: 30,

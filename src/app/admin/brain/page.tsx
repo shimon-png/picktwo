@@ -2,6 +2,8 @@ import { skipStats } from "@/server/services/skip-stats";
 import Link from "next/link";
 import { beforeAfterStats, getBrainStats, pinnedNumbers, type BrainView, type PinnedDay } from "@/server/services/brain";
 import { change } from "@/server/services/before-after-rules";
+import { unitEconomicsStats } from "@/server/services/unit-economics";
+import { money } from "@/server/services/unit-economics-rules";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
@@ -19,6 +21,51 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
 
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "—");
+
+type UeStats = Awaited<ReturnType<typeof unitEconomicsStats>>;
+
+/** Unit economics: how it's calculated, with the current Config assumptions spelled out. */
+function ueNote(ue: UeStats, view: BrainView) {
+  const a = ue.assumptions;
+  const lifetime =
+    a.ueLifetimeVisits > 0
+      ? `set to ${a.ueLifetimeVisits}`
+      : "= measured visits per visitor (ueLifetimeVisits 0); early on this undercounts people who will come back";
+  return [
+    "The most we can pay to acquire a visitor and break even = what a visitor brings in minus what serving them costs.",
+    `Measured from people who visited in this window (${view === "clean" ? "Clean" : "All data"} view): votes, visits and sign-ups, grouped by where they first came from.`,
+    `Prices are assumptions in Config: ads ${money(a.ueAdCpm)} per 1,000 views, one every ${a.ueVotesPerAd} votes (ueAdCpm, ueVotesPerAd);`,
+    `sponsored battles ${a.ueSponsoredSharePct}% of cards at ${money(a.ueSponsoredCpm)} per 1,000 votes (ueSponsoredSharePct, ueSponsoredCpm);`,
+    `a signed-up user is worth ${money(a.ueSignupValue)} a year (ueSignupValue); lifetime visits ${lifetime}.`,
+    "Serving cost = this month's usage above the fixed plan fees (/admin/finance) divided by this month's visitors; the fixed plans are a monthly bill the margin has to cover, shown below.",
+  ].join(" ");
+}
+
+function ueTiles(ue: UeStats): [string, string, string][] {
+  const o = ue.overall;
+  const a = ue.assumptions;
+  return [
+    ["Break-even per visitor", money(o.breakEven), "the most to pay per visitor"],
+    ["From ads", money(o.revenue.ads), `${o.lifetimeVotes.toFixed(1)} votes, 1 ad per ${a.ueVotesPerAd}`],
+    ["From sponsored battles", money(o.revenue.sponsored), `${a.ueSponsoredSharePct}% of votes`],
+    ["From sign-ups", money(o.revenue.signups), `${(100 * o.signupRate).toFixed(1)}% sign up × ${money(a.ueSignupValue)}`],
+    [
+      "Serving cost (usage)",
+      ue.cost.perVisitor == null ? "—" : money(-ue.cost.perVisitor),
+      ue.cost.usage == null ? "finance data unavailable" : `${money(ue.cost.usage)} usage ÷ ${ue.cost.visitors.toLocaleString()} visitors this month`,
+    ],
+  ];
+}
+
+/** Fixed plan fees vs the per-visitor margin: how many visitors a month cover them. */
+function ueFixedLine(ue: UeStats): string {
+  const fixed = ue.cost.fixedMonthly;
+  if (fixed == null) return "";
+  const be = ue.overall.breakEven;
+  return be > 0
+    ? `Fixed plans cost ${money(fixed)} a month; at ${money(be)} margin per visitor that takes about ${Math.ceil(fixed / be).toLocaleString()} visitors a month.`
+    : `Fixed plans cost ${money(fixed)} a month; with no margin per visitor yet, visitors don't cover them.`;
+}
 /** "14 days", "1.5 days", "40 min", "6 h" for how much time a Before / After side covers. */
 const spanLabel = (days: number) =>
   days >= 1 ? `${Math.round(days * 10) / 10} day${Math.round(days * 10) / 10 === 1 ? "" : "s"}` : days * 24 >= 1 ? `${Math.round(days * 24)} h` : `${Math.round(days * 1440)} min`;
@@ -156,7 +203,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, pins] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -167,6 +214,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     aboutStats(view, days),
     beforeAfterStats(view),
     skipStats(view, days),
+    unitEconomicsStats(view, days),
     pinnedNumbers(view),
   ]);
   const t = s.tiles;
@@ -285,6 +333,41 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
             ];
           })}
         />
+      </Section>
+
+      <Section title="Unit economics: what a visitor is worth" note={ueNote(ue, view)}>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          {ueTiles(ue).map(([label, value, sub], i) => (
+            <div key={label} className={`rounded-xl p-3 ${i === 0 ? (ue.overall.breakEven > 0 ? "bg-green-soft" : "bg-b-soft") : "bg-surface"}`}>
+              <div className="text-xs text-zinc-500">{label}</div>
+              <div className={`text-lg tabular-nums ${i === 0 ? (ue.overall.breakEven > 0 ? "text-green" : "text-b") : ""}`}>{value}</div>
+              <div className="text-[11px] text-zinc-500">{sub}</div>
+            </div>
+          ))}
+        </div>
+        <Rows
+          head={["First came from", "Visitors", "Votes per visitor", "Visits per visitor", "Sign-up rate", "Worth per visitor", "Break-even per visitor", "Per 1,000 visitors"]}
+          rows={[
+            { label: <b key="all">Everyone</b>, u: ue.overall },
+            ...ue.sources.map((r) => ({ label: r.visitors < 30 ? `${r.label} (few)` : r.label, u: r })),
+          ].map(({ label, u }) => [
+            label,
+            u.visitors,
+            u.votesPerVisitor.toFixed(1),
+            u.visitsPerVisitor.toFixed(2),
+            `${(100 * u.signupRate).toFixed(1)}%`,
+            money(u.revenue.total),
+            <b key="b" className={u.breakEven > 0 ? "text-green" : "text-b"}>
+              {money(u.breakEven)}
+            </b>,
+            money(u.breakEven * 1000),
+          ])}
+        />
+        <p className="text-xs text-zinc-500">
+          What moves it (everyone): sign-up rate ×2 → {money(ue.whatIf.doubleSignupRate)}; one more visit per person → {money(ue.whatIf.oneMoreVisit)}; a
+          signed-up user worth 3× → {money(ue.whatIf.signupValueX3)}. Compare with what an ad click costs on X or Meta (about $0.30–$2): break-even above
+          that means paid ads pay for themselves. {ueFixedLine(ue)}
+        </p>
       </Section>
 
       <Section
