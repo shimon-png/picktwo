@@ -14,7 +14,7 @@ export function TasteWheel({ axes, size = 220, showCrowd = true }: { axes: Axis[
   const crowd = radarPoints(order.map((a) => a?.crowd ?? 0));
   const labels = radarPoints(TASTE_AXES.map(() => 1), 100, 100, 92);
   return (
-    <svg viewBox="-46 -12 292 224" width={size} height={size} role="img" aria-label={`Taste wheel: ${TASTE_AXES.map((a, i) => `${a.left} ${Math.round(((order[i]?.score ?? 0) + 1) * 50)}%`).join(", ")}`}>
+    <svg viewBox="-46 -12 292 224" width={size} height={size} style={{ maxWidth: "100%", height: "auto" }} role="img" aria-label={`Taste wheel: ${TASTE_AXES.map((a, i) => `${a.left} ${Math.round(((order[i]?.score ?? 0) + 1) * 50)}%`).join(", ")}`}>
       <g fill="none" stroke="currentColor" strokeOpacity={0.18}>
         <polygon points={ring(1)} />
         <polygon points={ring(0.66)} />

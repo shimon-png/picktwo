@@ -13,6 +13,7 @@ import { battleCards, type BattleCard } from "@/server/services/battles";
 import { db } from "@/server/db";
 import { battles, outcomes, votes } from "@/server/db/schema";
 import { HeroRotator } from "@/components/battle/HeroRotator";
+import { KnowYourTaste } from "@/components/home/KnowYourTaste";
 import { Mark } from "@/components/layout/Logo";
 import { Avatar } from "@/components/ui/Avatar";
 import { track } from "@/server/analytics";
@@ -143,6 +144,9 @@ export default async function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* ---------- Know your taste (about-you + taste profile explainer) ---------- */}
+      <KnowYourTaste />
 
       {/* ---------- How it turned out ---------- */}
       {uniqueStories.length > 0 && (

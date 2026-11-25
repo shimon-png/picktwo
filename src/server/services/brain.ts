@@ -3,6 +3,7 @@ import { db } from "../db";
 import { users } from "../db/schema";
 import { or, eq, isNotNull } from "drizzle-orm";
 import { isAdmin } from "../viewer";
+import { beforeAfter, isoDay } from "./before-after-rules";
 import { getEconomy } from "./config";
 import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 
@@ -231,7 +232,7 @@ type Scope = Awaited<ReturnType<typeof brainScope>>;
 export type DayRow = { day: string; visitors: number; visits: number; signups: number; votes: number; voters: number; posts: number };
 
 /** Day by day (New York days, newest first): visitors, visits, sign-ups, votes, people who voted, battles posted. */
-async function dailyNumbers(scope: Scope): Promise<DayRow[]> {
+export async function dailyNumbers(scope: Scope): Promise<DayRow[]> {
   const { since, ev, vt, bt, us } = scope;
   const day = (col: SQL) => sql`to_char((${col} AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD')`;
   const rows = await db.execute<DayRow>(sql`
@@ -302,4 +303,17 @@ async function visitsBySource(scope: Scope): Promise<VisitSourceRow[]> {
       detail: [...b.hosts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 3).map(([h, n]) => `${h} (${n})`).join(", "),
     }))
     .sort((a, b) => b.visits - a.visits);
+}
+
+/**
+ * Before vs after a product change (economy `beforeAfterFrom`, a New York day as YYYYMMDD; default the about-you
+ * launch, Nov 25 2026): the same day-by-day numbers for up to 14 days before and every day since, with per-day
+ * averages for each side (before-after-rules.ts, tested).
+ */
+export async function beforeAfterStats(view: BrainView) {
+  const e = await getEconomy();
+  const changeDay = isoDay(e.beforeAfterFrom);
+  const days = Math.max(1, Math.ceil((Date.now() - Date.parse(`${changeDay}T00:00:00Z`)) / 86400_000) + 15);
+  const daily = await dailyNumbers(await brainScope(view, days));
+  return beforeAfter(daily, changeDay);
 }
