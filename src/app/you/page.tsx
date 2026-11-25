@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { tasteProfileFor } from "@/server/services/taste-profile";
 import { TasteSection } from "@/components/taste/TasteSection";
+import { ProfileBar } from "@/components/taste/ProfileBar";
+import { profileProgressFor } from "@/server/services/profile-progress";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
@@ -54,7 +56,7 @@ export default async function YouPage() {
   const e = await getEconomy();
   const admin = isAdmin(user);
   // Everything below is independent, so it all runs at once (one round of DB trips instead of ~7 in a row).
-  const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms, newMessages, flagged, reasonRows, taste] = await Promise.all([
+  const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms, newMessages, flagged, reasonRows, taste, progress] = await Promise.all([
     battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 100),
     countOpenLoops(user.id, e),
     countUnreported(user.id),
@@ -86,6 +88,7 @@ export default async function YouPage() {
       .where(and(eq(battles.authorId, user.id), isNotNull(votes.reason)))
       .groupBy(votes.battleId),
     tasteProfileFor({ user, deviceId: null }),
+    profileProgressFor({ user, deviceId: null }),
   ]);
   const reasonCounts = new Map(reasonRows.map((r) => [r.id, r.n]));
   const tier = expertTier(user.correctPicks, e);
@@ -150,6 +153,7 @@ export default async function YouPage() {
         )}
       </section>
 
+      {progress && !progress.complete && <ProfileBar p={progress} place="you" />}
       {taste && <TasteSection t={taste} />}
 
       <section>

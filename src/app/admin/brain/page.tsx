@@ -14,6 +14,7 @@ import { ARM_LABELS, type GateCell } from "@/server/services/gate-test-rules";
 import { LoadZipIncome, RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 import { passiveStats, type GroupRow } from "@/server/services/passive-stats";
 import { aboutStats, type ArmNumbers } from "@/server/services/about-stats";
+import { profileBarStats } from "@/server/services/profile-progress";
 import { ABOUT_QUESTIONS } from "@/lib/about";
 import type { BrainListKind } from "@/server/services/brain-lists";
 
@@ -113,6 +114,15 @@ function verdict(holdout: { visitors: number; votes: number }, cards: { visitors
   const c = cards.votes / cards.visitors;
   const lift = h ? (c - h) / h : 0;
   const side = `Cards ${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}% vs no cards`;
+  if (p == null) return `${side} · not enough data yet`;
+  return p < 0.05 ? `${side} · real difference (p = ${p.toFixed(3)})` : `${side} · could be chance (p = ${p.toFixed(2)})`;
+}
+
+function barVerdict(holdout: { visitors: number; votes: number }, bar: { visitors: number; votes: number }, p: number | null) {
+  if (!holdout.visitors || !bar.visitors) return "Not enough data yet";
+  const h = holdout.votes / holdout.visitors;
+  const lift = h ? (bar.votes / bar.visitors - h) / h : 0;
+  const side = `Votes per visitor with the bar ${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}% vs without`;
   if (p == null) return `${side} · not enough data yet`;
   return p < 0.05 ? `${side} · real difference (p = ${p.toFixed(3)})` : `${side} · could be chance (p = ${p.toFixed(2)})`;
 }
@@ -229,7 +239,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -242,6 +252,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     skipStats(view, days),
     unitEconomicsStats(view),
     pinnedNumbers(view),
+    profileBarStats(view, days),
   ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
@@ -563,6 +574,23 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
             .filter((r) => r.shown > 0 || ABOUT_QUESTIONS[r.id].inDeck)
             .map((r) => [QUESTION_LABELS[r.id] ?? r.id, r.shown, r.answered, r.skipped, pct(r.answered, r.shown)])}
         />
+      </Section>
+
+      <Section
+        title="Profile bar test"
+        note={`The bar above the Vote deck (and on You) counts toward a complete profile: ${pb.target} battles plus sex, age, relationship and ZIP. ${pb.holdoutPct}% of people (stable per account/browser) never see it. Votes are in the page window; "reached ${pb.target}" counts all their votes ever.`}
+      >
+        <Rows
+          head={["Group", "Visitors", "Votes", "Votes per visitor", `Reached ${pb.target} votes`]}
+          rows={(["bar", "holdout"] as const).map((k) => [
+            k === "bar" ? "Sees the bar" : `Holdout (${pb.holdoutPct}%, no bar)`,
+            pb.arms[k].visitors,
+            pb.arms[k].votes,
+            pb.arms[k].visitors ? (pb.arms[k].votes / pb.arms[k].visitors).toFixed(2) : "—",
+            pct(pb.arms[k].reached, pb.arms[k].visitors),
+          ])}
+        />
+        <p className="text-xs text-zinc-500">{barVerdict(pb.arms.holdout, pb.arms.bar, pb.p)}</p>
       </Section>
 
       <Section

@@ -167,6 +167,8 @@ export const ECONOMY_DEFAULTS = {
   aboutSkipRetry: 10,
   /** Share of people (stable per account/browser) who never see about-you cards, to measure their cost in votes. */
   aboutHoldoutPct: 10,
+  /** Profile bar (Pickbot Phase 0): share of people (stable per account/browser) who never see it, to measure what it adds. */
+  profileBarHoldoutPct: 10,
   /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */
   softGateEvery: 5,
   /** Close the loop (docs/rules/close-the-loop-and-experts.md): longest a battle can run, in hours (5 days). */

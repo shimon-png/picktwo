@@ -8,6 +8,8 @@ import { SignupGate } from "@/components/auth/SignupGate";
 import { AboutCard, type AboutCardPayload } from "./AboutCard";
 import type { LikeYou } from "@/lib/like-you";
 import { TasteReveal, type TasteMilestone } from "@/components/taste/TasteReveal";
+import { ProfileBar } from "@/components/taste/ProfileBar";
+import { withAnswer, withVote, type ProfileProgress } from "@/lib/profile-progress";
 import { cn, pct, timeLeft, titleSizeClass } from "@/lib/utils";
 import { AVATAR_TONES, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
@@ -52,6 +54,7 @@ export function SwipeDeck({
   guestLimit,
   softGate: initialSoft = false,
   likeYouMs = RESULT_MS,
+  progress: initialProgress = null,
 }: {
   initial: BattleCard[];
   signedIn: boolean;
@@ -64,6 +67,8 @@ export function SwipeDeck({
   softGate?: boolean;
   /** How long a result shows when it has a "people like you" row (economy likeYouResultMs). */
   likeYouMs?: number;
+  /** Profile bar (Pickbot Phase 0); null = holdout or unknown viewer, no bar. */
+  progress?: ProfileProgress | null;
 }) {
   const [queue, setQueue] = useState(initial);
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
@@ -83,6 +88,20 @@ export function SwipeDeck({
   const [grab, setGrab] = useState<{ side: Side; dx: number; dy: number } | null>(null);
   const [thrown, setThrown] = useState<{ side: Side; dir: -1 | 1 } | null>(null);
   const [pp, setPp] = useState(initialPP);
+  // Profile bar: moves by one on each new deck vote and drops a core question once its card is answered. On
+  // completion it shows the done state for a few seconds, then goes away.
+  const [progress, setProgress] = useState(initialProgress);
+  const [celebrate, setCelebrate] = useState(false);
+  const bump = useCallback((change: (p: ProfileProgress) => ProfileProgress) => setProgress((p) => p && change(p)), []);
+  const wasComplete = useRef(initialProgress?.complete ?? true);
+  useEffect(() => {
+    if (!progress?.complete || wasComplete.current) return;
+    wasComplete.current = true;
+    setCelebrate(true);
+    const t = setTimeout(() => setCelebrate(false), 4000);
+    return () => clearTimeout(t);
+  }, [progress?.complete]);
+  const showBar = !!progress && (!progress.complete || celebrate);
   const [session, setSession] = useState({ votes: 0, points: 0 });
   // "You're on a roll" card: picks this tab session (survives switching tabs), and the milestone on screen.
   const rollCount = useRef(0);
@@ -197,6 +216,7 @@ export function SwipeDeck({
       setPP(r.ppBalance);
       if (r.ppBalance != null) setPp(r.ppBalance);
       setSession((s) => ({ votes: s.votes + (prev ? 0 : 1), points: s.points + r.points }));
+      if (!prev) bump(withVote);
       if (r.points > 0) toast(`+${r.points} for voting`, "pp");
       return true;
     } catch (e) {
@@ -354,7 +374,7 @@ export function SwipeDeck({
   const tierLine = tier ? (tier.next ? `${tier.toNext} ⚡ to ${tier.next} priority.` : "Top priority — your battles go first.") : null;
 
   const header = (
-    <div className="sticky top-16 z-20 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
+    <div className="sticky top-16 z-30 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
       <p className="text-xs text-zinc-500" data-tour="status">
         {tierLine ?? (
           <>
@@ -371,6 +391,9 @@ export function SwipeDeck({
           </>
         )}
       </p>
+      {showBar && progress && (
+        <ProfileBar p={progress} place="deck" celebrate={celebrate} className="mt-2" onAsk={about || taste ? undefined : (q) => setAbout({ id: q })} />
+      )}
     </div>
   );
 
@@ -453,9 +476,18 @@ export function SwipeDeck({
       {prompt && (
         <SignupGate soft limit={guestLimit} next="/vote" place="deck" log={{ pos: deckPos.current }} onClose={() => setPrompt(false)} />
       )}
-      <div className="relative h-[calc(100dvh-15.35rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
+      <div className={cn("relative min-h-[440px]", showBar ? "h-[calc(100dvh-18.1rem)] md:h-[calc(100dvh-12.75rem)]" : "h-[calc(100dvh-15.35rem)] md:h-[calc(100dvh-10rem)]")}>
         {roll != null && <RollCard count={roll} onDone={() => setRoll(null)} />}
-        {about && <AboutCard key={about.id} card={about} onDone={() => setAbout(null)} />}
+        {about && (
+          <AboutCard
+            key={about.id}
+            card={about}
+            onDone={(answer) => {
+              if (answer) bump((p) => withAnswer(p, about.id));
+              setAbout(null);
+            }}
+          />
+        )}
         {taste && <TasteReveal t={taste} onDone={() => setTaste(null)} />}
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
