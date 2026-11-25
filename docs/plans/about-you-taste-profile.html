@@ -1,0 +1,615 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>About You & Taste Profile</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~72ch) with phone mockups set beside the text on wide screens, stacked on phones. Single dark look = Arcade Night, the app's live theme. */
+:root {
+  color-scheme: dark;
+  --page: #120e26;
+  --panel: #1f1940;
+  --panel-2: #2c2556;
+  --line: #3a3170;
+  --ink: #eae6ff;
+  --muted: #a29ac9;
+  --dim: #7d74b0;
+  --a: #2bd2ff;
+  --b: #ff3cac;
+  --lime: #c6ff3d;
+  --a-soft: #173a52;
+  --b-soft: #4a1840;
+  --lime-soft: #2b3a1a;
+  --warn: #ffb547;
+  --f-display: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  --f-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  background: radial-gradient(120% 50% at 50% 0%, #2a1d5c, var(--page) 55%) var(--page);
+  color: var(--ink);
+  font: 15px/1.6 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 80px;
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 700; }
+h1 .hl { color: var(--lime); text-shadow: 0 0 22px rgba(198,255,61,.3); }
+h2 { font-size: 26px; font-weight: 700; }
+h3 { font-size: 17px; font-weight: 600; }
+p { margin: 0; }
+.prose { max-width: 68ch; display: flex; flex-direction: column; gap: 12px; }
+.muted { color: var(--muted); }
+.eyebrow { font: 600 12px/1 var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--a); }
+code, .mono { font-family: var(--f-mono); font-size: 13px; }
+code { background: var(--panel-2); padding: 1px 6px; border-radius: 6px; color: var(--ink); word-break: break-word; }
+section { display: flex; flex-direction: column; gap: 20px; }
+a { color: var(--a); }
+
+/* Hero */
+.hero { display: flex; flex-direction: column; gap: 16px; }
+.answer { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 8px; }
+.answer div { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.answer b { font-family: var(--f-display); font-size: 15px; color: var(--lime); }
+.answer span { color: var(--muted); font-size: 14px; }
+
+/* Schedule */
+.track { overflow-x: auto; padding-bottom: 6px; }
+.track-inner { display: grid; grid-template-columns: repeat(15, minmax(52px, 1fr)); gap: 6px; min-width: 820px; }
+.v { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.v .n { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font: 600 13px var(--f-display); background: var(--panel); border: 1px solid var(--line); color: var(--muted); }
+.v.ask .n { background: var(--a-soft); border-color: var(--a); color: var(--a); }
+.v.mail .n { background: var(--lime-soft); border-color: var(--lime); color: var(--lime); }
+.v.wall .n { background: var(--b-soft); border-color: var(--b); color: var(--b); }
+.v .t { font-size: 11.5px; line-height: 1.3; text-align: center; color: var(--muted); }
+.v.ask .t, .v.mail .t, .v.wall .t { color: var(--ink); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 12px var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); background: #1a1535; }
+tr:last-child td { border-bottom: 0; }
+td.k { white-space: nowrap; font-family: var(--f-display); font-weight: 600; }
+.pill { display: inline-block; font: 600 11px/1 var(--f-display); letter-spacing: .06em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.have { background: var(--lime-soft); color: var(--lime); }
+.pill.part { background: #3d3418; color: var(--warn); }
+.pill.miss { background: var(--b-soft); color: var(--b); }
+.pill.s { background: var(--a-soft); color: var(--a); }
+
+/* Mockups */
+.mocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 28px; align-items: start; }
+.mock { display: flex; flex-direction: column; gap: 10px; }
+.mock figcaption { font-size: 13.5px; color: var(--muted); }
+.mock figcaption b { color: var(--ink); font-weight: 600; }
+figure { margin: 0; }
+.phone { width: 100%; max-width: 300px; border-radius: 34px; background: #0b0819; padding: 10px; box-shadow: 0 0 0 1px var(--line), 0 20px 60px rgba(0,0,0,.45); }
+.screen { border-radius: 26px; background: radial-gradient(120% 60% at 50% 0%, #2a1d5c, #120e26 60%); padding: 14px 12px 16px; min-height: 520px; display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden; }
+.topbar { display: flex; justify-content: space-between; align-items: center; font: 600 11px var(--f-display); color: var(--muted); }
+.topbar .logo { color: var(--ink); font-size: 13px; letter-spacing: .02em; }
+.topbar .logo i { font-style: normal; color: var(--a); }
+.topbar .logo em { font-style: normal; color: var(--b); }
+.count { font: 600 10.5px var(--f-display); color: var(--dim); }
+.card { background: var(--panel); border-radius: 20px; box-shadow: 0 0 0 1px var(--line), 0 0 40px rgba(255,60,172,.16); padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.card .q { font: 700 21px/1.2 var(--f-display); color: var(--lime); text-shadow: 0 0 16px rgba(198,255,61,.3); }
+.card .sub { font-size: 12.5px; color: var(--muted); }
+.opt { border-radius: 14px; padding: 13px 14px; font: 600 15px var(--f-display); display: flex; justify-content: space-between; align-items: center; }
+.opt.a { background: var(--a-soft); color: var(--a); box-shadow: 0 0 0 1px rgba(43,210,255,.35); }
+.opt.b { background: var(--b-soft); color: var(--b); box-shadow: 0 0 0 1px rgba(255,60,172,.35); }
+.opt.n { background: var(--panel-2); color: var(--ink); }
+.skip { text-align: center; font-size: 12px; color: var(--dim); margin-top: auto; }
+.tag { align-self: flex-start; font: 600 10px/1 var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--a); background: var(--a-soft); padding: 5px 8px; border-radius: 999px; }
+.tag.lime { color: var(--lime); background: var(--lime-soft); }
+.promise { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--ink); background: #1a1535; border-radius: 12px; padding: 9px 10px; }
+.promise svg { flex: none; }
+
+/* Result mock */
+.winner { border-radius: 18px; background: linear-gradient(160deg, #3a2a78, #1d2c4f); flex: 1; min-height: 230px; position: relative; padding: 14px; display: flex; flex-direction: column; justify-content: flex-end; box-shadow: 0 0 0 2px var(--a), 0 0 30px rgba(43,210,255,.35); }
+.winner .lbl { font: 700 20px var(--f-display); color: #fff; margin-bottom: 10px; }
+.title-sm { font: 600 14px/1.3 var(--f-display); color: var(--ink); }
+.bars { display: flex; flex-direction: column; gap: 7px; background: rgba(10,7,25,.72); border-radius: 12px; padding: 10px; }
+.bar { display: grid; grid-template-columns: 86px 1fr 34px; align-items: center; gap: 8px; font-size: 11px; color: rgba(255,255,255,.85); }
+.bar .tr { height: 7px; border-radius: 9px; background: rgba(255,255,255,.12); overflow: hidden; }
+.bar .tr span { display: block; height: 100%; border-radius: 9px; background: var(--a); }
+.bar.you .tr span { background: var(--lime); }
+.bar.you { color: var(--lime); font-weight: 600; }
+.bar b { font-family: var(--f-display); text-align: right; color: #fff; }
+.bar.you b { color: var(--lime); }
+.bar.lock { color: rgba(255,255,255,.65); grid-template-columns: 86px 1fr; }
+.bar.lock .cta { font-size: 11px; color: var(--lime); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Taste profile */
+.you-head { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: var(--panel-2); box-shadow: 0 0 0 2px var(--lime); display: grid; place-items: center; font: 700 14px var(--f-display); color: var(--lime); }
+.archetype { font: 700 19px/1.15 var(--f-display); color: var(--lime); }
+.radar text { font: 600 9.5px var(--f-display); fill: var(--muted); }
+.spec { display: flex; flex-direction: column; gap: 7px; }
+.sp { display: grid; grid-template-columns: 64px 1fr 64px; gap: 6px; align-items: center; font-size: 10.5px; color: var(--muted); }
+.sp span:last-child { text-align: right; }
+.sp .line { height: 4px; background: var(--panel-2); border-radius: 4px; position: relative; }
+.sp .line i { position: absolute; top: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--lime); transform: translateX(-50%); box-shadow: 0 0 8px rgba(198,255,61,.6); }
+.sp .line u { position: absolute; top: -2px; width: 2px; height: 8px; background: var(--dim); left: 50%; }
+.statrow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat { background: #1a1535; border-radius: 12px; padding: 9px 10px; }
+.stat b { display: block; font: 700 17px var(--f-display); color: var(--ink); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 10.5px; color: var(--muted); }
+.btn { border-radius: 999px; background: var(--lime); color: #120e26; font: 600 13px var(--f-display); text-align: center; padding: 10px; box-shadow: 0 0 18px rgba(198,255,61,.35); }
+.btn.ghost { background: transparent; color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+
+/* Share card */
+.share { width: 100%; max-width: 250px; aspect-ratio: 9 / 16; border-radius: 22px; background: linear-gradient(170deg, #2a1d5c 0%, #120e26 55%, #2a0f33 100%); box-shadow: 0 0 0 1px var(--line), 0 20px 60px rgba(0,0,0,.45); padding: 20px 18px; display: flex; flex-direction: column; gap: 10px; }
+.share .small { font: 600 10px var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.share .big { font: 700 24px/1.1 var(--f-display); color: var(--lime); text-shadow: 0 0 18px rgba(198,255,61,.35); }
+.share .line2 { font-size: 12px; color: var(--ink); }
+.share .foot { margin-top: auto; display: flex; justify-content: space-between; font: 600 11px var(--f-display); color: var(--muted); }
+
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; }
+@media (max-width: 760px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.box ul, .prose ul, .prose ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.box.warn { border-color: #5a4a1e; }
+.box.warn h3 { color: var(--warn); }
+.steps { display: flex; flex-direction: column; gap: 10px; }
+.step { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 14px; align-items: start; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.step .no { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--panel-2); font: 700 13px var(--f-display); color: var(--lime); }
+.step p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+@media (max-width: 520px) { .step { grid-template-columns: 30px minmax(0,1fr); } .step .pill { grid-column: 2; justify-self: start; } }
+.code { background: #0d0a1e; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; overflow-x: auto; font: 12.5px/1.6 var(--f-mono); color: var(--ink); white-space: pre; }
+.code .c { color: var(--dim); }
+:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <span class="eyebrow">Crowd Pick · plan · Nov 25, 2026</span>
+    <h1>Ask who they are <span class="hl">one tap at a time</span>, and pay them back right away</h1>
+    <div class="prose">
+      <p class="muted">Guests now get 15 free votes before the sign-up wall. Today we learn nothing about them until they sign up, so most visitors leave as anonymous devices we can't target, retarget or put in a brand panel. This plan fixes that with three things: short "about you" cards inside the deck, a "people like you" result that only works once they answer, and a taste profile they earn by voting. Passive signals (region, phone, time of day, estimated income) fill in the rest for everyone, including people who answer nothing.</p>
+    </div>
+    <div class="answer">
+      <div><b>Spread it out</b><span>One question per card, never two in a row, at most one every 2 to 3 votes. Each looks and taps like a battle.</span></div>
+      <div><b>Reward every answer</b><span>The very next result shows a "people like you" bar. Skipping leaves a locked bar that asks again.</span></div>
+      <div><b>Ask for email at vote 9</b><span>On a close battle that's still open: "This one's neck and neck. Want to know who wins?"</span></div>
+      <div><b>Give them a taste profile</b><span>A six-trait wheel in You with a name like "Romantic realist", plus a story-sized card to share.</span></div>
+    </div>
+  </header>
+
+  <!-- 1. One card or spread -->
+  <section>
+    <span class="eyebrow">1 · All on one card, or spread out?</span>
+    <h2>Spread out. One question per card, earned by the vote before it.</h2>
+    <div class="prose">
+      <p>A single form of four questions reads like a survey, and people skip surveys. A single one-tap card between battles feels like part of the game. It also lets each answer pay off on the very next result, which teaches people that answering is worth it. The rules:</p>
+      <ul>
+        <li>An about-you card only appears <b>right after a result</b>, as the next card in the deck. Same size, same tap targets, same Arcade Night look as a battle.</li>
+        <li>Never two cards in a row, and at least two battles between asks.</li>
+        <li>Every card has <b>Skip</b>. A skipped question comes back once, 10 votes later, then only lives in Settings and behind the locked bar.</li>
+        <li>Answers from a guest are saved against their device and move onto their account when they sign up (the same way guest votes carry over today). Sign-up then skips anything already answered, so for most people it becomes email, code, username, ZIP.</li>
+        <li>Questions that passive data already answers well (phone type, rough region) are never asked.</li>
+        <li><b>Split and shuffle (Alex):</b> a question with N answers splits the card into N equal slices that fill it, the same way a battle splits into two. The order is shuffled for each person and each showing, so no answer gets the top or first spot more often. The order shown is logged on <code>about_card_shown</code>, so the Brain can check for position bias. Age uses the same six bands sign-up and targeting already use (18–24 up to 65+), so the data lines up.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 2. Schedule -->
+  <section>
+    <span class="eyebrow">2 · Vote-by-vote schedule</span>
+    <h2>The first 15 votes</h2>
+    <div class="track" role="region" aria-label="Schedule for votes 1 to 15" tabindex="0">
+      <div class="track-inner">
+        <div class="v"><span class="n">1</span><span class="t">Just play</span></div>
+        <div class="v ask"><span class="n">2</span><span class="t">Woman / Man</span></div>
+        <div class="v"><span class="n">3</span><span class="t">First "like you" bar</span></div>
+        <div class="v ask"><span class="n">4</span><span class="t">Age range</span></div>
+        <div class="v"><span class="n">5</span><span class="t">"Women 25–34" bar</span></div>
+        <div class="v"><span class="n">6</span><span class="t"></span></div>
+        <div class="v ask"><span class="n">7</span><span class="t">Single / dating / taken / married</span></div>
+        <div class="v"><span class="n">8</span><span class="t"></span></div>
+        <div class="v mail"><span class="n">9</span><span class="t">Email on a close battle</span></div>
+        <div class="v"><span class="n">10</span><span class="t">Taste: 2 of 6 traits</span></div>
+        <div class="v"><span class="n">11</span><span class="t"></span></div>
+        <div class="v ask"><span class="n">12</span><span class="t">ZIP: "what your area picked"</span></div>
+        <div class="v"><span class="n">13</span><span class="t"></span></div>
+        <div class="v"><span class="n">14</span><span class="t"></span></div>
+        <div class="v wall"><span class="n">15</span><span class="t">Wall (only if no email yet)</span></div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--a)"></i>About-you card (after that vote's result)</span>
+      <span><i style="background:var(--lime)"></i>Email ask</span>
+      <span><i style="background:var(--b)"></i>Sign-up gate, rewritten as benefits</span>
+    </div>
+
+    <div class="tbl">
+      <table>
+        <thead><tr><th>When</th><th>Card</th><th>Why here</th><th>Reward they see</th></tr></thead>
+        <tbody>
+          <tr><td class="k">After vote 1</td><td>Nothing</td><td>Let the game hook them first. The 80% bounce happens before vote 1.</td><td>Normal result</td></tr>
+          <tr><td class="k">After vote 2</td><td>"I'm a…" Woman / Man / Skip</td><td>Cheapest answer, highest value for targeting and weighting.</td><td>Vote 3 shows a "Women" bar</td></tr>
+          <tr><td class="k">After vote 4</td><td>"I'm…" 18–24 / 25–34 / 35–44 / 45–54 / 55–64 / 65+ (six equal bands, shuffled)</td><td>Same buckets as sign-up today (stored in the existing <code>age_range</code>).</td><td>Bar narrows to "Women 25–34"</td></tr>
+          <tr><td class="k">After vote 7</td><td>"Right now I'm…" Single / Dating / Taken / Married</td><td>Our content is mostly couples and dating, so this splits results in the way people care about most. New field.</td><td>"Taken women 25–34" on couples battles</td></tr>
+          <tr><td class="k">After vote 9</td><td>Email ask on the next close, still-open battle (45–55% split)</td><td>The moment they want an answer they can't have yet. Uses the existing email code sign-in.</td><td>"We'll tell you who wins" + streak saved</td></tr>
+          <tr><td class="k">After vote 12</td><td>ZIP, prefilled from IP: "Near Austin? Enter your ZIP to see what Austin picked"</td><td>Last field sign-up needs. IP gives a starting guess so it's one confirm tap for many.</td><td>A "Near you" bar where there are enough votes</td></tr>
+          <tr><td class="k">Vote 15</td><td>One-tap sign-up card (A/B arms unchanged): everything we already know is filled in, so the only action is one button. See the mockup below.</td><td>Only people who skipped the email ask hit it. Anyone who gave email at vote 9 just keeps voting.</td><td>Taste profile preview with locked traits</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>After sign-up (one ask every ~5 votes, then stop)</h3>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Vote</th><th>Card</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td class="k">20</td><td>Kids? No / Expecting / Yes, then ages</td><td>Field already exists (<code>kids_status</code>, <code>kid_ages</code>). Age ranges only, never names or birthdays.</td></tr>
+          <tr><td class="k">25</td><td>Rent / Own / Live with family</td><td>Strong income and life-stage signal, easy to answer.</td></tr>
+          <tr><td class="k">30</td><td>Taste profile unlocks (all 6 traits)</td><td>Big moment: full-screen reveal with Share. No question here.</td></tr>
+          <tr><td class="k">35</td><td>Student / Working / Both / Neither</td><td>Fills out the panel for brand reports.</td></tr>
+          <tr><td class="k">45+</td><td>Optional, in Settings only: education, race or ethnicity, political lean</td><td>Never as a deck card. Separate consent screen. See privacy notes below.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="max-width:68ch">All the vote numbers live in the economy config (like <code>guestVoteLimit</code> today) so we can tune them from the admin panel without a deploy.</p>
+  </section>
+
+  <!-- 3. Mockups -->
+  <section>
+    <span class="eyebrow">3 · How it looks</span>
+    <h2>The cards and the reward</h2>
+    <div class="mocks">
+
+      <figure class="mock">
+        <div class="phone"><div class="screen">
+          <div class="topbar"><span class="logo">crowd<i>p</i><em>i</em>ck</span><span class="count">vote 2 of 15 free</span></div>
+          <div class="card">
+            <span class="tag">About you · 1 tap</span>
+            <div class="q">I'm a…</div>
+            <div class="sub">So we can show you how people like you voted.</div>
+            <div class="opt a">Woman</div>
+            <div class="opt b">Man</div>
+            <div class="promise">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c6ff3d" stroke-width="2" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              <span>Never shown on your profile. Only used in group results.</span>
+            </div>
+            <div class="skip">Skip</div>
+          </div>
+        </div></div>
+        <figcaption><b>About-you card.</b> Same shape as a battle: a question and big taps. The lock line answers "why do you want this?" before they ask. Even two-choice cards swap which answer is on top at random.</figcaption>
+      </figure>
+
+      <figure class="mock">
+        <div class="phone"><div class="screen">
+          <div class="topbar"><span class="logo">crowd<i>p</i><em>i</em>ck</span><span class="count">vote 4 of 15 free</span></div>
+          <div class="card" style="gap:8px;padding:14px 12px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span class="tag">About you · 1 tap</span><span class="count">Skip</span></div>
+            <div class="q" style="font-size:19px">I'm…</div>
+            <div style="flex:1;display:grid;grid-template-rows:repeat(6,1fr);gap:6px;min-height:330px">
+              <div class="opt a" style="justify-content:center">35–44</div>
+              <div class="opt b" style="justify-content:center">18–24</div>
+              <div class="opt n" style="justify-content:center;color:var(--lime);box-shadow:0 0 0 1px rgba(198,255,61,.35);background:var(--lime-soft)">65+</div>
+              <div class="opt a" style="justify-content:center">25–34</div>
+              <div class="opt b" style="justify-content:center">55–64</div>
+              <div class="opt n" style="justify-content:center;color:var(--lime);box-shadow:0 0 0 1px rgba(198,255,61,.35);background:var(--lime-soft)">45–54</div>
+            </div>
+          </div>
+        </div></div>
+        <figcaption><b>More than two choices: split the card evenly.</b> Six age bands = six equal slices filling the card, in a fresh random order for each person. Colours repeat by position, not by answer, so no answer looks like the default.</figcaption>
+      </figure>
+
+      <figure class="mock">
+        <div class="phone"><div class="screen">
+          <div class="topbar"><span class="logo">crowd<i>p</i><em>i</em>ck</span><span class="count">vote 5 of 15 free</span></div>
+          <div class="title-sm">He forgot our anniversary but planned a huge surprise a week later. Does it count?</div>
+          <div class="winner">
+            <div class="lbl">It counts</div>
+            <div class="bars">
+              <div class="bar"><span>Everyone</span><span class="tr"><span style="width:58%"></span></span><b>58%</b></div>
+              <div class="bar you"><span>Women 25–34</span><span class="tr"><span style="width:71%"></span></span><b>71%</b></div>
+              <div class="bar"><span>Experts</span><span class="tr"><span style="width:49%"></span></span><b>49%</b></div>
+            </div>
+          </div>
+          <div class="skip">Next battle in 2s</div>
+        </div></div>
+        <figcaption><b>The reward.</b> A lime "people like you" bar joins Everyone and Experts in <code>ResultBars</code>. It uses the narrowest group with at least 20 real votes (sex × age, then sex alone) and is hidden when no group is big enough.</figcaption>
+      </figure>
+
+      <figure class="mock">
+        <div class="phone"><div class="screen">
+          <div class="topbar"><span class="logo">crowd<i>p</i><em>i</em>ck</span><span class="count">vote 6 of 15 free</span></div>
+          <div class="title-sm">Is it a red flag if he still follows his ex on Instagram?</div>
+          <div class="winner" style="box-shadow:0 0 0 2px var(--b),0 0 30px rgba(255,60,172,.35);background:linear-gradient(160deg,#4a1840,#2a1d5c)">
+            <div class="lbl">Red flag</div>
+            <div class="bars">
+              <div class="bar"><span>Everyone</span><span class="tr"><span style="width:63%;background:var(--b)"></span></span><b>63%</b></div>
+              <div class="bar lock"><span>People like you</span><span class="cta">Tell us your age to see</span></div>
+            </div>
+          </div>
+          <div class="skip">Next battle in 2s</div>
+        </div></div>
+        <figcaption><b>If they skipped.</b> The bar stays, locked, with one link that opens the missing card. This is the "reason to answer" doing its job on every vote.</figcaption>
+      </figure>
+
+      <figure class="mock">
+        <div class="phone"><div class="screen">
+          <div class="topbar"><span class="logo">crowd<i>p</i><em>i</em>ck</span><span class="count">vote 9 of 15 free</span></div>
+          <div class="card">
+            <span class="tag lime">Neck and neck · 1 day left</span>
+            <div class="q">51% vs 49%. Want to know who wins?</div>
+            <div class="sub">"Should I tell my best friend her fiancé is on Hinge?"</div>
+            <div class="opt n" style="color:var(--muted);font-weight:500;font-family:var(--f-body);font-size:14px">you@email.com</div>
+            <div class="btn">Tell me when it ends</div>
+            <div class="promise">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c6ff3d" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              <span>Also saves your picks and your streak. No password, just a code.</span>
+            </div>
+            <div class="skip">Keep voting</div>
+          </div>
+        </div></div>
+        <figcaption><b>Email at vote 9.</b> The email box uses <code>autocomplete="email"</code>, so iPhone and Android offer their saved address above the keyboard: one tap, no typing. Triggered by a close battle they just voted on that is still open, so the payoff is real. After the code, they're signed in and keep voting.</figcaption>
+      </figure>
+
+      <figure class="mock">
+        <div class="phone"><div class="screen">
+          <div class="topbar"><span class="logo">crowd<i>p</i><em>i</em>ck</span><span class="count">15 of 15 free</span></div>
+          <div class="card" style="gap:10px">
+            <span class="tag lime">Save your 15 picks</span>
+            <div class="q" style="font-size:19px">You're all set. Just confirm.</div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="opt n" style="padding:9px 12px;font-size:13px"><span>@mia4859</span><span style="color:var(--dim);font-size:11px">edit</span></div>
+              <div class="opt n" style="padding:9px 12px;font-size:13px"><span>Woman · 25–34</span><span style="color:var(--dim);font-size:11px">edit</span></div>
+              <div class="opt n" style="padding:9px 12px;font-size:13px"><span>Austin, TX 78704</span><span style="color:var(--dim);font-size:11px">edit</span></div>
+            </div>
+            <div class="btn" style="display:flex;align-items:center;justify-content:center;gap:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#120e26" stroke-width="2.4" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Continue with Google</div>
+            <div class="btn ghost" style="padding:8px;font-size:12px">Continue with Apple</div>
+            <div class="skip" style="margin-top:0">or use email + code</div>
+          </div>
+        </div></div>
+        <figcaption><b>Sign-up at vote 15: one tap.</b> Username, sex, age and ZIP come prefilled from their cards and IP; each row is editable but needs nothing. The only thing we can't know is who they are, so the main button is Google (already set up in our sign-in) or Apple, which hand us a verified email with no typing and no code.</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">3b · The one-tap sign-up card</span>
+    <h2>Vote 15: prefill everything, leave one button</h2>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Field</th><th>Prefilled from</th><th>If we don't know it</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Email</td><td>Google or Apple sign-in hands it over verified (no code). Email + code stays as the fallback, with the phone's saved-address suggestion.</td><td>This is the one tap.</td></tr>
+          <tr><td class="k">Username</td><td>From the Google/Apple email (<code>suggestedHandle()</code>, e.g. mia4859); before that, a random handle in the same style.</td><td>Always prefilled.</td></tr>
+          <tr><td class="k">Sex, age</td><td>Their about-you cards at votes 2 and 4.</td><td>Not asked here. The card comes back in the deck later.</td></tr>
+          <tr><td class="k">ZIP</td><td>Vote 12 card, else the IP ZIP guess from Vercel.</td><td>Not asked here (asked later in the deck).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="prose">
+      <p><b>Rule change this needs:</b> today sign-up refuses to finish without sex, age and ZIP. For the one-tap card, those become "ask later in the deck" instead of required at the gate. Targeting already handles missing answers (people with no answer just don't see targeted battles), so nothing breaks.</p>
+      <p><b>Apple sign-in</b> needs the Apple Developer account you're setting up. Google works today. Apple matters because most of our audience is on iPhone.</p>
+    </div>
+  </section>
+
+  <!-- 4. Taste profile -->
+  <section>
+    <span class="eyebrow">4 · What they get</span>
+    <h2>A taste profile in You, and a card worth posting</h2>
+    <div class="prose">
+      <p>The artifact is a <b>Taste profile</b>: a six-trait wheel built from what they picked, a name for their type, and how they compare with people like them. It fills in as they vote (2 traits at vote 10, all 6 at vote 30), which gives guests a reason to sign up ("save your profile") and members a reason to keep voting. A one-tap share card sized for Instagram and TikTok stories brings new people in.</p>
+    </div>
+
+    <div class="mocks">
+      <figure class="mock">
+        <div class="phone"><div class="screen" style="gap:12px">
+          <div class="topbar"><span class="logo">You</span><span class="count">34 votes</span></div>
+          <div class="you-head">
+            <div class="avatar">M</div>
+            <div><div class="archetype">Romantic realist</div><div class="count" style="color:var(--muted)">Your taste profile · updated today</div></div>
+          </div>
+          <svg class="radar" viewBox="0 0 200 200" width="100%" role="img" aria-label="Taste wheel: high romantic and direct, medium trendy and adventurous, lower big spender and forgiving">
+            <g fill="none" stroke="#3a3170" stroke-width="1">
+              <polygon points="100,20 169.3,60 169.3,140 100,180 30.7,140 30.7,60"/>
+              <polygon points="100,46.7 146.2,73.3 146.2,126.7 100,153.3 53.8,126.7 53.8,73.3"/>
+              <polygon points="100,73.3 123.1,86.7 123.1,113.3 100,126.7 76.9,113.3 76.9,86.7"/>
+              <line x1="100" y1="100" x2="100" y2="20"/><line x1="100" y1="100" x2="169.3" y2="60"/><line x1="100" y1="100" x2="169.3" y2="140"/>
+              <line x1="100" y1="100" x2="100" y2="180"/><line x1="100" y1="100" x2="30.7" y2="140"/><line x1="100" y1="100" x2="30.7" y2="60"/>
+            </g>
+            <polygon points="100,60 134.6,80 134.6,120 100,140 65.4,120 65.4,80" fill="none" stroke="#7d74b0" stroke-width="1.2" stroke-dasharray="3 3"/>
+            <polygon points="100,32 138.1,78 127.7,116 100,156 79.2,112 44.6,68" fill="rgba(198,255,61,.22)" stroke="#c6ff3d" stroke-width="2"/>
+            <g fill="#c6ff3d"><circle cx="100" cy="32" r="2.6"/><circle cx="138.1" cy="78" r="2.6"/><circle cx="127.7" cy="116" r="2.6"/><circle cx="100" cy="156" r="2.6"/><circle cx="79.2" cy="112" r="2.6"/><circle cx="44.6" cy="68" r="2.6"/></g>
+            <text x="100" y="12" text-anchor="middle">Romantic</text>
+            <text x="174" y="56" text-anchor="start">Adventurous</text>
+            <text x="174" y="148" text-anchor="start">Spender</text>
+            <text x="100" y="195" text-anchor="middle">Trendy</text>
+            <text x="26" y="148" text-anchor="end">Forgiving</text>
+            <text x="26" y="56" text-anchor="end">Direct</text>
+          </svg>
+          <div class="statrow">
+            <div class="stat"><b>78%</b><span>agree with women 25–34</span></div>
+            <div class="stat"><b>6 of 34</b><span>picks against the crowd</span></div>
+          </div>
+          <div class="btn">Share my profile</div>
+        </div></div>
+        <figcaption><b>Taste wheel in You.</b> Lime is them; the dashed ring is the average voter. Short labels so it fits a phone (Spender = premium taste).</figcaption>
+      </figure>
+
+      <figure class="mock">
+        <div class="phone"><div class="screen" style="gap:12px">
+          <div class="topbar"><span class="logo">Your six traits</span><span class="count">vs everyone</span></div>
+          <div class="spec">
+            <div class="sp"><span>Romantic</span><span class="line"><u></u><i style="left:84%"></i></span><span>Practical</span></div>
+            <div class="sp"><span>Adventurous</span><span class="line"><u></u><i style="left:42%"></i></span><span>Cautious</span></div>
+            <div class="sp"><span>Spender</span><span class="line"><u></u><i style="left:64%"></i></span><span>Saver</span></div>
+            <div class="sp"><span>Trendy</span><span class="line"><u></u><i style="left:30%"></i></span><span>Classic</span></div>
+            <div class="sp"><span>Forgiving</span><span class="line"><u></u><i style="left:70%"></i></span><span>Strict</span></div>
+            <div class="sp"><span>Direct</span><span class="line"><u></u><i style="left:22%"></i></span><span>Diplomatic</span></div>
+          </div>
+          <div class="box" style="padding:12px;gap:4px">
+            <div style="font:600 12px var(--f-display);color:var(--ink)">Why "Direct"</div>
+            <div style="font-size:11.5px;color:var(--muted)">You picked "Tell her" on 5 of 6 battles about whether to speak up. Most people split 50/50.</div>
+          </div>
+          <div class="box" style="padding:12px;gap:4px">
+            <div style="font:600 12px var(--f-display);color:var(--ink)">Your taste twins</div>
+            <div style="font-size:11.5px;color:var(--muted)">3 people agree with you 80%+ of the time.</div>
+          </div>
+          <div class="btn ghost">See battles behind this</div>
+        </div></div>
+        <figcaption><b>Detail view.</b> Each trait is a slider between two poles, with a plain "why" made from their own votes. Twins reuse the existing People who vote like you page.</figcaption>
+      </figure>
+
+      <figure class="mock">
+        <div class="share">
+          <span class="small">My taste on crowdpick.ai</span>
+          <span class="big">Romantic realist</span>
+          <svg viewBox="0 0 200 200" width="100%" aria-hidden="true">
+            <g fill="none" stroke="#3a3170"><polygon points="100,20 169.3,60 169.3,140 100,180 30.7,140 30.7,60"/><polygon points="100,60 134.6,80 134.6,120 100,140 65.4,120 65.4,80"/></g>
+            <polygon points="100,32 138.1,78 127.7,116 100,156 79.2,112 44.6,68" fill="rgba(198,255,61,.25)" stroke="#c6ff3d" stroke-width="2.5"/>
+          </svg>
+          <span class="line2">Most romantic 15% · Says it straight</span>
+          <span class="line2" style="color:var(--muted)">Went against the crowd 6 times out of 34</span>
+          <div class="btn" style="padding:8px;font-size:12px">What's yours? crowdpick.ai</div>
+          <div class="foot"><span>@mia.rose</span><span>crowd pick</span></div>
+        </div>
+        <figcaption><b>Share card (9:16).</b> Made on the server with <code>next/og</code>, so it's an image for stories and a link preview. No age, sex or location on it, ever.</figcaption>
+      </figure>
+    </div>
+
+    <h3>What drives each trait</h3>
+    <div class="prose">
+      <p>We already have the raw material. Every new battle is auto-tagged by AI with up to three voter traits per side (<code>battle.tags.brain.a / .b</code>, 21 traits in <code>lib/brain-tags.ts</code>). A pick "votes for" the traits on the side they chose and "against" the traits on the side they passed on. Score = (for − against) ÷ battles that carried that trait, smoothed toward 0 until there are 5 such battles, then shown against the crowd average. Same pure lift math style as <code>taste-rules.ts</code>, with tests.</p>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Wheel axis</th><th>Pole A tags → pole B tags</th><th>Example battle that moves it</th></tr></thead>
+        <tbody>
+          <tr><td class="k">Romantic ↔ Practical</td><td><code>romantic</code> → <code>practical</code></td><td>Proposal at sunset vs proposal at home, save the money</td></tr>
+          <tr><td class="k">Adventurous ↔ Cautious</td><td><code>adventurous</code>, <code>risk_taking</code> → <code>cautious</code></td><td>Quit to travel for a year vs keep the job</td></tr>
+          <tr><td class="k">Spender ↔ Saver</td><td><code>premium_taste</code> → <code>budget_conscious</code></td><td>$300 sneakers vs the $90 ones</td></tr>
+          <tr><td class="k">Trendy ↔ Classic</td><td><code>trendy</code> → <code>classic_style</code>, <code>traditional</code></td><td>Wedding dress A (fashion-week) vs B (timeless)</td></tr>
+          <tr><td class="k">Forgiving ↔ Strict</td><td><code>forgiving</code> → <code>strict</code></td><td>Give him another chance vs done</td></tr>
+          <tr><td class="k">Direct ↔ Diplomatic</td><td><code>direct</code> → <code>diplomatic</code></td><td>Tell her the dress is ugly vs say it's fine</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="max-width:68ch">The other traits we already tag (<code>family_first</code>, <code>career_driven</code>, <code>social</code>, <code>independent</code>, <code>health_focused</code>, <code>eco_conscious</code>, <code>tech_forward</code>) appear as badges once they're strong, and all 21 feed brand panels. The type name comes from the top two axes (6 × 6 table of names like "Romantic realist", "Careful splurger"), written by hand, not generated. Battles posted before AI tagging went live may have no tags; a one-time back-fill fixes that.</p>
+  </section>
+
+  <!-- 5. Passive capture -->
+  <section>
+    <span class="eyebrow">5 · Free signals</span>
+    <h2>Region, phone, time of day and estimated income, for every visitor</h2>
+    <div class="prose">
+      <p>These cost nothing and need no question, so they cover the guests who answer nothing. I checked what the app logs today. The browser already sends a <code>session_start</code> event (<code>lib/events.ts</code>), and the server stamps it with the raw user-agent in <code>server/analytics.ts</code>. Here is what's there and what's missing.</p>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Signal</th><th>Today</th><th>How to get it</th><th>Where in code</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="k">Region</td>
+            <td><span class="pill miss">Missing</span></td>
+            <td>Vercel adds the visitor's location to every request as headers: <code>x-vercel-ip-country</code>, <code>-country-region</code> (state), <code>-city</code>, <code>-postal-code</code>, <code>-timezone</code>. Free, no lookup service. City and ZIP from IP are metro-level guesses (mobile carriers often place people a city away), so we store them as "IP guess", never overwrite a typed ZIP.</td>
+            <td><code>app/api/events/route.ts</code> reads the headers (or <code>geolocation()</code> from <code>@vercel/functions</code>) and passes them into <code>logClientEvents</code>, which adds them to <code>session_start</code>. Also saved on the <code>device</code> row.</td>
+          </tr>
+          <tr>
+            <td class="k">Time of day</td>
+            <td><span class="pill have">Have it</span></td>
+            <td>Server time plus the browser's time zone (<code>tz</code>, already in <code>session_start</code>) gives local hour and weekday for every event.</td>
+            <td>No capture work. Add a <code>local_hour</code> helper in the Brain queries.</td>
+          </tr>
+          <tr>
+            <td class="k">iPhone vs Android, OS</td>
+            <td><span class="pill part">Raw only</span></td>
+            <td>The user-agent string is stored but never parsed. Parse it once into platform (iOS / Android / desktop), browser, and in-app browser (X, Instagram, TikTok all mark their UA, which also tells us where they came from).</td>
+            <td>Pure <code>parseDevice(ua)</code> in <code>lib/analytics-rules.ts</code> (next to <code>isBotUserAgent</code>), with tests. Store the parsed result on <code>session_start</code> and the <code>device</code> row.</td>
+          </tr>
+          <tr>
+            <td class="k">Newer vs older phone</td>
+            <td><span class="pill miss">Missing</span></td>
+            <td><b>iPhone:</b> Apple hides the model, but screen size × pixel density narrows it to a class: 430×932 @3x = Pro Max / Plus (newest, priciest), 393×852 @3x = recent Pro / standard, 375×667 @2x = SE or 8 (budget or old). We log the viewport today, not the screen, so add <code>screen.width</code>, <code>screen.height</code>, <code>devicePixelRatio</code>. <b>Android (Chrome):</b> ask for the model with client hints, e.g. "SM-S928U" = Galaxy S24 Ultra; plus <code>navigator.deviceMemory</code>. A small lookup table maps model class to a price tier (budget / mid / flagship).</td>
+            <td><code>startProps()</code> in <code>lib/events.ts</code> adds screen, dpr, memory and <code>navigator.userAgentData.getHighEntropyValues(["model","platformVersion"])</code>. Tier mapping in a pure <code>deviceTier()</code>, tested.</td>
+          </tr>
+          <tr>
+            <td class="k">Estimated income</td>
+            <td><span class="pill miss">Missing</span></td>
+            <td>Map ZIP (typed, or IP guess) to the Census American Community Survey 5-year median household income for that ZIP area (table B19013), plus % renters (B25003). Public, free, about 33,000 rows. Combine with phone tier into an income band (lower / middle / upper) used only for weighting and brand panels, never shown to anyone.</td>
+            <td>Static data file shipped server-side like the <code>zipcodes</code> dataset in <code>services/zip.ts</code>. New pure <code>incomeBand(zipIncome, deviceTier)</code> in <code>services/demo-rules.ts</code>.</td>
+          </tr>
+          <tr>
+            <td class="k">Ad pixels (retarget guests)</td>
+            <td><span class="pill part">X only</span></td>
+            <td>X's pixel is live with the sign-up conversion. Adding Meta's pixel (and later its server-side Conversions API) lets us retarget Instagram traffic. Fire a "voted 5" event too, so ads can optimize for engaged guests, not just sign-ups.</td>
+            <td>Same pattern as <code>XPixel</code> and <code>lib/marketing.ts</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="code"><span class="c">// app/api/events/route.ts — the core of the region + device change (sketch)</span>
+const h = await headers();
+const geo = {
+  country: h.get("x-vercel-ip-country"),
+  region:  h.get("x-vercel-ip-country-region"),
+  city:    decodeURIComponent(h.get("x-vercel-ip-city") ?? "") || null,
+  zip:     h.get("x-vercel-ip-postal-code"),
+};
+await logClientEvents(input.events, { userId, deviceId, userAgent: ua, geo });
+<span class="c">// session_start props gain: geo, device: parseDevice(ua) → { os, browser, inApp, tier }</span></div>
+  </section>
+
+  <!-- 6. Storage + privacy -->
+  <section>
+    <span class="eyebrow">6 · Data and privacy</span>
+    <div class="two">
+      <div class="box">
+        <h3>Where answers live</h3>
+        <ul>
+          <li>New table <code>profile_answer</code>: who (account or device), question, answer, when, and where it was asked (card, sign-up, Settings). Append-only, like the Brain events.</li>
+          <li>Current values copy onto <code>user</code> when they sign up (sex and age already have columns; new ones: relationship, housing, work).</li>
+          <li><code>device</code> table gets IP region, platform and phone tier from the first visit, so guests are in the Brain and Journey views with demographics.</li>
+          <li>New Brain events: <code>about_card_shown</code>, <code>about_card_answered</code>, <code>about_card_skipped</code>, <code>like_you_shown</code>, <code>taste_shared</code>. Added to <code>data-dictionary.md</code> first.</li>
+        </ul>
+      </div>
+      <div class="box warn">
+        <h3>Privacy cautions (short version)</h3>
+        <ul>
+          <li><b>Race, ethnicity, religion, health and sex life are "sensitive" data</b> under California's CPRA and most new state laws. Political views are sensitive in some states. Ask only with separate, explicit opt-in, use only in groups, and let people delete them. Never as a deck card.</li>
+          <li><b>Pixels count as "sharing"</b> under California law. Once Meta joins X, we need a "Do not sell or share my info" link and should honor the browser's Global Privacy Control signal.</li>
+          <li><b>Brand insights stay in groups</b>: minimum 20 people per cell (the taste-profile rule already uses 20), from people with <code>data_consent</code> on. Never an individual, never a ZIP-level cell.</li>
+          <li>Privacy policy gets a plain list of what we infer (region from IP, phone type, estimated income band) and why.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Build order -->
+  <section>
+    <span class="eyebrow">7 · Build order</span>
+    <h2>Five PRs, about two weeks of work</h2>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><div><h3>Passive capture</h3><p>Vercel geo headers, screen + client hints, <code>parseDevice()</code>, <code>deviceTier()</code>, Census income file, <code>device</code> columns, Brain shows region and phone tier. No UI change, so it can ship first and every day after starts collecting.</p></div><span class="pill s">Small · 1 day</span></div>
+      <div class="step"><span class="no">2</span><div><h3>About-you cards in the deck</h3><p><code>profile_answer</code> table, card component, schedule in economy config, guest-to-account carry-over, sign-up skips answered fields. 10% holdout who never see cards, so we can check they don't cut votes per visitor.</p></div><span class="pill s">Medium · 2–3 days</span></div>
+      <div class="step"><span class="no">3</span><div><h3>"People like you" bar</h3><p>Third row in <code>ResultBars</code> plus the battle page, narrowest group with ≥20 real votes, locked state with the open-the-card link. Result shows a little longer (1.5s → 2.2s) when the bar is there.</p></div><span class="pill s">Medium · 1–2 days</span></div>
+      <div class="step"><span class="no">4</span><div><h3>Email at vote 9 and the one-tap gate</h3><p>Close-battle trigger, inline email + code card, "results are in" email for that battle (the lifecycle email already exists). Vote 15 card prefilled from cards and IP with Google (now) and Apple (once the developer account is ready) as the one tap; sex, age and ZIP no longer required to finish sign-up.</p></div><span class="pill s">Medium · 2–3 days</span></div>
+      <div class="step"><span class="no">5</span><div><h3>Taste profile and share card</h3><p>Trait scoring (pure, tested), tag back-fill for old battles, You section with wheel and sliders, type names, <code>next/og</code> story card, unlock moment at vote 30.</p></div><span class="pill s">Medium-large · 3–4 days</span></div>
+      <div class="step"><span class="no">6</span><div><h3>Later</h3><p>Rent/own, work and kids cards after sign-up; sensitive opt-ins in Settings with consent; Meta pixel with the do-not-share link; weighted brand reports (results re-weighted to match the US 18–35 mix by sex, age and region).</p></div><span class="pill s">Large · later</span></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">8 · Decisions for Alex</span>
+    <div class="prose">
+      <ol>
+        <li><b>Relationship status at vote 7?</b> I think it's the most useful third question for our content. The alternative is kids, which we already store but which fits fewer of our 18–35 voters.</li>
+        <li><b>Email at vote 9, wall still at 15?</b> Recommended. The wall then only catches people who already said no once.</li>
+        <li><b>Start with PR 1 now?</b> It's invisible to users and the data only starts counting from the day it ships.</li>
+      </ol>
+    </div>
+  </section>
+
+</div>
+
+</body></html>

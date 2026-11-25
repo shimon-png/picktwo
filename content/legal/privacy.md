@@ -8,6 +8,15 @@ _Last updated: November 2026_
 - What you do: battles you post, votes, reasons, outcomes, and basic usage analytics.
 - A random device identifier cookie so you can vote without an account.
 - Where your visit came from (for example the website or ad campaign that linked you here), so we know which campaigns work.
+- Optional "about you" answers you give in the app (for example woman/man, age range, relationship status, ZIP, kids, whether you rent or own, work). Skipping is always fine. They're never shown on your profile; we use them to show you how people like you voted and in group results.
+
+## What we estimate (no questions asked)
+To understand our audience as groups, we estimate a few things from what every browser sends:
+- Your rough region (state and metro area) from your IP address, using our hosting provider's location lookup. We don't store your IP address for this.
+- Your device type: iPhone or Android, the browser or app you opened us in, and the phone's price range (from screen size or model name).
+- An estimated household income band (lower, middle or upper) from public Census figures for your ZIP area, adjusted by phone type.
+
+These estimates are never shown to anyone, never used about you as an individual, and only appear in groups of at least 20 people.
 
 ## Advertising measurement
 We use the X (Twitter) pixel to measure our ads on X. It tells X when someone visits crowdpick.ai and when a new account is created, so X can report how many sign-ups an ad brought. We don't send X your name, email, votes or anything you post. You can limit this with your browser's tracking protection or X's own ad settings.
