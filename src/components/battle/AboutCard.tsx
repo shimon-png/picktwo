@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
 import { api, toast } from "@/lib/client";
 import { logEvent } from "@/lib/events";
-import { ABOUT_QUESTIONS, KID_AGE_CHOICES, shuffled, type AboutQuestionId } from "@/lib/about";
+import { ABOUT_QUESTIONS, KID_AGE_CHOICES, PREFER_NOT, cardOrder, type AboutQuestionId } from "@/lib/about";
 import { cn } from "@/lib/utils";
 
 export type AboutCardPayload = { id: AboutQuestionId; zipGuess?: string | null; cityGuess?: string | null };
@@ -22,7 +22,7 @@ const SLICE = [
  */
 export function AboutCard({ card, onDone }: { card: AboutCardPayload; onDone: (answer: string | null) => void }) {
   const q = ABOUT_QUESTIONS[card.id];
-  const [order] = useState(() => shuffled(q.options));
+  const [order] = useState(() => cardOrder(q.options));
   const [busy, setBusy] = useState(false);
   const [zip, setZip] = useState(card.zipGuess ?? "");
   const [kidsYes, setKidsYes] = useState(false);
@@ -110,7 +110,11 @@ export function AboutCard({ card, onDone }: { card: AboutCardPayload; onDone: (a
               key={o.id}
               type="button"
               disabled={busy}
-              className={cn("rounded-[14px] px-4 font-display text-[20px] font-semibold transition active:scale-[.98]", SLICE[i % SLICE.length])}
+              className={cn(
+                "rounded-[14px] px-4 font-display font-semibold leading-tight transition active:scale-[.98]",
+                order.length > 5 ? "text-[17px]" : "text-[20px]",
+                o.id === PREFER_NOT ? "bg-surface text-[15px] font-medium text-zinc-500 ring-1 ring-ink/10" : SLICE[i % SLICE.length],
+              )}
               onClick={() => (q.id === "kids" && o.id === "YES" ? setKidsYes(true) : send(o.id))}
             >
               {o.label}

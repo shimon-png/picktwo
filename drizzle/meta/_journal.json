@@ -281,6 +281,13 @@
       "when": 1795626101272,
       "tag": "0039_before_after_minute",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795634819409,
+      "tag": "0040_about_cards_v2",
+      "breakpoints": true
     }
   ]
 }

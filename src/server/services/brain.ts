@@ -350,3 +350,35 @@ export async function beforeAfterStats(view: BrainView) {
   }
   return { changeDay, changeTime: time, ...summarize(rows) };
 }
+
+export type PinnedDay = { votesPerVisitor: number | null; votersPerVisitor: number | null; newVoters: number; signups: number; posts: number };
+
+/**
+ * The pinned row at the top of the Brain (Alex, Nov 25): today so far and yesterday (New York days), same counting
+ * as Day by day. New voters = people whose first counted vote ever fell on that day (in Clean view: their first real
+ * vote since the clean start date).
+ */
+export async function pinnedNumbers(view: BrainView): Promise<{ today: PinnedDay; yesterday: PinnedDay; todayDay: string }> {
+  const scope = await brainScope(view, 2);
+  const [daily, firsts, [t]] = await Promise.all([
+    dailyNumbers(scope),
+    db.execute<{ day: string; n: number }>(sql`
+      WITH f AS (SELECT ${WHO_V} AS who, min(v.created_at) AS first FROM ${V_FROM} WHERE NOT v.flagged AND ${scope.vt} GROUP BY 1)
+      SELECT to_char((first AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD') AS day, count(*)::int AS n
+      FROM f WHERE who IS NOT NULL AND first > now() - interval '3 days' GROUP BY 1`),
+    db.execute<{ today: string; yesterday: string }>(sql`
+      SELECT to_char((now() AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD') AS today, to_char((now() AT TIME ZONE ${TZ})::date - 1, 'YYYY-MM-DD') AS yesterday`),
+  ]);
+  const pin = (day: string): PinnedDay => {
+    const d = daily.find((r) => r.day === day);
+    const visitors = Number(d?.visitors ?? 0);
+    return {
+      votesPerVisitor: visitors ? Number(d!.votes) / visitors : null,
+      votersPerVisitor: visitors ? Number(d!.voters) / visitors : null,
+      newVoters: Number([...firsts].find((r) => r.day === day)?.n ?? 0),
+      signups: Number(d?.signups ?? 0),
+      posts: Number(d?.posts ?? 0),
+    };
+  };
+  return { today: pin(t.today), yesterday: pin(t.yesterday), todayDay: t.today };
+}
