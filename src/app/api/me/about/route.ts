@@ -8,7 +8,7 @@ import { ABOUT_QUESTION_IDS } from "@/lib/about";
 const input = z.object({
   question: z.enum(ABOUT_QUESTION_IDS),
   /** null = skipped */
-  answer: z.string().trim().max(12).nullable(),
+  answer: z.string().trim().max(24).nullable(),
   kidAges: z.array(z.string().max(12)).max(6).optional(),
   via: z.enum(["card", "signup", "settings", "pickbot"]).optional(),
 });

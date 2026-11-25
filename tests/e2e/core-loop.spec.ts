@@ -499,7 +499,8 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await expect(b.getByText(/You’re hidden from “Voted like you”/)).toBeVisible();
 });
 
-test("Pickbot: ask → profile question → tailored → quick battles → answer → anonymous crowd battle (fake AI)", async ({ browser }) => {
+test("Pickbot: every profile card first → answer → ask the crowd → better answer after 30 battles (fake AI)", async ({ browser }) => {
+  test.setTimeout(180_000);
   // 10% of accounts are in the Pickbot holdout (stable per account): make a fresh one until it isn't.
   let p: Page | null = null;
   for (let i = 0; i < 4 && !p; i++) {
@@ -516,30 +517,30 @@ test("Pickbot: ask → profile question → tailored → quick battles → answe
   await page.getByRole("button", { name: "Send" }).click();
   await page.waitForURL(/\/ask\/[^/]+$/);
 
-  // Onboarding gave sex, age and ZIP: Pickbot asks only the missing relationship question.
+  // Onboarding gave sex, age and ZIP; Pickbot asks every other card in the chat, with no way to skip.
   const gate = page.getByTestId("pickbot-gate");
-  await expect(gate.getByText("of 4")).toBeVisible();
+  await expect(gate).toBeVisible();
+  await expect(page.getByText(/Before I answer, I need to know you a little/)).toBeVisible();
+  await expect(page.getByText("Skip, just answer")).toHaveCount(0);
   await snap(page, "pickbot-02-gate");
-  await gate.getByRole("button", { name: "Single" }).click();
-  await expect(page.getByText("Single", { exact: true })).toBeVisible();
+  let cards = 0;
+  while (await gate.isVisible().catch(() => false)) {
+    const label = await gate.getByText(/of 10/).textContent();
+    await gate.getByRole("button").first().click();
+    await expect(gate.getByText(label!)).toHaveCount(0, { timeout: 10_000 });
+    if (++cards > 10) throw new Error("too many cards");
+  }
+  expect(cards).toBe(6); // relationship, education, home, race, party, work (onboarding gave sex, age, ZIP and kids)
 
-  // Under 30 battles: general or tailored.
-  await page.getByRole("button", { name: /Tailored to my personality/ }).click();
-  const battles = page.getByTestId("pickbot-battles");
-  await expect(battles.getByText(/more to go/)).toBeVisible();
-  await snap(page, "pickbot-03-battles");
-  await battles.getByRole("button", { name: /^Vote for/ }).first().click();
-  await expect(battles.getByText(/\d+%/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Stop and answer now" }).click();
-
-  // The (fake) answer streams in, labelled General since the profile isn't complete.
+  // Then the answer right away: General, since the taste profile isn't at 30 yet.
   const answer = page.getByTestId("pickbot-answer").last();
   await expect(answer.getByText("The first option")).toBeVisible();
   await expect(answer.getByText("General")).toBeVisible();
-  await expect(answer.getByText(/Why it fits you/)).toBeVisible();
   await answer.getByRole("button", { name: "Helpful", exact: true }).click();
   await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute("aria-pressed", "true");
   await snap(page, "pickbot-04-answer");
+  // No "better answer" offer until the crowd question is settled.
+  await expect(page.getByTestId("pickbot-better")).toHaveCount(0);
 
   // Ask the crowd: draft → review → post as "Asked via Pickbot".
   await page.getByRole("button", { name: "Yes, ask the crowd" }).click();
@@ -549,15 +550,37 @@ test("Pickbot: ask → profile question → tailored → quick battles → answe
   await draft.getByRole("button", { name: "Post anonymously" }).click();
   await expect(page.getByText("Posted anonymously.", { exact: false })).toBeVisible();
   await expect(page.getByText("With the crowd")).toBeVisible();
+
+  // Then: "Want a better answer?" with the 30-battle bar (all votes so far count).
+  const better = page.getByTestId("pickbot-better");
+  await expect(better.getByText(/Want a better answer, tailored to your personality\? Answer \d+ more battles?/)).toBeVisible();
+  await expect(better.getByText(/\d+ \/ 30 battles/)).toBeVisible();
+  await snap(page, "pickbot-06-better");
+  await better.getByRole("button", { name: "Yes, let’s go" }).click();
+  const battles = page.getByTestId("pickbot-battles");
+  const bar = battles.getByTestId("pickbot-taste-bar");
+  const before = Number((await bar.getByText(/\/ 30 battles/).textContent())!.split("/")[0].trim());
+  await battles.getByRole("button", { name: /^Vote for/ }).first().click();
+  await expect(bar.getByText(`${before + 1} / 30 battles`)).toBeVisible();
+  await snap(page, "pickbot-07-battles");
+
+  // Reach 30 votes (through the API, like voting in the deck), then the thread gives the tailored answer.
+  const need = 30 - (before + 1);
+  const cast = await apiVotes(page, need);
+  test.skip(cast.filter((c) => c.status === 200).length < need, "not enough open battles to reach 30");
+  await page.reload();
+  await expect(page.getByTestId("pickbot-answer").last().getByText("Tailored")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("pickbot-better")).toHaveCount(0);
+  await snap(page, "pickbot-08-tailored");
+
+  // The crowd battle never shows who asked; follow-ups work; history lists the question.
   await page.getByRole("link", { name: "See it →" }).click();
   await expect(page.getByText(/askedviapickbot|Asked via Pickbot/).first()).toBeVisible();
   await expect(page.getByText(/asker\d_/)).toHaveCount(0);
-
-  // Follow-up in the same thread, and the question shows in history.
   await page.goBack();
   await page.getByLabel("Ask a follow-up").fill("What shoes go with it?");
   await page.getByLabel("Ask a follow-up").press("Enter");
-  await expect(page.getByTestId("pickbot-answer")).toHaveCount(2);
+  await expect(page.getByTestId("pickbot-answer")).toHaveCount(3);
   await page.goto("/ask");
   await expect(page.getByRole("heading", { name: "Your questions" })).toBeVisible();
 });

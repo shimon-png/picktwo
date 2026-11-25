@@ -11,12 +11,12 @@ export const askInput = z.object({
 
 export const gateInput = z.object({
   question: z.enum(ABOUT_QUESTION_IDS),
-  answer: z.string().trim().max(12).nullable(),
+  answer: z.string().trim().min(1).max(24),
   label: z.string().trim().max(40).nullable().default(null),
   kidAges: z.array(z.string().max(12)).max(6).optional(),
 });
 
-export const stepInput = z.object({ action: z.enum(["general", "tailored", "stop", "retailor"]) });
+export const stepInput = z.object({ action: z.enum(["retailor", "stop"]) });
 
 export const rateInput = z.object({ messageId: z.string().max(40), rating: z.enum(["UP", "DOWN"]), note: z.string().max(200).optional() });
 
