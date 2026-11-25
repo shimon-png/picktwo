@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getBrainStats, type BrainView } from "@/server/services/brain";
+import { beforeAfterStats, getBrainStats, type BrainView } from "@/server/services/brain";
+import { change } from "@/server/services/before-after-rules";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
@@ -103,7 +104,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -112,6 +113,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     gateTestResults(days),
     passiveStats(view, days),
     aboutStats(view, days),
+    beforeAfterStats(view),
   ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
@@ -225,6 +227,49 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
             ];
           })}
         />
+      </Section>
+
+      <Section
+        title={`Before vs after the change · ${ba.changeDay}`}
+        note={`The about-you launch (cards in the deck, "people like you", one-tap sign-up, taste profile) went live on ${ba.changeDay}. Same counting as Day by day (${view === "clean" ? "Clean" : "All data"} view). Averages are per day; the launch day itself counts as neither side. To compare around a different change, set beforeAfterFrom (YYYYMMDD) in Config.`}
+      >
+        <Rows
+          head={["Per day", `Before (${ba.before.days} days)`, `After (${ba.after.days} day${ba.after.days === 1 ? "" : "s"})`, "Change"]}
+          rows={(
+            [
+              ["Visitors", ba.before.visitors, ba.after.visitors, (x: number) => x.toFixed(1)],
+              ["Votes", ba.before.votes, ba.after.votes, (x: number) => x.toFixed(1)],
+              ["Voters", ba.before.voters, ba.after.voters, (x: number) => x.toFixed(1)],
+              ["Sign-ups", ba.before.signups, ba.after.signups, (x: number) => x.toFixed(1)],
+              ["Votes per visitor", ba.before.votesPerVisitor, ba.after.votesPerVisitor, (x: number) => x.toFixed(2)],
+              ["Votes per voter", ba.before.votesPerVoter, ba.after.votesPerVoter, (x: number) => x.toFixed(2)],
+              ["Sign-up rate (of visitors)", ba.before.signupRate, ba.after.signupRate, (x: number) => `${(100 * x).toFixed(1)}%`],
+            ] as const
+          ).map(([label, b, a, fmt]) => {
+            const c = ba.after.days && ba.before.days ? change(b, a) : null;
+            return [
+              label,
+              ba.before.days ? fmt(b) : "—",
+              ba.after.days ? fmt(a) : "—",
+              c == null ? "—" : <span key="c" className={c > 0 ? "text-green" : c < 0 ? "text-b" : ""}>{`${c > 0 ? "+" : c < 0 ? "−" : ""}${Math.abs(Math.round(c * 100))}%`}</span>,
+            ];
+          })}
+        />
+        <Rows
+          head={["Day", "Period", "Visitors", "Votes", "Voters", "Votes per visitor", "Votes per voter", "Sign-ups", "Sign-up rate"]}
+          rows={ba.rows.map((d) => [
+            d.day,
+            d.period === "launch" ? <b key="p">Launch day</b> : d.period === "after" ? <span key="p" className="text-green">After</span> : "Before",
+            d.visitors,
+            d.votes,
+            d.voters,
+            d.visitors ? (d.votes / d.visitors).toFixed(1) : "—",
+            d.voters ? (d.votes / d.voters).toFixed(1) : "—",
+            d.signups,
+            pct(d.signups, d.visitors),
+          ])}
+        />
+        {ba.after.days === 0 && <p className="text-xs text-zinc-500">No full day after the change yet: the After column fills in from tomorrow (New York time).</p>}
       </Section>
 
       <Section
