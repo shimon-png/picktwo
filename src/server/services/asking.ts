@@ -101,7 +101,7 @@ export async function askingFor(v: Viewer, opts: { topic?: AskingTopic | null; n
   const key = v.user?.id ?? v.deviceId ?? "anon";
   const rounds: AskingItem[][] = [];
   for (let r = 0; r < Math.max(1, e.askingRounds); r++) {
-    const picks = pickAsking({ exclude, sex: known.sex, age: known.age, month: nyMonth(now), campaign, topic: mindTopic, seed: `asking:${key}:${nyDay(now)}:${r}` });
+    const picks = pickAsking({ exclude, sex: known.sex, age: known.age, month: nyMonth(now), campaign, topic: mindTopic, n: e.askingCount, seed: `asking:${key}:${nyDay(now)}:${r}` });
     if (!picks.length) break;
     picks.forEach((p) => exclude.add(p.id));
     rounds.push(picks.map((p) => ({ id: p.id, q: p.q, context: p.context ?? null, slug: slugs.get(presetBattleId(p.id))!, a: p.a, b: p.b })));
