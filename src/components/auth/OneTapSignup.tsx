@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { AGE_RANGES } from "@/lib/constants";
 import { suggestedHandle } from "@/lib/handles";
 import { useZipCheck } from "@/lib/use-zip";
-import { ZipHint } from "@/components/ui/ZipHint";
 
 type Prefill = {
   votes: number;
@@ -38,9 +37,11 @@ const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
  * The sign-up card at the end of the free votes (About-you plan §3b, Nov 25 2026): everything we already know is
  * filled in (username, sex · age from the about-you cards, ZIP from the card or the IP guess), each row editable,
  * so the only action left is who they are: Google (when set up) or email + code. Sex, age and ZIP are optional.
+ * ZIP is never asked (Alex, Nov 26 2026): it comes from the about-you answers or the IP and is saved silently.
+ * Variant "map" ("See my personality map", lib/mind.ts): any missing sex / age shows open and must be tapped.
  * Ends with a full page load of `next` so the guest's votes and answers move onto the new account.
  */
-export function OneTapSignup({ next, soft = false }: { next: string; soft?: boolean }) {
+export function OneTapSignup({ next, soft = false, variant }: { next: string; soft?: boolean; variant?: "map" }) {
   const [pre, setPre] = useState<Prefill | null>(null);
   const [step, setStep] = useState<"confirm" | "code">("confirm");
   const [handle, setHandle] = useState("");
@@ -48,7 +49,7 @@ export function OneTapSignup({ next, soft = false }: { next: string; soft?: bool
   const [sex, setSex] = useState("");
   const [age, setAge] = useState("");
   const [zip, setZip] = useState("");
-  const [edit, setEdit] = useState<"handle" | "about" | "place" | null>(null);
+  const [edit, setEdit] = useState<"handle" | "about" | null>(null);
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [devCode, setDevCode] = useState<string | null>(null);
@@ -138,7 +139,10 @@ export function OneTapSignup({ next, soft = false }: { next: string; soft?: bool
   if (!pre) return <div className="h-64 animate-pulse rounded-[14px] bg-surface" aria-label="Loading" />;
 
   const aboutLine = [SEX_LABEL[sex], AGE_RANGES.find((a) => a.id === age)?.label].filter(Boolean).join(" · ");
-  const placeLine = zip.trim() && zipCheck.state === "ok" ? `${zipCheck.state === "ok" && zip === pre.zipCode && pre.place ? `${pre.place} ` : ""}${zip.trim()}` : "";
+  const map = variant === "map";
+  // Personality map: what the cards didn't tell us stays open until it's tapped.
+  const askAbout = map && (!pre.sex || !pre.ageRange);
+  const aboutMissing = map && (!sex || !age);
 
   return (
     <div className="space-y-3">
@@ -146,9 +150,15 @@ export function OneTapSignup({ next, soft = false }: { next: string; soft?: bool
         <span className="inline-block rounded-full bg-green-soft px-2 py-1 font-display text-[10px] font-semibold uppercase tracking-[.1em] text-green">
           Save your {pre.votes > 0 ? `${pre.votes} ` : ""}picks
         </span>
-        <h2 className="text-[22px] leading-tight">You’re all set. Just confirm.</h2>
+        <h2 className="text-[22px] leading-tight">{map ? "Your personality map is ready." : "You’re all set. Just confirm."}</h2>
         <p className="text-sm text-zinc-600">
-          {soft ? "Saves your picks and streak, or keep voting for now." : "Keep voting, save your picks and see how people like you voted."}
+          {map
+            ? askAbout
+              ? "We filled in what we know. Tap what’s missing and confirm."
+              : "We filled in what we know. Just confirm."
+            : soft
+              ? "Saves your picks and streak, or keep voting for now."
+              : "Keep voting, save your picks and see how people like you voted."}
         </p>
       </div>
 
@@ -177,7 +187,13 @@ export function OneTapSignup({ next, soft = false }: { next: string; soft?: bool
                 />
               </div>
             </Row>
-            <Row label={aboutLine || "Add sex and age (optional)"} hint="About you" muted={!aboutLine} onEdit={() => setEdit(edit === "about" ? null : "about")} open={edit === "about"}>
+            <Row
+              label={aboutLine || (map ? "Tap your sex and age" : "Add sex and age (optional)")}
+              hint="About you"
+              muted={!aboutLine}
+              onEdit={() => setEdit(edit === "about" ? null : "about")}
+              open={edit === "about" || askAbout}
+            >
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(SEX_LABEL).map(([id, l]) => (
                   <button key={id} type="button" className={cn("chip !py-1 text-sm", sex === id && "chip-on")} aria-pressed={sex === id} onClick={() => setSex(sex === id ? "" : id)}>
@@ -193,14 +209,10 @@ export function OneTapSignup({ next, soft = false }: { next: string; soft?: bool
                 ))}
               </div>
             </Row>
-            <Row label={placeLine || "Add your ZIP (optional)"} hint={pre.zipFromIp && zip === pre.zipCode ? "Your area (from your connection)" : "Your area"} muted={!placeLine} onEdit={() => setEdit(edit === "place" ? null : "place")} open={edit === "place"}>
-              <input aria-label="ZIP code" className="input" inputMode="numeric" autoComplete="postal-code" maxLength={10} placeholder="ZIP code" value={zip} onChange={(e) => setZip(e.target.value)} />
-              <ZipHint check={zipCheck} />
-            </Row>
           </ul>
 
           {pre.google && (
-            <button type="button" className="btn-cta w-full py-3" onClick={google} disabled={busy}>
+            <button type="button" className="btn-cta w-full py-3" onClick={google} disabled={busy || aboutMissing}>
               Continue with Google
             </button>
           )}
@@ -219,7 +231,7 @@ export function OneTapSignup({ next, soft = false }: { next: string; soft?: bool
               onChange={(e) => setEmail(e.target.value)}
               aria-label="Your email"
             />
-            <button className={cn("w-full py-3", pre.google ? "btn-outline" : "btn-cta")} disabled={busy || !email.trim() || !HANDLE_RE.test(handle) || (!!zip.trim() && zipCheck.state === "bad")}>
+            <button className={cn("w-full py-3", pre.google ? "btn-outline" : "btn-cta")} disabled={busy || !email.trim() || !HANDLE_RE.test(handle) || aboutMissing}>
               {busy ? "Sending…" : "Email me a code"}
             </button>
           </form>
