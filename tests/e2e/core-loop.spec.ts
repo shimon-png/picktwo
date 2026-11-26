@@ -655,6 +655,12 @@ test("Ask Pickbot deck card: shows once, at the account's tested position (never
       await expect(mindCard).toBeHidden({ timeout: 5000 }).catch(() => {});
       continue;
     }
+    const asking = p.getByTestId("asking-card");
+    if (await asking.isVisible().catch(() => false)) {
+      await asking.getByRole("button", { name: /^(Not now|Keep voting)$/ }).click({ timeout: 3000 }).catch(() => {});
+      await expect(asking).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
     const about = p.getByRole("article", { name: /^About you/ });
     if (await about.isVisible()) {
       await about.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
@@ -692,6 +698,12 @@ test("Ask Pickbot deck card: shows once, at the account's tested position (never
     if (await mindCard.isVisible()) {
       await mindCard.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
       await expect(mindCard).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const asking = p.getByTestId("asking-card");
+    if (await asking.isVisible().catch(() => false)) {
+      await asking.getByRole("button", { name: /^(Not now|Keep voting)$/ }).click({ timeout: 3000 }).catch(() => {});
+      await expect(asking).toBeHidden({ timeout: 5000 }).catch(() => {});
       continue;
     }
     const about = p.getByRole("article", { name: /^About you/ });
