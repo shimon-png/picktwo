@@ -54,6 +54,8 @@ export type BattleTags = {
   brain?: BrainTags;
   /** Pinned first: the homepage hero and the top of everyone's Vote deck while it's open (set by a migration). */
   featured?: boolean;
+  /** Backs a "People like you are asking" preset (lib/asking.ts, migration 0043); kept out of the Vote feed. */
+  askingPreset?: string;
   /** Posted from a Pickbot thread ("Asked via Pickbot"). The asker is only in pickbot_thread, never shown. */
   pickbot?: boolean;
   /** Written by auto-seeding (services/auto-seed.ts): batch, poster voice, topic, planned split, photo credits. Never sent to the browser. */

@@ -10,9 +10,24 @@ const EXAMPLES = ["Which dress for a winter wedding?", "Should I text him back?"
 /**
  * The Pickbot text box: words, up to 4 photos. New question (no `threadId`) → opens the thread; follow-up → `onSent`.
  */
-export function AskComposer({ threadId, onSent, examples = false, placeholder = "Ask anything…" }: { threadId?: string; onSent?: () => void; examples?: boolean; placeholder?: string }) {
+export function AskComposer({
+  threadId,
+  onSent,
+  examples = false,
+  placeholder = "Ask anything…",
+  initialText = "",
+  preset,
+}: {
+  threadId?: string;
+  onSent?: () => void;
+  examples?: boolean;
+  placeholder?: string;
+  /** Filled in from a "People like you are asking" card (lib/asking.ts); `preset` goes with the question. */
+  initialText?: string;
+  preset?: string;
+}) {
   const router = useRouter();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [photos, setPhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -44,7 +59,7 @@ export function AskComposer({ threadId, onSent, examples = false, placeholder = 
         setPhotos([]);
         onSent?.();
       } else {
-        const { id } = await api<{ id: string }>("/api/pickbot/ask", { body: { text: t, photos } });
+        const { id } = await api<{ id: string }>("/api/pickbot/ask", { body: { text: t, photos, ...(preset ? { preset } : {}) } });
         router.push(`/ask/${id}`);
         return;
       }
@@ -94,7 +109,8 @@ export function AskComposer({ threadId, onSent, examples = false, placeholder = 
                 send();
               }
             }}
-            rows={threadId ? 1 : 2}
+            rows={threadId ? 1 : initialText ? 3 : 2}
+            autoFocus={!!initialText}
             placeholder={placeholder}
             className="min-h-11 flex-1 resize-none bg-transparent px-2 py-2.5 text-[16px] text-ink outline-none placeholder:text-ink/40"
           />

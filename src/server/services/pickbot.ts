@@ -24,6 +24,7 @@ import { deliver } from "./mailer";
 import { zipPlace } from "./zip";
 import { similarBattles } from "./pickbot-crowd";
 import { sendPush } from "./push";
+import { presetById } from "@/lib/asking";
 import { classifyQuestion, draftCrowdBattle, pickbotConfigured, streamAnswer, type CrowdDraft, type ProfileForAi, type Turn } from "./pickbot-ai";
 import {
   answerModel,
@@ -137,16 +138,17 @@ async function screen(user: User, photos: string[]) {
 }
 
 /** A new question: screen photos, classify, open the thread. Off-topic and crisis replies are added right away. */
-export async function askPickbot(userIn: User | null, input: { text: string; photos: string[] }) {
+export async function askPickbot(userIn: User | null, input: { text: string; photos: string[]; preset?: string }) {
   const user = await requireAccess(userIn);
   if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow for more.");
   await screen(user, input.photos);
   const { c, stats } = await classifyQuestion(input.text, input.photos);
-  const [t] = await db.insert(pickbotThreads).values({ userId: user.id, title: c.title, classification: c, state: {} }).returning();
+  const preset = presetById(input.preset)?.id;
+  const [t] = await db.insert(pickbotThreads).values({ userId: user.id, title: c.title, classification: c, state: preset ? { preset } : {} }).returning();
   await addMessage(t.id, { role: "USER", kind: "question", text: input.text, photos: input.photos, model: stats?.model, costUsd: stats?.costUsd, inputTokens: stats?.inputTokens, outputTokens: stats?.outputTokens });
   if (c.crisis) await addMessage(t.id, { role: "BOT", kind: "note", text: CRISIS });
   if (c.scope === "off_topic") await addMessage(t.id, { role: "BOT", kind: "note", text: OFF_TOPIC });
-  track("pickbot_asked", { threadId: t.id, photos: input.photos.length, chars: input.text.length, scope: c.scope, theme: c.theme, crisis: c.crisis, followUp: false }, { userId: user.id });
+  track("pickbot_asked", { threadId: t.id, photos: input.photos.length, chars: input.text.length, scope: c.scope, theme: c.theme, crisis: c.crisis, followUp: false, preset: preset ?? null }, { userId: user.id });
   return { id: t.id };
 }
 

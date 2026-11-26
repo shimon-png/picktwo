@@ -7,6 +7,8 @@ const photo = z.string().refine((u) => u.startsWith("https://") || u.startsWith(
 export const askInput = z.object({
   text: z.string().trim().min(3, "Ask a little more").max(2000, "Keep it under 2,000 characters"),
   photos: z.array(photo).max(4).default([]),
+  /** "People like you are asking" preset it started from (lib/asking.ts). */
+  preset: z.string().regex(/^[a-z_]{2,40}$/).optional(),
 });
 
 export const gateInput = z.object({

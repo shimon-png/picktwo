@@ -9,7 +9,7 @@ export const metadata = { title: "Brain list" };
 
 const nyTime = (iso: string) =>
   new Date(iso).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
-const PLACES: Record<string, string> = { feed: "Vote deck", home: "Homepage card", discover: "Discover", search: "Search", profile: "Profile", seed: "Seed (fake)" };
+const PLACES: Record<string, string> = { feed: "Vote deck", home: "Homepage card", discover: "Discover", search: "Search", profile: "Profile", asking: "People like you are asking", seed: "Seed (fake)" };
 
 function Person({ who, handle }: { who: string | null; handle: string | null }) {
   // A vote or visit can outlive its owner (deleted account): nothing to open.
