@@ -5,7 +5,7 @@ import { or, eq, isNotNull } from "drizzle-orm";
 import { isAdmin } from "../viewer";
 import { parseChange, periodOf, summarize, type BaRow } from "./before-after-rules";
 import { getEconomy } from "./config";
-import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
+import { campaignOf, classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 
 /**
  * Two ways to look at the Brain (Alex, Nov 23 2026). Nothing is ever deleted; the views only filter.
@@ -290,7 +290,7 @@ async function visitsBySource(scope: Scope): Promise<VisitSourceRow[]> {
     b.who.add(who);
     if (r.day === r.today) b.today.add(who);
     if (r.day === r.yesterday) b.yesterday.add(who);
-    const tag = String(p.utm_source ?? p.referrerHost ?? (p.twclid ? "twclid" : ""));
+    const tag = campaignOf(p) ?? String(p.utm_source ?? p.referrerHost ?? (p.twclid ? "twclid" : ""));
     if (tag) b.hosts.set(tag, (b.hosts.get(tag) ?? 0) + 1);
     by.set(src, b);
   }

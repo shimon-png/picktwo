@@ -10,7 +10,7 @@ import { db } from "../db";
 import { brainScope, WHO_E, WHO_V, type BrainView } from "./brain";
 import { getEconomy } from "./config";
 import { getFinance } from "./finance";
-import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
+import { campaignOf, classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 import { unitEconomics, whatIf, type UeAssumptions, type UeInputs } from "./unit-economics-rules";
 import { isoDay } from "./before-after-rules";
 
@@ -36,7 +36,7 @@ async function costPerVisitor(): Promise<{ perVisitor: number | null; spend: num
   }
 }
 
-type Person = { who: string; visits: number; first: Record<string, unknown> | null; votes: number; signed: boolean };
+type Person = { who: string; visits: number; days: number; first: Record<string, unknown> | null; votes: number; signed: boolean };
 
 /** All data from economy `ueFrom` (a New York day, YYYYMMDD; default 2026-11-23, the start of real tracking) to now. */
 export async function unitEconomicsStats(view: BrainView) {
@@ -52,14 +52,15 @@ export async function unitEconomicsStats(view: BrainView) {
       WHERE e.name = 'session_start' AND e.created_at > ${since} AND ${ev}
     ),
     p AS (
-      SELECT who, count(*)::int AS visits, (array_agg(props ORDER BY created_at))[1] AS first
+      SELECT who, count(*)::int AS visits, (array_agg(props ORDER BY created_at))[1] AS first,
+        count(DISTINCT (created_at AT TIME ZONE 'America/New_York')::date)::int AS days
       FROM s WHERE who IS NOT NULL GROUP BY who
     ),
     vv AS (
       SELECT ${WHO_V} AS who, count(*)::int AS n FROM vote v LEFT JOIN device dv ON dv.id = v.device_id
       WHERE v.created_at > ${since} AND NOT v.flagged AND ${vt} GROUP BY 1
     )
-    SELECT p.who, p.visits, p.first, COALESCE(vv.n, 0) AS votes,
+    SELECT p.who, p.visits, p.days, p.first, COALESCE(vv.n, 0) AS votes,
       EXISTS (SELECT 1 FROM "user" u WHERE u.id = p.who AND u.onboarded_at > ${since} AND ${us}) AS signed
     FROM p LEFT JOIN vv ON vv.who = p.who`);
   const cost = await costPerVisitor();
@@ -85,8 +86,30 @@ export async function unitEconomicsStats(view: BrainView) {
     const src = classifySource(p.first);
     bySource.set(src, [...(bySource.get(src) ?? []), p]);
   }
+  // Ad campaigns (Nov 26, two-funnel test): people whose first visit was an ad click, split by its utm_campaign.
+  const byCampaign = new Map<string, { source: Source; people: Person[]; landings: Map<string, number> }>();
+  for (const p of all) {
+    const c = campaignOf(p.first);
+    if (!c) continue;
+    const b = byCampaign.get(c) ?? { source: classifySource(p.first), people: [] as Person[], landings: new Map<string, number>() };
+    b.people.push(p);
+    const f = (p.first?.first && typeof p.first.first === "object" ? p.first.first : p.first) as Record<string, unknown> | null;
+    const landing = typeof f?.landing === "string" ? f.landing : "";
+    if (landing) b.landings.set(landing, (b.landings.get(landing) ?? 0) + 1);
+    byCampaign.set(c, b);
+  }
+  const campaigns = [...byCampaign.entries()]
+    .map(([campaign, b]) => ({
+      campaign,
+      label: SOURCE_LABELS[b.source],
+      landing: [...b.landings.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? "",
+      cameBack: b.people.filter((p) => Number(p.days) >= 2).length / b.people.length,
+      ...unitEconomics(inputs(b.people), a),
+    }))
+    .sort((x, y) => y.visitors - x.visitors);
   const order: Source[] = ["x_campaign", "x_organic", "direct", "referral", "other_campaign", "unknown"];
   return {
+    campaigns,
     from,
     assumptions: a,
     cost,

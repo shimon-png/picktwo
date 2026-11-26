@@ -478,6 +478,31 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           signed-up user worth 3× → {money(ue.whatIf.signupValueX3)}. Compare with what an ad click costs on X or Meta (about $0.30–$2): break-even above
           that means paid ads pay for themselves. {ueFixedLine(ue)}
         </p>
+        <h3 className="pt-2 font-sans text-sm font-medium">By ad campaign</h3>
+        {ue.campaigns.length === 0 ? (
+          <p className="text-xs text-zinc-500">No ad visits yet. Tag each campaign link, e.g. ?utm_source=x&amp;utm_campaign=whos_right.</p>
+        ) : (
+          <Rows
+            head={["Campaign (utm_campaign)", "Source", "Landing page", "Visitors", "Votes per visitor", "Sign-up rate", "Came back another day", "Break-even per visitor"]}
+            rows={ue.campaigns.map((c) => [
+              c.visitors < 30 ? `${c.campaign} (few)` : c.campaign,
+              <span key="s" className="text-xs text-zinc-500">{c.label}</span>,
+              <span key="l" className="text-xs text-zinc-500">{c.landing || "—"}</span>,
+              c.visitors,
+              c.votesPerVisitor.toFixed(1),
+              `${(100 * c.signupRate).toFixed(1)}%`,
+              `${Math.round(100 * c.cameBack)}%`,
+              <b key="b" className={c.breakEven > 0 ? "text-green" : "text-b"}>
+                {money(c.breakEven)}
+              </b>,
+            ])}
+          />
+        )}
+        <p className="text-xs text-zinc-500">
+          Each person counts under the campaign of their first visit (an ad click or utm tag), with the page that visit landed on. Came back = visited on 2+
+          different New York days. Compare break-even with that campaign&apos;s cost per click in X Ads: break-even is the most a visitor can cost, so higher is
+          better. Under 30 visitors the numbers swing a lot.
+        </p>
       </Section>
 
       <Section
@@ -782,7 +807,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section
         title="Visits by source"
-        note="Each visit's own tags: an X ad click (twclid) or utm_source=x/twitter is the X campaign, a t.co / x.com referrer is X organic. Visits add up to the Visits tile; a person who came two ways counts under both. Tip: put utm_source on every campaign link, because apps often hide the referrer."
+        note="Each visit's own tags: an X ad click (twclid) or utm_source=x/twitter is the X campaign, a t.co / x.com referrer is X organic. Visits add up to the Visits tile; a person who came two ways counts under both. Top tags show the utm_campaign for ad visits. Tip: put utm_source and utm_campaign on every campaign link, because apps often hide the referrer."
       >
         <Rows
           head={["Source", "People today", "People yesterday", "People", "Visits", "Top tags"]}
