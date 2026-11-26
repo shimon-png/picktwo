@@ -122,7 +122,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     const engaged = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
     const d = decisions.get(r.b.id);
     // "What's on your mind this week?" (lib/mind.ts): battles on the topic they picked rise.
-    const onMind = mindFactor(mind, { theme: r.b.tags?.brain?.theme, title: r.b.title, context: r.b.context }, economy.mindBoost);
+    const onMind = mindFactor(mind?.topic ?? null, { theme: r.b.tags?.brain?.theme, title: r.b.title, context: r.b.context }, economy.mindBoost, mind?.text);
     const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind;
     const featured = !!r.b.tags?.featured;
     const human = isHumanBattle({ id: r.b.id, authorHasEmail: !!r.authorHasEmail, pickbot: r.b.tags?.pickbot });

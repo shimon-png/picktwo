@@ -14,6 +14,7 @@ import { ARM_LABELS, type GateCell } from "@/server/services/gate-test-rules";
 import { LoadZipIncome, RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
 import { passiveStats, type GroupRow } from "@/server/services/passive-stats";
 import { aboutStats, type ArmNumbers } from "@/server/services/about-stats";
+import { mindStats } from "@/server/services/mind-stats";
 import { profileBarStats } from "@/server/services/profile-progress";
 import { pickbotStats } from "@/server/services/pickbot-stats";
 import { ABOUT_QUESTIONS } from "@/lib/about";
@@ -299,7 +300,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb, pk] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb, pk, md] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -314,6 +315,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     pinnedNumbers(view),
     profileBarStats(view, days),
     pickbotStats(view, days),
+    mindStats(view, days),
   ]);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
@@ -615,6 +617,19 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
           <span>{ps.zipIncomeRows ? `Census income loaded for ${ps.zipIncomeRows.toLocaleString()} ZIP areas.` : "Census income isn't loaded yet (the daily job loads it; or tap the button)."}</span>
           <LoadZipIncome rows={ps.zipIncomeRows} />
+        </div>
+      </Section>
+
+      <Section
+        title="What’s on your mind this week?"
+        note={`One-tap deck card ${md.on ? "after vote 3 (Config mindAt), again after a week" : "(off: Config mindAt = 0)"}; the topic picked steers the next battles. "Other" lets people type their own answer, listed below (the typed words steer battles too). Signed-out people get the "personality map" sign-up card 8 votes after picking. ${md.holdoutPct}% of people never see the card.`}
+      >
+        <p className="text-sm">
+          Shown {md.shown} · answered {md.answered} ({pct(md.answered, md.shown)}) · skipped {md.skipped} · sign-up nudges {md.nudges}
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Rows head={["Topic", "Picked", "Share"]} rows={md.topics.map((t) => [t.label, t.n, pct(t.n, md.answered)])} />
+          <Rows head={["Typed after “Other”", "Times", "Last"]} rows={md.typed.map((t) => [t.text, t.n, t.last.slice(5, 16)])} />
         </div>
       </Section>
 

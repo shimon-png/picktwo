@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeMind, matchesMind, mindCardDue, mindFactor, mindNudgeDue, MIND_TOPICS, type MindRow } from "@/lib/mind";
+import { activeMind, cleanMindText, matchesMind, mindCardDue, mindFactor, mindNudgeDue, mindWords, topicsInText, MIND_TOPIC_IDS, MIND_TOPICS, type MindRow } from "@/lib/mind";
 
 const now = new Date("2026-11-26T12:00:00Z");
 const daysAgo = (d: number) => new Date(now.getTime() - d * 86400_000);
@@ -52,5 +52,20 @@ describe("What's on your mind this week?", () => {
     expect(mindNudgeDue({ ...a, last: row({ nudgedAt: daysAgo(0.5) }) }, rules)).toBe(false);
     expect(mindNudgeDue({ ...a, last: row({ topic: null, answeredAt: null }) }, rules)).toBe(false);
     expect(mindNudgeDue(a, { ...rules, mindNudgeAfter: 0 })).toBe(false);
+  });
+
+  it("takes a typed 'Other' answer: tidied, its words steer the deck", () => {
+    expect(MIND_TOPIC_IDS).toContain("other");
+    expect(cleanMindText("  my   sister's wedding https://x.co/a  ")).toBe("my sister's wedding");
+    expect(cleanMindText(" ")).toBeNull();
+    expect(cleanMindText("x".repeat(90))).toHaveLength(60);
+    expect(mindWords("My sister's wedding and what to wear")).toEqual(["sister", "wedding", "wear"]);
+    expect(topicsInText("my rent is going up")).toEqual(["home"]);
+    expect(matchesMind("other", { title: "Which dress for my cousin's weddings?" }, "wedding outfit")).toBe(true);
+    expect(matchesMind("other", { theme: "money", title: "Pay off debt or invest?" }, "my rent went up")).toBe(false);
+    expect(matchesMind("other", { title: "Should we move to a bigger apartment?" }, "my rent went up")).toBe(true);
+    expect(matchesMind("other", { title: "Pizza or tacos?" }, "the weekend")).toBe(false);
+    expect(mindFactor("other", { title: "Weekend trip or stay home?" }, 5, "weekend plans")).toBe(5);
+    expect(mindFactor("other", { title: "Weekend trip or stay home?" }, 5, null)).toBe(1);
   });
 });
