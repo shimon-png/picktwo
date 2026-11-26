@@ -132,6 +132,7 @@ export default async function BrainListPage({
                 <th className="py-1 pr-2 font-normal">Signed up</th>
                 <th className="py-1 pr-2 font-normal">Profile</th>
                 <th className="py-1 pr-2 text-right font-normal">Votes</th>
+                <th className="py-1 pr-2 text-right font-normal">Asked Pickbot</th>
               </tr>
             </thead>
             <tbody>
@@ -141,6 +142,7 @@ export default async function BrainListPage({
                   <td className="py-1.5 pr-2 text-xs text-zinc-500">{nyTime(u.at)}</td>
                   <td className="py-1.5 pr-2 text-xs text-zinc-500">{[u.sex, u.ageRange].filter(Boolean).join(" · ") || "—"}</td>
                   <td className="py-1.5 pr-2 text-right tabular-nums">{u.votes}</td>
+                  <td className="py-1.5 pr-2 text-right tabular-nums">{u.asked || "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -150,7 +152,10 @@ export default async function BrainListPage({
             <thead>
               <tr className="text-left text-xs text-zinc-500">
                 <th className="py-1 pr-2 font-normal">Person</th>
-                <th className="py-1 pr-2 text-right font-normal">{list.kind === "voters" ? "Votes" : list.kind === "visitors" ? "Visits" : "Times"}</th>
+                <th className="py-1 pr-2 text-right font-normal">
+                  {list.kind === "voters" ? "Votes" : list.kind === "visitors" ? "Visits" : list.kind === "askers" ? "Questions" : "Times"}
+                </th>
+                {list.kind !== "askers" && <th className="py-1 pr-2 text-right font-normal">Asked Pickbot</th>}
                 <th className="py-1 pr-2 font-normal">First</th>
                 <th className="py-1 pr-2 font-normal">Last</th>
               </tr>
@@ -160,6 +165,7 @@ export default async function BrainListPage({
                 <tr key={p.who} className="border-t border-ink/10">
                   <td className="py-1.5 pr-2"><Person who={p.who} handle={p.handle} /></td>
                   <td className="py-1.5 pr-2 text-right tabular-nums">{p.n}</td>
+                  {list.kind !== "askers" && <td className="py-1.5 pr-2 text-right tabular-nums">{p.asked || "—"}</td>}
                   <td className="py-1.5 pr-2 text-xs text-zinc-500">{nyTime(p.first)}</td>
                   <td className="py-1.5 pr-2 text-xs text-zinc-500">{nyTime(p.last)}</td>
                 </tr>

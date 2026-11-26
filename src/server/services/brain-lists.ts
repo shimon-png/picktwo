@@ -13,6 +13,7 @@ export const BRAIN_LISTS = {
   visitors: "Visitors (people)",
   signups: "Sign-ups",
   gates: "Hit the sign-up wall",
+  askers: "People who asked Pickbot",
 } as const;
 export type BrainListKind = keyof typeof BRAIN_LISTS;
 
@@ -21,17 +22,18 @@ const LIMIT = 500;
 const EV_FROM = sql`analytics_event e LEFT JOIN device d ON d.id = e.device_id`;
 const V_FROM = sql`vote v LEFT JOIN device dv ON dv.id = v.device_id`;
 
-export type PersonRow = { who: string; handle: string | null; n: number; first: string; last: string };
+/** `asked` = Pickbot questions this person ever asked (follow-ups not counted). */
+export type PersonRow = { who: string; handle: string | null; n: number; first: string; last: string; asked: number };
 export type BattleRow = { slug: string; title: string; status: string; at: string; handle: string | null; authorId: string; votes: number; photo: boolean; iVoted: boolean };
 /** `who` is null for a vote whose account was deleted after its browser's votes moved into it (no owner left). */
 export type VoteRow = { at: string; who: string | null; handle: string | null; slug: string; title: string; picked: string; source: string | null };
-export type SignupRow = { who: string; handle: string | null; at: string; sex: string | null; ageRange: string | null; votes: number };
+export type SignupRow = { who: string; handle: string | null; at: string; sex: string | null; ageRange: string | null; votes: number; asked: number };
 
 export type BrainList =
   | { kind: "battles"; total: number; rows: BattleRow[] }
   | { kind: "votes"; total: number; rows: VoteRow[] }
   | { kind: "signups"; total: number; rows: SignupRow[] }
-  | { kind: "voters" | "visitors" | "gates"; total: number; rows: PersonRow[] };
+  | { kind: "voters" | "visitors" | "gates" | "askers"; total: number; rows: PersonRow[] };
 
 /** `day` = a New York date (YYYY-MM-DD) from the Day by day table, to narrow the list to that day. */
 export async function brainList(kind: BrainListKind, view: BrainView, days: number, day: string | null, viewerId: string | null): Promise<BrainList> {
@@ -39,6 +41,9 @@ export async function brainList(kind: BrainListKind, view: BrainView, days: numb
   const { since, ev, vt, bt, us } = scope;
   const onDay = (col: SQL) => (day ? sql`to_char((${col} AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD') = ${day}` : sql`true`);
   const handleOf = (who: SQL) => sql`(SELECT pu.handle FROM "user" pu WHERE pu.id = ${who})`;
+  // Pickbot is for accounts only, so its events carry the user id.
+  const askedBy = (who: SQL) =>
+    sql`(SELECT count(*)::int FROM analytics_event pa WHERE pa.name = 'pickbot_asked' AND pa.user_id = ${who} AND COALESCE(pa.props->>'followUp', 'false') <> 'true')`;
 
   if (kind === "battles") {
     const where = sql`b.created_at > ${since} AND ${bt} AND ${onDay(sql`b.created_at`)}`;
@@ -68,7 +73,7 @@ export async function brainList(kind: BrainListKind, view: BrainView, days: numb
     const where = sql`u.onboarded_at > ${since} AND ${us} AND ${onDay(sql`u.onboarded_at`)}`;
     const rows = await db.execute<SignupRow>(sql`
       SELECT u.id AS who, u.handle, u.onboarded_at::text AS at, u.sex, u.age_range AS "ageRange",
-        (SELECT count(*)::int FROM vote v WHERE v.user_id = u.id AND NOT v.flagged) AS votes
+        (SELECT count(*)::int FROM vote v WHERE v.user_id = u.id AND NOT v.flagged) AS votes, ${askedBy(sql`u.id`)} AS asked
       FROM "user" u WHERE ${where} ORDER BY u.onboarded_at DESC LIMIT ${LIMIT}`);
     const [t] = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM "user" u WHERE ${where}`);
     return { kind, total: t?.n ?? 0, rows: [...rows] };
@@ -76,14 +81,19 @@ export async function brainList(kind: BrainListKind, view: BrainView, days: numb
 
   // People lists: one row per person (account, else device mapped to its account).
   const inner =
-    kind === "voters"
+    kind === "askers"
+      ? sql`SELECT ${WHO_E} AS who, count(*)::int AS n, min(e.created_at) AS first, max(e.created_at) AS last
+          FROM ${EV_FROM} WHERE e.name = 'pickbot_asked' AND COALESCE(e.props->>'followUp', 'false') <> 'true'
+            AND e.created_at > ${since} AND ${ev} AND ${onDay(sql`e.created_at`)} GROUP BY 1`
+      : kind === "voters"
       ? sql`SELECT ${WHO_V} AS who, count(*)::int AS n, min(v.created_at) AS first, max(v.created_at) AS last
           FROM ${V_FROM} WHERE v.created_at > ${since} AND NOT v.flagged AND ${vt} AND ${onDay(sql`v.created_at`)} GROUP BY 1`
       : sql`SELECT ${WHO_E} AS who, count(*)::int AS n, min(e.created_at) AS first, max(e.created_at) AS last
           FROM ${EV_FROM} WHERE e.name = ${kind === "visitors" ? "session_start" : "signup_gate_shown"} AND e.created_at > ${since} AND ${ev}
             AND ${onDay(sql`e.created_at`)} GROUP BY 1`;
   const rows = await db.execute<PersonRow>(sql`
-    SELECT p.who, (SELECT pu.handle FROM "user" pu WHERE pu.id = p.who) AS handle, p.n, p.first::text AS first, p.last::text AS last
+    SELECT p.who, (SELECT pu.handle FROM "user" pu WHERE pu.id = p.who) AS handle, p.n, p.first::text AS first, p.last::text AS last,
+      ${askedBy(sql`p.who`)} AS asked
     FROM (${inner}) p WHERE p.who IS NOT NULL ORDER BY p.last DESC LIMIT ${LIMIT}`);
   // No owner left (account deleted after its guest votes moved into it): not a person, and the tiles' count(DISTINCT) skips it too.
   const [t] = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM (${inner}) p WHERE p.who IS NOT NULL`);
