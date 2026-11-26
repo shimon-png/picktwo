@@ -33,14 +33,19 @@ const stamp = Date.now().toString(36);
  */
 let guests = 0;
 const salt = Math.random().toString(36).slice(2, 8);
-async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm) {
+async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm, opts: { mind?: boolean } = {}) {
   const n = ++guests; // a new browser every call
   let id = "";
   // …and outside the about-you cards holdout, so the deck asks its questions.
   // …and outside the about-you cards and profile bar holdouts, so the deck asks its questions and shows the bar.
   for (
     let i = 0;
-    !id || pickArm(id, 50) !== arm || inHoldout(`about:${id}`, ECONOMY_DEFAULTS.aboutHoldoutPct) || inHoldout(`pbar:${id}`, ECONOMY_DEFAULTS.profileBarHoldoutPct);
+    !id ||
+    pickArm(id, 50) !== arm ||
+    inHoldout(`about:${id}`, ECONOMY_DEFAULTS.aboutHoldoutPct) ||
+    inHoldout(`pbar:${id}`, ECONOMY_DEFAULTS.profileBarHoldoutPct) ||
+    // "What's on your mind" card (vote 3): only where a test asks for it; elsewhere a browser in its holdout.
+    inHoldout(`mind:${id}`, ECONOMY_DEFAULTS.mindHoldoutPct) !== !opts.mind;
     i++
   )
     id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
@@ -316,6 +321,41 @@ test("about-you cards: a question after vote 2, answers stick, skip works (Nov 2
   await expect(card).toHaveCount(0);
   const me = await page.request.get("/api/signup-prefill").then((r) => r.json());
   expect(me).toMatchObject({ sex: "FEMALE", ageRange: null });
+});
+
+test("what's on your mind: one tap at vote 3, then the personality map sign-up with only what's missing (Nov 26)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control", { mind: true });
+  const page = await ctx.newPage();
+  await page.goto("/vote");
+  const before = await apiVotes(page, 2);
+  test.skip(before.length < 2, "not enough open battles");
+  await page.reload();
+  await page.getByRole("button", { name: /^Vote for/ }).first().click();
+  const card = page.getByTestId("mind-card");
+  await expect(card.getByText("What’s on your mind this week?")).toBeVisible({ timeout: 8000 });
+  await expect(card.getByRole("button")).toHaveCount(7); // 6 topics + Skip
+  await snap(page, "mind-card");
+  await card.getByRole("button", { name: "Money" }).click();
+  await expect(card).toHaveCount(0);
+  // A run of votes with it in mind, then the sign-up nudge (mindNudgeAfter = 8 votes since the pick).
+  const run = await apiVotes(page, ECONOMY_DEFAULTS.mindNudgeAfter - 1);
+  test.skip(run.length < ECONOMY_DEFAULTS.mindNudgeAfter - 1, "not enough open battles");
+  await page.reload();
+  await page.getByRole("button", { name: /^Vote for/ }).first().click();
+  const nudge = page.getByTestId("mind-nudge");
+  await expect(nudge.getByText("We’re starting to really understand you.")).toBeVisible({ timeout: 8000 });
+  await snap(page, "mind-nudge");
+  await nudge.getByRole("button", { name: "See my personality map" }).click();
+  const dialog = page.getByRole("dialog", { name: "Sign up, or keep voting" });
+  await expect(dialog.getByText("Your personality map is ready.")).toBeVisible();
+  await expect(dialog.getByLabel("ZIP code")).toHaveCount(0); // ZIP is inferred, never asked
+  await dialog.getByLabel("Your email").fill(`mind-${stamp}@test.dev`);
+  await expect(dialog.getByRole("button", { name: "Email me a code" })).toBeDisabled(); // sex + age missing
+  await dialog.getByRole("button", { name: "Woman" }).click();
+  await dialog.getByRole("button", { name: "25–34" }).click();
+  await expect(dialog.getByRole("button", { name: "Email me a code" })).toBeEnabled();
+  await snap(page, "mind-signup");
+  await ctx.close();
 });
 
 test("non-admin cannot post as another user", async ({ browser }) => {
@@ -608,6 +648,12 @@ test("Ask Pickbot deck card: shows once, at the account's tested position (never
   const promo = p.getByTestId("pickbot-promo");
   let picks = 0;
   for (let guard = 0; guard < 40 && !(await promo.isVisible()); guard++) {
+    const mindCard = p.getByTestId("mind-card");
+    if (await mindCard.isVisible()) {
+      await mindCard.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(mindCard).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
     const about = p.getByRole("article", { name: /^About you/ });
     if (await about.isVisible()) {
       await about.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
@@ -641,6 +687,12 @@ test("Ask Pickbot deck card: shows once, at the account's tested position (never
   await p.goto("/vote");
   for (let i = 0, guard = 0; i < at + 1 && guard < 40; guard++) {
     // Close other special cards (about-you, taste reveal) the same way a person would.
+    const mindCard = p.getByTestId("mind-card");
+    if (await mindCard.isVisible()) {
+      await mindCard.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(mindCard).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
     const about = p.getByRole("article", { name: /^About you/ });
     if (await about.isVisible()) {
       await about.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});

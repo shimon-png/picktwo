@@ -7,6 +7,7 @@ import { awardPoints, votePointsToday } from "./points";
 import { gateArm } from "./gate-test";
 import { aboutAfterVote, likeYouFor, moveDeviceAnswers } from "./about";
 import { tasteProfileFor, voteTotal } from "./taste-profile";
+import { mindAfterVote } from "./mind";
 import { gateDecision, type GateArm } from "./gate-test-rules";
 import { getEconomy } from "./config";
 import { voteQualityIssue, isValidReason } from "./priority";
@@ -240,8 +241,10 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
   // Deck extras after a new vote: a taste-profile moment wins over an about-you card (which simply waits a vote).
   const inDeck = res.isNew && input.source === "feed" && !res.gatePrompt;
   const [taste, likeYou] = await Promise.all([inDeck ? tasteMilestone(viewer, economy) : null, likeYouFor(b.id, viewer)]);
-  const about = inDeck && !taste ? await aboutAfterVote(viewer) : null;
-  return { ...res, about, likeYou, taste };
+  // Then "What's on your mind this week?" or its sign-up nudge (lib/mind.ts); an about-you card waits a vote for it.
+  const mind = inDeck && !taste ? await mindAfterVote(viewer, await voteTotal(viewer)) : null;
+  const about = inDeck && !taste && !mind ? await aboutAfterVote(viewer) : null;
+  return { ...res, about, likeYou, taste, mind };
 }
 
 /** Taste profile moments in the deck: the first traits at tasteFirstAt votes, the full wheel at tasteFullAt. */
