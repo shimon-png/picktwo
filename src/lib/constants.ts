@@ -185,6 +185,8 @@ export const ECONOMY_DEFAULTS = {
   pickbotResultsAt: 50,
   /** Default length of a Pickbot crowd battle, in hours. */
   pickbotCrowdHours: 24,
+  /** "Ask Pickbot" card in the Vote deck, once per person at a tested position (lib/pickbot-promo.ts). 0 = off. */
+  pickbotPromo: 1,
   /** Share of people (stable per account) who don't get Pickbot, to measure what it adds. */
   pickbotHoldoutPct: 10,
   /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */
