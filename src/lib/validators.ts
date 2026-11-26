@@ -74,7 +74,7 @@ export const voteInput = z.object({
   side: z.enum(["A", "B"]),
   reason: z.string().trim().max(140).optional(),
   dwellMs: z.number().int().min(0).max(3_600_000).optional(),
-  source: z.enum(["link", "feed", "profile", "home", "discover", "search", "pickbot"]).optional(),
+  source: z.enum(["link", "feed", "profile", "home", "discover", "search", "pickbot", "asking"]).optional(),
   /** Data-brain context (docs/brain/data-dictionary.md): how the pick was made and where in the deck. */
   meta: z
     .object({
@@ -86,7 +86,7 @@ export const voteInput = z.object({
 });
 
 /** Event names the browser may log through POST /api/events. Keep docs/brain/data-dictionary.md in sync. */
-export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "device_hints", "about_card_shown", "taste_shared", "engaged", "home_click", "profile_bar_tap", "pickbot_promo_shown", "pickbot_promo_tap", "pickbot_promo_dismissed", "mind_card_shown", "mind_nudge_shown", "mind_nudge_tap", "mind_nudge_dismissed"] as const;
+export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "device_hints", "about_card_shown", "taste_shared", "engaged", "home_click", "profile_bar_tap", "pickbot_promo_shown", "pickbot_promo_tap", "pickbot_promo_dismissed", "mind_card_shown", "mind_nudge_shown", "mind_nudge_tap", "mind_nudge_dismissed", "asking_shown", "asking_tap", "asking_voted", "asking_signup_tap", "asking_dismissed"] as const;
 export type ClientEventName = (typeof CLIENT_EVENTS)[number];
 const safeId = z.string().regex(/^[A-Za-z0-9_-]{6,40}$/);
 export const clientEventsInput = z.object({

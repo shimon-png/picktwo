@@ -198,6 +198,15 @@ export const ECONOMY_DEFAULTS = {
   pickbotCrowdHours: 24,
   /** "Ask Pickbot" card in the Vote deck, once per person at a tested position (lib/pickbot-promo.ts). 0 = off. */
   pickbotPromo: 1,
+  /**
+   * "People like you are asking" card in the Vote deck (lib/asking.ts): 1 = on. Shows after askingAt picks in a deck
+   * visit (after the sex and age cards), then again every askingEvery picks with three new questions, at most
+   * askingRounds times a visit.
+   */
+  askingCard: 1,
+  askingAt: 6,
+  askingEvery: 12,
+  askingRounds: 3,
   /** Share of people (stable per account) who don't get Pickbot, to measure what it adds. */
   pickbotHoldoutPct: 10,
   /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */

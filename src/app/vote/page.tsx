@@ -7,6 +7,7 @@ import { guestVotesLeft } from "@/server/services/votes";
 import { softGateFor } from "@/server/services/gate-test";
 import { profileProgressFor } from "@/server/services/profile-progress";
 import { pickbotPromoFor } from "@/server/services/pickbot";
+import { askingFor } from "@/server/services/asking";
 import { SwipeDeck } from "@/components/battle/SwipeDeck";
 import { Tutorial } from "@/components/layout/Tutorial";
 
@@ -16,13 +17,14 @@ export const dynamic = "force-dynamic";
 export default async function VotePage() {
   const viewer = await getViewer();
   if (viewer.user && profileIncomplete(viewer.user)) redirect(onboardingUrl("/vote"));
-  const [items, economy, guestLeft, softGate, progress, promo] = await Promise.all([
+  const [items, economy, guestLeft, softGate, progress, promo, asking] = await Promise.all([
     getFeed(viewer, { limit: 20 }),
     getEconomy(),
     guestVotesLeft(viewer),
     softGateFor(viewer),
     profileProgressFor(viewer),
     pickbotPromoFor(viewer.user),
+    askingFor(viewer).catch(() => null),
   ]);
   return (
     <>
@@ -37,6 +39,7 @@ export default async function VotePage() {
       likeYouMs={economy.likeYouResultMs}
       progress={progress}
       pickbotPromo={promo}
+      asking={asking}
       />
       <Tutorial signedIn={!!viewer.user} accountSeen={!!viewer.user?.tourSeenAt} />
     </>
