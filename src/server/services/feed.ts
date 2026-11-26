@@ -7,6 +7,8 @@ import { priorityFactor } from "./priority";
 import { feedScore, diversify, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, type ViewerProfile } from "./ranking";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 import { matchesTarget } from "./targeting";
+import { activeMindTopic } from "./mind";
+import { mindFactor } from "@/lib/mind";
 
 export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; featured?: boolean; debug?: Record<string, number> };
 
@@ -94,7 +96,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   const sWeight = arm === "engine" ? economy.skipWeight : 0;
   const decisions = sWeight ? await deckDecisions(rows.map((r) => r.b.id)) : new Map<string, { votes: number; skips: number }>();
   const avgPick = averagePickRate([...decisions.values()]);
-  const loops = await openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy);
+  const [loops, mind] = await Promise.all([openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy), activeMindTopic(viewer)]);
   const scored = rows.map((r) => {
     const boostActive = !!r.b.boostUntil && r.b.boostUntil > now && r.b.boostVotesLeft > 0;
     const pf = priorityFactor({ ppBalance: r.authorPP, openLoops: loops.get(r.b.authorId) ?? 0, boostActive, cap: economy.priorityCap });
@@ -111,7 +113,9 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     });
     const engaged = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
     const d = decisions.get(r.b.id);
-    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight);
+    // "What's on your mind this week?" (lib/mind.ts): battles on the topic they picked rise.
+    const onMind = mindFactor(mind, { theme: r.b.tags?.brain?.theme, title: r.b.title, context: r.b.context }, economy.mindBoost);
+    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind;
     return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
   // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet.
