@@ -117,7 +117,7 @@ export async function deckCheck(rank: number) {
   const [left] = await db.execute<{ n: number }>(sql`
     SELECT count(*)::int AS n FROM battle b JOIN "user" a ON a.id = b.author_id
     WHERE b.status = 'OPEN' AND b.deadline > now() AND b.created_at > ${new Date(Date.now() - 7 * 86400_000).toISOString()}
-      AND b.visibility = 'PUBLIC' AND a.banned_at IS NULL ${userId ? sql`AND b.author_id <> ${userId}` : sql``}
+      AND b.visibility = 'PUBLIC' AND a.banned_at IS NULL AND (b.tags->>'askingPreset') IS NULL ${userId ? sql`AND b.author_id <> ${userId}` : sql``}
       AND NOT EXISTS (SELECT 1 FROM vote v WHERE v.battle_id = b.id AND ${mine("v")})
       AND NOT EXISTS (SELECT 1 FROM skip s WHERE s.battle_id = b.id AND ${mine("s")})`);
   return { voters: top.length, rank: r, votes: who.n, remaining: Number(left?.n ?? 0) };
