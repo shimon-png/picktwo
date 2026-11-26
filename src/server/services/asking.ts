@@ -10,6 +10,7 @@ import { getEconomy } from "./config";
 import { knownAnswers } from "./about";
 import { pickbotAccess } from "./pickbot";
 import { activeMindTopic } from "./mind";
+import { MIND_OTHER, mindWords, topicsInText } from "@/lib/mind";
 import { ASKING_PRESETS, pickAsking, presetBattleId, type AskingTopic } from "@/lib/asking";
 
 type Viewer = { user: User | null; deviceId: string | null };
@@ -83,9 +84,11 @@ export async function askingFor(v: Viewer, opts: { topic?: AskingTopic | null; n
     opts.topic === undefined ? activeMindTopic(v).catch(() => null) : Promise.resolve(null),
   ]);
   // "What's on your mind this week?" (lib/mind.ts): its topics match the bank's, except "home" (where to live),
-  // which steers by words instead.
-  const mindTopic = opts.topic !== undefined ? opts.topic : mind === "home" ? null : ((mind as AskingTopic | null) ?? null);
-  const campaign = mind === "home" ? `${words} rent apartment housing house move city` : words;
+  // which steers by words instead, and "Other", which uses a listed topic its typed words name, plus the words.
+  const picked = mind?.topic === MIND_OTHER ? (topicsInText(mind.text)[0] ?? null) : (mind?.topic ?? null);
+  const mindTopic = opts.topic !== undefined ? opts.topic : picked === "home" ? null : ((picked as AskingTopic | null) ?? null);
+  const typed = mind?.topic === MIND_OTHER ? mindWords(mind.text).join(" ") : "";
+  const campaign = [words, picked === "home" ? "rent apartment housing house move city" : "", typed].filter(Boolean).join(" ");
   // Only presets whose battle is live (the card votes on it before sign-up).
   const live = await db
     .select({ id: battles.id, slug: battles.slug, side: options.side, label: options.label })

@@ -334,9 +334,13 @@ test("what's on your mind: one tap at vote 3, then the personality map sign-up w
   await page.getByRole("button", { name: /^Vote for/ }).first().click();
   const card = page.getByTestId("mind-card");
   await expect(card.getByText("What’s on your mind this week?")).toBeVisible({ timeout: 8000 });
-  await expect(card.getByRole("button")).toHaveCount(7); // 6 topics + Skip
+  await expect(card.getByRole("button")).toHaveCount(8); // 6 topics + Other + Skip
   await snap(page, "mind-card");
-  await card.getByRole("button", { name: "Money" }).click();
+  // "Other" opens a text box (Alex, Nov 26); Back returns to the topics.
+  await card.getByRole("button", { name: "Other…" }).click();
+  await card.getByLabel("What’s on your mind").fill("my sister's wedding");
+  await snap(page, "mind-other");
+  await card.getByRole("button", { name: "Show me battles about it" }).click();
   await expect(card).toHaveCount(0);
   // A run of votes with it in mind, then the sign-up nudge (mindNudgeAfter = 8 votes since the pick).
   const run = await apiVotes(page, ECONOMY_DEFAULTS.mindNudgeAfter - 1);
