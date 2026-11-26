@@ -7,11 +7,9 @@ import { MIND_OTHER, MIND_TEXT_MAX, MIND_TOPICS, type MindTopic } from "@/lib/mi
 import type { BattleCard } from "@/server/services/battles";
 import { cn } from "@/lib/utils";
 
-const SLICE = [
-  "bg-a-soft text-a ring-1 ring-a/35",
-  "bg-b-soft text-b ring-1 ring-b/35",
-  "bg-green-soft text-green ring-1 ring-green/35",
-];
+/** Bright tiles (globals.css `qtile-*`), one colour each, with an emoji so the grid feels alive (Alex, Nov 26). */
+const TILE = ["qtile-1", "qtile-2", "qtile-3", "qtile-4", "qtile-5", "qtile-6"];
+const EMOJI: Record<string, string> = { money: "💸", dating: "💘", work: "💼", family: "👨‍👩‍👧", gifts: "🎁", home: "🏡" };
 
 /**
  * "What's on your mind this week?" (lib/mind.ts): one tap, same size as a battle card. The topics come in a fresh
@@ -44,7 +42,7 @@ export function MindCard({ onDone }: { onDone: (topic: MindTopic | null, items: 
   return (
     <article aria-label="What's on your mind this week?" className="deck-card animate-pop absolute inset-0 z-40 flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-card" data-testid="mind-card">
       <div className="flex items-center justify-between">
-        <span className="rounded-full bg-violet-soft px-2 py-1 font-display text-[10px] font-semibold uppercase tracking-[.1em] text-violet">This week · 1 tap</span>
+        <span className="qbadge qbadge-v font-display">This week · 1 tap</span>
         <button type="button" className="px-2 py-1 text-sm text-zinc-500 underline-offset-2 hover:underline" onClick={() => send(null)} disabled={busy}>
           Skip
         </button>
@@ -84,16 +82,19 @@ export function MindCard({ onDone }: { onDone: (topic: MindTopic | null, items: 
               key={o.id}
               type="button"
               disabled={busy}
-              className={cn("rounded-[14px] px-3 font-display text-[19px] font-semibold leading-tight transition active:scale-[.98]", SLICE[i % SLICE.length])}
+              className={cn("qtile flex-col !gap-1 px-3 font-display text-[18px]", TILE[i % TILE.length])}
               onClick={() => send(o.id)}
             >
+              <span className="qtile-emoji" aria-hidden>
+                {EMOJI[o.id]}
+              </span>
               {o.label}
             </button>
           ))}
           <button
             type="button"
             disabled={busy}
-            className="col-span-2 rounded-[14px] bg-surface px-3 font-display text-[17px] font-semibold text-zinc-600 ring-1 ring-ink/10 transition active:scale-[.98]"
+            className="qtile qtile-quiet col-span-2 px-3 font-display text-[17px] !font-semibold"
             onClick={() => setTyping(true)}
           >
             Other…

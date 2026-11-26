@@ -9,7 +9,7 @@ import { CONFIDENCE_LABEL, partialField, type Answer, type AnswerKind } from "@/
 import type { ThreadView } from "@/server/services/pickbot";
 import { AskComposer } from "./AskComposer";
 import { PushButton } from "@/components/app/PushButton";
-import { cardOrder } from "@/lib/about";
+import { PREFER_NOT, cardOrder } from "@/lib/about";
 
 type Msg = ThreadView["messages"][number];
 type Similar = { slug: string; title: string; a: string; b: string; votesA: number; votesB: number; likeA: number | null; likeB: number | null };
@@ -27,6 +27,16 @@ const WHY: Record<string, string> = {
   race: "Background changes what people pick. Prefer not to say is fine.",
   party: "Views shape some choices. Prefer not to say is fine.",
 };
+
+/** Bright answer tiles (globals.css `qtile-*`), by position. */
+const TILE = ["qtile-1", "qtile-2", "qtile-3", "qtile-4", "qtile-5", "qtile-6"];
+
+/** What the profile cards buy, said before the first one (Alex, Nov 26: explain why answering makes the advice better). */
+const GATE_WHY = [
+  { e: "💸", t: "Keep it realistic for your money, time and stage of life." },
+  { e: "👯", t: "Compare you with people like you, and what they actually picked." },
+  { e: "🎯", t: "Skip advice that fits an average person but not you." },
+];
 
 const END = "\u0000";
 
@@ -484,11 +494,31 @@ function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (
   const [opts, setOpts] = useState(g.options);
   useEffect(() => setOpts(cardOrder(g.options)), [g.options]);
   const [zip, setZip] = useState("");
+  const left = step.total - step.index + 1;
   return (
     <div className="space-y-2" data-testid="pickbot-gate">
       {step.index <= 1 || first ? (
         <Bot>
-          Before I answer, I need to know you a little: {step.total - step.index + 1} quick tap{step.total - step.index + 1 === 1 ? "" : "s"}. Your answers are what make my advice fit you.
+          <p>
+            Before I answer, I need to know you a little: <b>only {left} quick tap{left === 1 ? "" : "s"}</b>.
+          </p>
+          <p className="mt-2">
+            Here’s why it matters. The right call for a 24-year-old renter who just started dating is often the wrong one for a 38-year-old parent with a
+            mortgage. Each answer helps me:
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {GATE_WHY.map((w) => (
+              <li key={w.t} className="flex items-start gap-2">
+                <span className="text-[16px] leading-[1.2]" aria-hidden>
+                  {w.e}
+                </span>
+                <span>{w.t}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 flex items-center gap-1.5 text-[13px] text-ink/60">
+            <Lock className="size-3.5 shrink-0" aria-hidden /> Ranges only, never shown on your profile.
+          </p>
         </Bot>
       ) : null}
       <div className="card space-y-3 px-4 py-4">
@@ -513,14 +543,23 @@ function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (
           </form>
         ) : (
           <div className="grid grid-cols-2 gap-2">
-            {opts.map((o) => (
-              <button key={o.id} type="button" disabled={busy} className="chip justify-center !py-3 text-[15px]" onClick={() => onAnswer(o.id, o.label)}>
+            {opts.map((o, i) => (
+              <button
+                key={o.id}
+                type="button"
+                disabled={busy}
+                className={cn("qtile min-h-[52px] px-3 py-3 text-[15px]", o.id === PREFER_NOT ? "qtile-quiet" : TILE[i % TILE.length])}
+                onClick={() => onAnswer(o.id, o.label)}
+              >
                 {o.label}
               </button>
             ))}
           </div>
         )}
-        <p className="text-[13px] text-ink/60">Why I ask: {WHY[g.q]}</p>
+        <p className="why-ask">
+          <span className="why-ask-tag">Why I ask</span>
+          <span>{WHY[g.q]}</span>
+        </p>
         <p className="flex items-center gap-1 text-[12px] text-ink/45">
           <Lock className="size-3" /> Never shown on your profile
         </p>
