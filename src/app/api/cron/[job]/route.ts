@@ -23,6 +23,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     closed: await closeDueBattles(),
     emails: await runHourlyEmails(),
     pickbotResults: await deliverPickbotResults(),
+    // Hourly so new battles (incl. auto-seeded ones) get AI tags before people's taste profiles need them.
+    tagging: await tagUntagged(100),
   }),
   "pickbot-results": () => deliverPickbotResults(),
   // Hourly, on its own so a slow batch never delays the emails: more seed battles when the 10th top voter runs low.

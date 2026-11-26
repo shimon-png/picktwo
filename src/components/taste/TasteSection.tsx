@@ -7,6 +7,8 @@ import { ShareTaste } from "./ShareTaste";
 export function TasteSection({ t }: { t: TasteProfile }) {
   const locked = t.axes.length === 0;
   const full = t.axes.length >= 6;
+  // No AI-tagged battle among their picks yet: every axis would sit on the middle ring, so say so instead.
+  const reading = !locked && t.axes.every((a) => a.n === 0);
   return (
     <section className="card space-y-3 px-4 py-5">
       <div className="flex items-baseline justify-between">
@@ -27,10 +29,11 @@ export function TasteSection({ t }: { t: TasteProfile }) {
           <div className="flex justify-center text-ink">
             <TasteWheel axes={t.axes} size={230} />
           </div>
+          {reading && <p className="text-center text-[13px] text-zinc-500">We&apos;re still reading the battles you voted on. Your shape fills in soon.</p>}
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-[12px] bg-surface px-3 py-2">
               <b className="block font-display text-[19px] tabular-nums">{t.likeYou ? `${t.likeYou.agree}%` : "—"}</b>
-              <span className="text-[12px] text-zinc-600">{t.likeYou ? `agree with ${t.likeYou.label.toLowerCase()}` : "agree with people like you (needs more votes)"}</span>
+              <span className="text-[12px] text-zinc-600">{t.likeYou ? `agree with ${t.likeYou.label.toLowerCase()}` : t.canCompare ? "agree with people like you (not enough of them have voted with you yet)" : "agree with people like you (add your sex and age in Settings)"}</span>
             </div>
             <div className="rounded-[12px] bg-surface px-3 py-2">
               <b className="block font-display text-[19px] tabular-nums">

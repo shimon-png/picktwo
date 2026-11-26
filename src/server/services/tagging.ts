@@ -73,14 +73,17 @@ export async function untaggedCount(): Promise<number> {
   return r?.n ?? 0;
 }
 
-/** Tag up to `limit` untagged battles (newest first), a few at a time. */
+/**
+ * Tag up to `limit` untagged battles, a few at a time. Most-voted first (then newest): taste profiles and the Brain
+ * read tags off the battles people actually voted on, so those go before fresh seeds nobody has seen yet.
+ */
 export async function tagUntagged(limit = 25): Promise<{ tagged: number; failed: number; remaining: number; enabled: boolean }> {
   if (!taggingEnabled()) return { tagged: 0, failed: 0, remaining: await untaggedCount(), enabled: false };
   const rows = await db
     .select({ id: battles.id })
     .from(battles)
     .where(and(ne(battles.status, "DELETED"), sql`NOT (${battles.tags} ? 'brain')`))
-    .orderBy(sql`${battles.createdAt} DESC`)
+    .orderBy(sql`(${battles.votesA} + ${battles.votesB}) DESC`, sql`${battles.createdAt} DESC`)
     .limit(limit);
   let tagged = 0;
   let failed = 0;
