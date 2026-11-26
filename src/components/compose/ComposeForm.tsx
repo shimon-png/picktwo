@@ -141,7 +141,26 @@ export function ComposeForm({
         <OptionEditor key={`a${loaded}`} side="A" value={a} onChange={setA} />
         <OptionEditor key={`b${loaded}`} side="B" value={b} onChange={setB} />
       </div>
-      <p className="mt-2 text-xs text-zinc-500">No photos where a child’s face is visible.</p>
+      <p className="mt-1.5 text-xs text-zinc-500">No photos where a child’s face is visible.</p>
+
+      {/* The story sits right under the options (Alex, Nov 26): battles with no context ("Eric or Anne?") get skipped. */}
+      <div className="mt-3 shrink-0">
+        <label className="flex items-baseline justify-between text-[15px] text-ink" htmlFor="context">
+          <span>
+            The story <span className="text-xs text-zinc-500">· people pick better with it</span>
+          </span>
+          {context.length > 200 && <span className="text-xs text-zinc-500">{280 - context.length}</span>}
+        </label>
+        <textarea
+          id="context"
+          className="input mt-1.5 resize-none"
+          rows={3}
+          maxLength={280}
+          value={context}
+          onChange={(e) => setContext(e.target.value)}
+          placeholder="What’s going on? Who it’s for, the budget, what you’re torn about…"
+        />
+      </div>
 
       <button className="btn-cta mt-3 w-full shrink-0 py-3" disabled={!ready} onClick={openReview}>
         Continue <ArrowRight className="size-4" aria-hidden />
@@ -196,21 +215,6 @@ export function ComposeForm({
                   }}
                 />
               </div>
-              <div>
-                <label className="label" htmlFor="context">
-                  Context — helps people give better advice
-                </label>
-                <textarea
-                  id="context"
-                  className="input"
-                  rows={2}
-                  maxLength={280}
-                  value={context}
-                  onChange={(e) => setContext(e.target.value)}
-                  placeholder="Gift for my 6-year-old, loves art, ~$50"
-                />
-              </div>
-
               <div className="rounded-lg shadow-ring">
                 <button
                   type="button"

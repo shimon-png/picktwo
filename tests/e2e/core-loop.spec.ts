@@ -103,14 +103,15 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await poster.getByRole("button", { name: "Name for option A" }).click();
   await poster.getByLabel("Name of option A").fill("Lego Art Set");
   await poster.getByLabel("Name of option B").fill("Paint easel");
+  await poster.getByLabel(/The story/).fill("Loves art, budget ~$50");
   await snap(poster, "01-new-battle");
   await poster.getByRole("button", { name: "Continue" }).click();
   const sheet = poster.getByRole("dialog", { name: "Review & publish" });
   await expect(sheet.getByLabel("Question")).toHaveValue("Lego Art Set or Paint easel?");
   await expect(sheet.getByText(/Category/)).toHaveCount(0);
   await expect(sheet.getByLabel(/Post as/)).toHaveCount(0); // admin-only
+  await expect(sheet.getByLabel(/The story/)).toHaveCount(0); // asked on the options step now
   await sheet.getByLabel("Question").fill(`Gift for my 6 y/o ${stamp}`);
-  await sheet.getByLabel(/Context/).fill("Loves art, budget ~$50");
   await expect(sheet.getByText(/Kid’s age/)).toHaveCount(0);
   await expect(sheet.getByRole("checkbox")).toHaveCount(0); // data use lives in Settings now
   await sheet.getByRole("button", { name: /Target a specific group/ }).click();
