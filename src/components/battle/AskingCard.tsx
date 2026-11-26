@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Sparkles } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { currentSessionId, logEvent } from "@/lib/events";
 import type { LikeYou } from "@/lib/like-you";
@@ -9,6 +9,7 @@ import type { AskingItem } from "@/server/services/asking";
 import { SignupGate } from "@/components/auth/SignupGate";
 import { ResultBars } from "./ResultBars";
 import { cn } from "@/lib/utils";
+import { PickbotMark, PickbotWord } from "@/components/pickbot/PickbotMark";
 
 type Score = { a: number; b: number; total: number };
 type VoteRes = {
@@ -114,33 +115,41 @@ export function AskingCard({
       {signup && open && <SignupGate soft next={pickbotUrl(open.id)} place="asking" log={{ preset: open.id }} onClose={() => setSignup(false)} />}
       <article
         aria-label="People like you are worried about"
-        className="deck-card animate-pop absolute inset-0 z-40 flex flex-col gap-4 overflow-y-auto rounded-[20px] bg-white p-5 shadow-card"
+        className="deck-card animate-pop absolute inset-0 z-40 flex flex-col gap-3 overflow-y-auto rounded-[20px] bg-white p-5 shadow-card"
         data-testid="asking-card"
       >
         {!open ? (
           <>
             <div className="space-y-2">
-              <h1 className="text-[30px] leading-tight text-green">People like you are worried about</h1>
-              <p className="flex items-center gap-2 text-[17px] font-medium leading-snug text-ink/85">
-                <Sparkles className="size-5 shrink-0 text-violet" aria-hidden />
-                {mode === "pickbot" ? "Tap one and Pickbot answers it for you." : "Tap one and see what the crowd says."}
+              <h1 className="text-[26px] leading-tight text-green">People like you are worried about</h1>
+              <p className="flex items-center gap-2.5 text-[16px] font-medium leading-snug text-ink/85">
+                {mode === "pickbot" ? (
+                  <>
+                    <PickbotMark className="size-8" />
+                    <span>
+                      Tap one and <PickbotWord /> answers it for you.
+                    </span>
+                  </>
+                ) : (
+                  "Tap one and see what the crowd says."
+                )}
               </p>
             </div>
-            <div className="flex flex-1 flex-col justify-center gap-2">
+            <div className="flex flex-1 flex-col justify-center gap-1.5">
               {items.map((it, i) => (
                 <button
                   key={it.id}
                   type="button"
                   data-testid="asking-question"
                   onClick={() => tap(it, i)}
-                  className="flex items-center gap-3 rounded-[14px] bg-surface px-4 py-3 text-left shadow-soft ring-1 ring-ink/15 transition active:scale-[.98]"
+                  className="flex items-center gap-2 rounded-[14px] bg-surface px-3.5 py-2.5 text-left shadow-soft ring-1 ring-ink/15 transition active:scale-[.98]"
                 >
-                  <span className="flex-1 text-[15px] font-medium leading-snug text-ink">“{it.q}”</span>
+                  <span className="flex-1 text-[14.5px] font-medium leading-snug text-ink">“{it.q}”</span>
                   <ChevronRight className="size-5 shrink-0 text-ink/40" aria-hidden />
                 </button>
               ))}
             </div>
-            <button type="button" data-testid="asking-keep-voting" className="w-full rounded-full py-3 text-[16px] font-semibold text-ink ring-2 ring-ink/40 transition active:scale-[.98]" onClick={close}>
+            <button type="button" data-testid="asking-keep-voting" className="w-full shrink-0 rounded-full py-3 text-[16px] font-semibold text-ink ring-2 ring-ink/40 transition active:scale-[.98]" onClick={close}>
               Keep voting
             </button>
           </>
@@ -180,9 +189,9 @@ export function AskingCard({
                 {!signedIn && (
                   <>
                     <p className="flex items-center gap-1.5 text-[13px] text-ink/70">
-                      <Sparkles className="size-4 shrink-0 text-violet" aria-hidden />
+                      <PickbotMark className="size-6" />
                       <span>
-                        Want an answer that fits <i>you</i>? Pickbot answers this one using your taste.
+                        Want an answer that fits <i>you</i>? <PickbotWord /> answers this one using your taste.
                       </span>
                     </p>
                     <button type="button" className="btn-primary w-full !py-3 text-[16px]" onClick={askPickbot} data-testid="asking-pickbot">
