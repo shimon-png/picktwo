@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Sparkles, Users } from "lucide-react";
+import { ChevronRight, Sparkles } from "lucide-react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { currentSessionId, logEvent } from "@/lib/events";
 import type { LikeYou } from "@/lib/like-you";
@@ -113,37 +113,34 @@ export function AskingCard({
     <>
       {signup && open && <SignupGate soft next={pickbotUrl(open.id)} place="asking" log={{ preset: open.id }} onClose={() => setSignup(false)} />}
       <article
-        aria-label="People like you are asking"
+        aria-label="People like you are worried about"
         className="deck-card animate-pop absolute inset-0 z-40 flex flex-col gap-4 overflow-y-auto rounded-[20px] bg-white p-5 shadow-card"
         data-testid="asking-card"
       >
-        <span className="flex items-center gap-1.5 self-start rounded-full bg-violet-soft px-2.5 py-1 font-display text-[10px] font-semibold uppercase tracking-[.1em] text-violet">
-          <Users className="size-3.5" aria-hidden /> People like you are asking
-        </span>
-
         {!open ? (
           <>
-            <div className="space-y-1">
-              <h1 className="text-[28px] leading-tight">What’s on people’s minds this week</h1>
-              <p className="text-[14px] text-ink/65">
+            <div className="space-y-2">
+              <h1 className="text-[30px] leading-tight text-green">People like you are worried about</h1>
+              <p className="flex items-center gap-2 text-[17px] font-medium leading-snug text-ink/85">
+                <Sparkles className="size-5 shrink-0 text-violet" aria-hidden />
                 {mode === "pickbot" ? "Tap one and Pickbot answers it for you." : "Tap one and see what the crowd says."}
               </p>
             </div>
-            <div className="flex flex-1 flex-col justify-center gap-2.5">
+            <div className="flex flex-1 flex-col justify-center gap-2">
               {items.map((it, i) => (
                 <button
                   key={it.id}
                   type="button"
                   data-testid="asking-question"
                   onClick={() => tap(it, i)}
-                  className="flex items-center gap-3 rounded-[16px] bg-surface px-4 py-3.5 text-left shadow-soft ring-1 ring-ink/10 transition active:scale-[.98]"
+                  className="flex items-center gap-3 rounded-[14px] bg-surface px-4 py-3 text-left shadow-soft ring-1 ring-ink/15 transition active:scale-[.98]"
                 >
-                  <span className="flex-1 text-[16px] font-medium leading-snug text-ink">“{it.q}”</span>
+                  <span className="flex-1 text-[15px] font-medium leading-snug text-ink">“{it.q}”</span>
                   <ChevronRight className="size-5 shrink-0 text-ink/40" aria-hidden />
                 </button>
               ))}
             </div>
-            <button type="button" className="py-2 text-[14px] text-ink/60" onClick={close}>
+            <button type="button" data-testid="asking-keep-voting" className="w-full rounded-full py-3 text-[16px] font-semibold text-ink ring-2 ring-ink/40 transition active:scale-[.98]" onClick={close}>
               Keep voting
             </button>
           </>
@@ -193,7 +190,7 @@ export function AskingCard({
                     </button>
                   </>
                 )}
-                <button type="button" className="py-2 text-[14px] text-ink/60" onClick={close}>
+                <button type="button" className="w-full rounded-full py-3 text-[16px] font-semibold text-ink ring-2 ring-ink/40 transition active:scale-[.98]" onClick={close}>
                   Keep voting
                 </button>
               </div>

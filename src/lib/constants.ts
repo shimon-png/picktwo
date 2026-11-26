@@ -207,6 +207,8 @@ export const ECONOMY_DEFAULTS = {
   askingAt: 6,
   askingEvery: 12,
   askingRounds: 3,
+  /** Questions on the card (Alex, Nov 26: 5). */
+  askingCount: 5,
   /** Share of people (stable per account) who don't get Pickbot, to measure what it adds. */
   pickbotHoldoutPct: 10,
   /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */

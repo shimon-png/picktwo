@@ -162,7 +162,7 @@ export function presetScore(p: AskingPreset, a: Omit<AskingInput, "exclude" | "s
  * always the best match.
  */
 export function pickAsking(a: AskingInput, bank: readonly AskingPreset[] = ASKING_PRESETS): AskingPreset[] {
-  const n = a.n ?? 3;
+  const n = a.n ?? 5;
   const ranked = bank
     .filter((p) => !a.exclude.has(p.id) && eligible(p, a))
     .map((p) => ({ p, s: presetScore(p, a) * (0.2 + 0.8 * unit(`${a.seed}:${p.id}`)) }))
