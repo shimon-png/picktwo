@@ -250,6 +250,18 @@ export const ECONOMY_DEFAULTS = {
   winbackCooldownDays: 14,
   /** Most win-back emails sent in one daily run. */
   winbackDailyMax: 200,
+  /** Auto-seeding (Alex + Shimon, Nov 26 2026; services/auto-seed.ts): 1 = on, 0 = off. Needs ANTHROPIC_API_KEY (writing) and PEXELS_API_KEY (photos). */
+  autoSeed: 1,
+  /** Watch the person ranked this high by real votes in the last 7 days (the 10th top voter)… */
+  autoSeedRank: 10,
+  /** …and when they have this many battles or fewer left in their deck… */
+  autoSeedAt: 50,
+  /** …write this many new seed battles… */
+  autoSeedCount: 100,
+  /** …this percent of them with photos (the rest text cards)… */
+  autoSeedPhotoPct: 33,
+  /** …then wait at least this many hours before the next batch. */
+  autoSeedCooldownHours: 12,
   /** Brain "Clean" view counts real activity from this New York day on (YYYYMMDD). The "All data" view ignores it. */
   brainCleanFrom: 20261123,
   /** Admin "Sign-ups by source": engaged = voted on this many different days (or posted a battle)… */

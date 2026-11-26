@@ -5,6 +5,7 @@ import { ensureZipIncome } from "@/server/services/passive";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 import { runDailyEmails, runHourlyEmails } from "@/server/services/lifecycle";
 import { deliverPickbotResults, purgeOldThreads } from "@/server/services/pickbot";
+import { runAutoSeed } from "@/server/services/auto-seed";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -24,6 +25,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     pickbotResults: await deliverPickbotResults(),
   }),
   "pickbot-results": () => deliverPickbotResults(),
+  // Hourly, on its own so a slow batch never delays the emails: more seed battles when the 10th top voter runs low.
+  "auto-seed": () => runAutoSeed(),
   // Once a day.
   daily: async () => ({
     closed: await closeDueBattles(),
