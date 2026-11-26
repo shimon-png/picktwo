@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { db } from "../db";
+import { brainScope, WHO_V } from "./brain";
 import {
   PLANS,
   monthWindow,
@@ -137,16 +138,22 @@ async function safe(fn: () => Promise<Live>): Promise<Live> {
   }
 }
 
-/** Real (non-seed) votes, voters and battles this month: the denominators for unit costs. Cached 15 min. */
+/**
+ * Real votes, voters, battles and sign-ups this month: the denominators for unit costs. Cached 15 min.
+ * Counted with the Brain's Clean rules (`brainScope`: no seed votes or accounts, no admins, one person = account
+ * else browser), so each number opens a Brain list with the same total (Alex, Nov 26 2026).
+ */
 const monthCounts = unstable_cache(
   async (startIso: string) => {
+    const scope = await brainScope("clean", 62);
+    const since = startIso > scope.since ? startIso : scope.since;
     const [r] = await db.execute<{ votes: number; voters: number; battles: number; signups: number }>(sql`
       SELECT
-        (SELECT count(*)::int FROM vote WHERE created_at >= ${startIso} AND COALESCE(source, '') <> 'seed' AND NOT flagged) AS votes,
-        (SELECT count(DISTINCT COALESCE(user_id, device_id))::int FROM vote
-          WHERE created_at >= ${startIso} AND COALESCE(source, '') <> 'seed' AND NOT flagged) AS voters,
-        (SELECT count(*)::int FROM battle WHERE created_at >= ${startIso} AND id NOT LIKE 'seed_%') AS battles,
-        (SELECT count(*)::int FROM analytics_event WHERE name = 'onboarding_completed' AND created_at >= ${startIso}) AS signups`);
+        (SELECT count(*)::int FROM vote v WHERE v.created_at > ${since} AND NOT v.flagged AND ${scope.vt}) AS votes,
+        (SELECT count(DISTINCT ${WHO_V})::int FROM vote v LEFT JOIN device dv ON dv.id = v.device_id
+          WHERE v.created_at > ${since} AND NOT v.flagged AND ${scope.vt}) AS voters,
+        (SELECT count(*)::int FROM battle b WHERE b.created_at > ${since} AND ${scope.bt}) AS battles,
+        (SELECT count(*)::int FROM "user" u WHERE u.onboarded_at > ${since} AND ${scope.us}) AS signups`);
     return r ?? { votes: 0, voters: 0, battles: 0, signups: 0 };
   },
   ["finance-month-counts"],
@@ -196,6 +203,7 @@ export async function getFinance(now = new Date()) {
   return {
     asOf: now.toISOString(),
     month: win.start.toISOString().slice(0, 7),
+    monthStart: win.start.toISOString(),
     dayOfMonth: Math.ceil(win.elapsed),
     daysInMonth: win.days,
     rows,

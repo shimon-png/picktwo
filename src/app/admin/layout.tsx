@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AdminNav } from "@/components/admin/AdminNav";
 import { notFound } from "next/navigation";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { unreadContactCount } from "@/server/services/contact";
@@ -13,24 +13,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     // admin-wide: widens <main> past the app's phone-width column on desktop (globals.css), so charts and tables have room.
     <div className="admin-wide space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-2 text-xl font-medium">Admin</h1>
-        <Link href="/admin" className="chip">Metrics</Link>
-        <Link href="/admin/brain" className="chip">Brain</Link>
-        <Link href="/admin/journey" className="chip">Journey</Link>
-        <Link href="/admin/finance" className="chip">Finance</Link>
-        <Link href="/admin/reports" className="chip">
-          Moderation
-          {flagged > 0 && <span className="ml-1.5 rounded-full bg-b px-1.5 text-[11px] text-white">{flagged}</span>}
-        </Link>
-        <Link href="/admin/battles" className="chip">Battles</Link>
-        <Link href="/admin/messages" className="chip">
-          Messages
-          {unread > 0 && <span className="ml-1.5 rounded-full bg-b px-1.5 text-[11px] text-white">{unread}</span>}
-        </Link>
-        <Link href="/admin/config" className="chip">Config</Link>
-        <a href="/api/admin/export" className="chip">Export JSONL</a>
-      </div>
+      <AdminNav flagged={flagged} unread={unread} />
       {children}
     </div>
   );
