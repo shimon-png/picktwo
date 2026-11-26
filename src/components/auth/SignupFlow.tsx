@@ -5,8 +5,6 @@ import { signIn } from "next-auth/react";
 import { api } from "@/lib/client";
 import { cn } from "@/lib/utils";
 import { AGE_RANGES, SEX_OPTIONS } from "@/lib/constants";
-import { useZipCheck } from "@/lib/use-zip";
-import { ZipHint } from "@/components/ui/ZipHint";
 import { ChipGroup } from "@/components/compose/ComposeForm";
 
 type Step = "email" | "code" | "username" | "about";
@@ -23,7 +21,8 @@ const CODE_ERRORS: Record<string, string> = {
 };
 
 /**
- * Sign up / sign in in 4 steps: email → 6-digit code → username → sex, age + ZIP.
+ * Sign up / sign in in 4 steps: email → 6-digit code → username → sex + age. ZIP is never asked (Alex, Nov 26
+ * 2026): the about-you answer or the IP guess from GET /api/me/quick-profile is saved silently.
  * Existing users with a complete profile finish after the code. Ends with a full page load of `next`
  * so the server links this device (and its guest votes) to the account.
  */
@@ -91,7 +90,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
     setBusy(true);
     setError(null);
     try {
-      // Sex, age and ZIP are optional since the one-tap sign-up (the Vote deck asks later).
+      // Sex and age are optional since the one-tap sign-up (the Vote deck asks later); ZIP is inferred, never asked.
       await api("/api/me/quick-profile", { body: { handle, sex: sex || undefined, ageRange: ageRange || undefined, zipCode: zip.trim() || undefined } });
       done();
     } catch (err) {
@@ -103,8 +102,6 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
   }
 
   const n = STEPS.indexOf(step) + 1;
-  const zipCheck = useZipCheck(zip);
-  const zipOk = zipCheck.state === "ok";
 
   return (
     <div className="space-y-4">
@@ -212,7 +209,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
             e.preventDefault();
             setError(null);
             // Already answered in the Vote deck (about-you cards): nothing left to ask.
-            if (sex && ageRange && zip) finish();
+            if (sex && ageRange) finish();
             else setStep("about");
           }}
           className="space-y-3"
@@ -260,23 +257,7 @@ export function SignupFlow({ next, intro, finishLabel = "Finish" }: { next: stri
             onChange={(v) => setAgeRange(v[0] ?? "")}
             single
           />
-          <div>
-            <label htmlFor="signup-zip" className="label">
-              ZIP code (optional)
-            </label>
-            <input
-              id="signup-zip"
-              autoComplete="postal-code"
-              className="input"
-              placeholder="10001"
-              maxLength={10}
-              value={zip}
-              aria-invalid={zipCheck.state === "bad"}
-              onChange={(e) => setZip(e.target.value)}
-            />
-            <ZipHint check={zipCheck} />
-          </div>
-          <button className="btn-cta w-full py-3" disabled={busy || (!!zip.trim() && !zipOk)}>
+          <button className="btn-cta w-full py-3" disabled={busy}>
             {busy ? "Finishing…" : finishLabel}
           </button>
           <button type="button" className="w-full text-sm text-zinc-500" onClick={() => setStep("username")}>

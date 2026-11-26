@@ -7,5 +7,5 @@ import { ASKING_TOPICS, type AskingTopic } from "@/lib/asking";
 export const GET = handler(async (req) => {
   const t = new URL(req.url).searchParams.get("topic");
   const topic = (ASKING_TOPICS as readonly string[]).includes(t ?? "") ? (t as AskingTopic) : null;
-  return { card: await askingFor(await getViewer(), { topic }) };
+  return { card: await askingFor(await getViewer(), topic ? { topic } : {}) };
 });

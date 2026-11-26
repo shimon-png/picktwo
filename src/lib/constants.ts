@@ -167,6 +167,17 @@ export const ECONOMY_DEFAULTS = {
   aboutSkipRetry: 10,
   /** Share of people (stable per account/browser) who never see about-you cards, to measure their cost in votes. */
   aboutHoldoutPct: 10,
+  /**
+   * "What's on your mind this week?" deck card (lib/mind.ts, Nov 26 2026): first asked after this many votes (0 = off),
+   * again after mindDays. The topic picked multiplies matching battles' feed score by mindBoost (1 = off) for mindDays.
+   */
+  mindAt: 3,
+  mindDays: 7,
+  mindBoost: 5,
+  /** Signed-out: "We're starting to really understand you" sign-up card after this many votes since the pick (0 = off). */
+  mindNudgeAfter: 8,
+  /** Share of people (stable per account/browser) who never see the card, to measure what it adds. */
+  mindHoldoutPct: 10,
   /** Profile bar (Pickbot Phase 0): share of people (stable per account/browser) who never see it, to measure what it adds. */
   profileBarHoldoutPct: 10,
   /** Pickbot (docs/plans/pickbot-prd.html). 1 = every signed-in person (not the holdout); 0 = admins only (alpha). */

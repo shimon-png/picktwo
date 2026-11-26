@@ -9,6 +9,7 @@ import { battles, options, pickbotThreads, type User } from "../db/schema";
 import { getEconomy } from "./config";
 import { knownAnswers } from "./about";
 import { pickbotAccess } from "./pickbot";
+import { activeMindTopic } from "./mind";
 import { ASKING_PRESETS, pickAsking, presetBattleId, type AskingTopic } from "@/lib/asking";
 
 type Viewer = { user: User | null; deviceId: string | null };
@@ -73,13 +74,18 @@ export async function askingFor(v: Viewer, opts: { topic?: AskingTopic | null; n
   const e = await getEconomy();
   if (!e.askingCard || e.askingAt <= 0) return null;
   const now = opts.now ?? new Date();
-  const [known, retired, voted, campaign, access] = await Promise.all([
+  const [known, retired, voted, words, access, mind] = await Promise.all([
     knownAnswers(v),
     retiredPresetIds(),
     votedPresetIds(v),
     campaignWords(v),
     v.user ? pickbotAccess(v.user) : Promise.resolve({ ok: false as const }),
+    opts.topic === undefined ? activeMindTopic(v).catch(() => null) : Promise.resolve(null),
   ]);
+  // "What's on your mind this week?" (lib/mind.ts): its topics match the bank's, except "home" (where to live),
+  // which steers by words instead.
+  const mindTopic = opts.topic !== undefined ? opts.topic : mind === "home" ? null : ((mind as AskingTopic | null) ?? null);
+  const campaign = mind === "home" ? `${words} rent apartment housing house move city` : words;
   // Only presets whose battle is live (the card votes on it before sign-up).
   const live = await db
     .select({ id: battles.id, slug: battles.slug, side: options.side, label: options.label })
@@ -92,7 +98,7 @@ export async function askingFor(v: Viewer, opts: { topic?: AskingTopic | null; n
   const key = v.user?.id ?? v.deviceId ?? "anon";
   const rounds: AskingItem[][] = [];
   for (let r = 0; r < Math.max(1, e.askingRounds); r++) {
-    const picks = pickAsking({ exclude, sex: known.sex, age: known.age, month: nyMonth(now), campaign, topic: opts.topic ?? null, seed: `asking:${key}:${nyDay(now)}:${r}` });
+    const picks = pickAsking({ exclude, sex: known.sex, age: known.age, month: nyMonth(now), campaign, topic: mindTopic, seed: `asking:${key}:${nyDay(now)}:${r}` });
     if (!picks.length) break;
     picks.forEach((p) => exclude.add(p.id));
     rounds.push(picks.map((p) => ({ id: p.id, q: p.q, context: p.context ?? null, slug: slugs.get(presetBattleId(p.id))!, a: p.a, b: p.b })));
