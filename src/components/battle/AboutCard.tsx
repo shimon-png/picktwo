@@ -8,12 +8,8 @@ import { cn } from "@/lib/utils";
 
 export type AboutCardPayload = { id: AboutQuestionId; zipGuess?: string | null; cityGuess?: string | null };
 
-/** Slice colours repeat by position, not by answer, so no answer looks like the default. */
-const SLICE = [
-  "bg-a-soft text-a ring-1 ring-a/35",
-  "bg-b-soft text-b ring-1 ring-b/35",
-  "bg-green-soft text-green ring-1 ring-green/35",
-];
+/** Bright tile colours (globals.css `qtile-*`) repeat by position, not by answer, so no answer looks like the default. */
+const TILE = ["qtile-1", "qtile-2", "qtile-3", "qtile-4", "qtile-5", "qtile-6"];
 
 /**
  * An about-you question shown as a deck card (lib/about.ts): same size and taps as a battle. Answers split the card
@@ -49,7 +45,7 @@ export function AboutCard({ card, onDone }: { card: AboutCardPayload; onDone: (a
   return (
     <article aria-label={`About you: ${q.title}`} className="deck-card animate-pop absolute inset-0 z-40 flex flex-col gap-3 rounded-[20px] bg-white p-4 shadow-card">
       <div className="flex items-center justify-between">
-        <span className="rounded-full bg-a-soft px-2 py-1 font-display text-[10px] font-semibold uppercase tracking-[.1em] text-a">
+        <span className="qbadge qbadge-a font-display">
           About you · {q.kind === "zip" ? "one box" : "1 tap"}
         </span>
         <button type="button" className="px-2 py-1 text-sm text-zinc-500 underline-offset-2 hover:underline" onClick={() => send(null)} disabled={busy}>
@@ -111,9 +107,9 @@ export function AboutCard({ card, onDone }: { card: AboutCardPayload; onDone: (a
               type="button"
               disabled={busy}
               className={cn(
-                "rounded-[14px] px-4 font-display font-semibold leading-tight transition active:scale-[.98]",
+                "qtile px-4 font-display",
                 order.length > 5 ? "text-[17px]" : "text-[20px]",
-                o.id === PREFER_NOT ? "bg-surface text-[15px] font-medium text-zinc-500 ring-1 ring-ink/10" : SLICE[i % SLICE.length],
+                o.id === PREFER_NOT ? "qtile-quiet text-[15px]" : TILE[i % TILE.length],
               )}
               onClick={() => (q.id === "kids" && o.id === "YES" ? setKidsYes(true) : send(o.id))}
             >

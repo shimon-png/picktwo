@@ -201,6 +201,50 @@ body {
 .hero-card-in { animation: hero-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .hero-card-out { animation: hero-out 0.38s cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }
 
+/* Question answers (about-you cards in the deck and in Pickbot, "What's on your mind this week?"; Alex, Nov 26):
+ * bright, candy-coloured tiles with dark text so they read as buttons in every theme. Colours go by position
+ * (`qtile-1`…`qtile-6`), so no answer looks like the default. `qtile-quiet` = "Prefer not to say". No lime here:
+ * lime is for action buttons and main titles only (Alex's design rule, Nov 26). */
+.qtile {
+  display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+  border-radius: 16px; color: #15112b; font-weight: 700; text-align: center; line-height: 1.15;
+  box-shadow: 0 3px 0 rgb(0 0 0 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.55);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+.qtile:hover { filter: brightness(1.05); }
+.qtile:active { transform: translateY(2px) scale(0.985); box-shadow: 0 1px 0 rgb(0 0 0 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.55); }
+.qtile:disabled { opacity: 0.7; }
+.qtile-1 { background: linear-gradient(160deg, #a6ffe0, #4fe8b4); }
+.qtile-2 { background: linear-gradient(160deg, #9aeeff, #3fd3ff); }
+.qtile-3 { background: linear-gradient(160deg, #ffb0dc, #ff6cc0); }
+.qtile-4 { background: linear-gradient(160deg, #fff09a, #ffcf3f); }
+.qtile-5 { background: linear-gradient(160deg, #d9ccff, #a991ff); }
+.qtile-6 { background: linear-gradient(160deg, #ffc9a8, #ff9763); }
+.qtile-quiet {
+  color: var(--color-ink); font-weight: 500;
+  background: color-mix(in oklab, var(--color-ink) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-ink) 18%, transparent);
+}
+.qtile-emoji { font-size: 1.6em; line-height: 1; filter: drop-shadow(0 1px 0 rgb(255 255 255 / 0.5)); }
+
+/* Small bright label on a question card ("About you · 1 tap", "This week · 1 tap"). */
+.qbadge { border-radius: 999px; padding: 4px 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #15112b; }
+.qbadge-a { background: #3fd3ff; }
+.qbadge-v { background: #b9a4ff; }
+
+/* "Why I ask" under a question: a small callout, clearly not an answer. */
+.why-ask {
+  display: flex; align-items: flex-start; gap: 0.5rem; border-radius: 12px; padding: 0.5rem 0.75rem;
+  font-size: 13px; line-height: 1.35; color: var(--color-ink);
+  background: color-mix(in oklab, #b9a4ff 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, #b9a4ff 45%, transparent);
+}
+.why-ask-tag {
+  flex-shrink: 0; border-radius: 999px; padding: 1px 8px; margin-top: 1px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  background: #b9a4ff; color: #15112b;
+}
+
 /* ------------------------------------------------------------------
  * Themes (Nov 2026). Arcade Night is the default (DEFAULT_THEME in
  * lib/theme-preview.ts, rendered on <html>). ?theme=prompt / fizz / arcade
