@@ -63,6 +63,8 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
         user ? sql`${battles.authorId} <> ${user.id}` : sql`true`,
         blocked.length ? notInArray(battles.authorId, blocked) : sql`true`,
         sql`${users.bannedAt} IS NULL`,
+        // "People like you are asking" preset battles (lib/asking.ts) only show through their card.
+        sql`(${battles.tags}->>'askingPreset') IS NULL`,
         seenCond,
       ),
     )

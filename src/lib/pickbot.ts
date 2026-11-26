@@ -28,6 +28,8 @@ export type ThreadState = {
   stopBattles?: boolean;
   /** After a general answer: "Want a better answer?" → quick battles to the target, then a tailored answer. */
   retailor?: boolean;
+  /** Started from a "People like you are asking" preset (lib/asking.ts). Posting it to the crowd retires the preset. */
+  preset?: string;
 };
 
 export type Step =

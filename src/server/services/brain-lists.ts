@@ -51,7 +51,7 @@ export type BrainList =
   | { kind: "voters" | "visitors" | "gates" | "askers" | "newvoters"; total: number; rows: PersonRow[] };
 
 /** Where a vote was made (vote.source); "page" = battle page or a shared link (no source). */
-export const VOTE_PLACES = { feed: "Vote deck", home: "Homepage card", discover: "Discover", search: "Search", profile: "Profile", seed: "Seed (fake)", page: "Battle page / link" } as const;
+export const VOTE_PLACES = { feed: "Vote deck", home: "Homepage card", discover: "Discover", search: "Search", profile: "Profile", asking: "People like you are asking", seed: "Seed (fake)", page: "Battle page / link" } as const;
 export type VotePlace = keyof typeof VOTE_PLACES;
 
 /**

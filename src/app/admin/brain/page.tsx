@@ -220,6 +220,7 @@ const PLACE_KEY: Record<string, string> = {
   Discover: "discover",
   Search: "search",
   Profile: "profile",
+  "People like you are asking": "asking",
   "Seed votes (fake, All view only)": "seed",
   "Battle page / shared link": "page",
 };

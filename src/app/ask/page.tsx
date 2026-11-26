@@ -9,14 +9,18 @@ import { profileProgressFor } from "@/server/services/profile-progress";
 import { ProfileBar } from "@/components/taste/ProfileBar";
 import { AskComposer } from "@/components/pickbot/AskComposer";
 import { PickbotHistory } from "@/components/pickbot/History";
+import { presetById } from "@/lib/asking";
 
 export const metadata = { title: "Ask Pickbot" };
 export const dynamic = "force-dynamic";
 
 /** Ask (Pickbot PRD S1): the profile bar, the question box with examples, and your past questions. */
-export default async function AskPage() {
+export default async function AskPage({ searchParams }: { searchParams: Promise<{ preset?: string }> }) {
+  // "People like you are asking" (lib/asking.ts): the tapped question comes filled in, through sign-up and onboarding.
+  const preset = presetById((await searchParams).preset);
+  const here = preset ? `/ask?preset=${preset.id}` : "/ask";
   const user = await getCurrentUser();
-  if (user && profileIncomplete(user)) redirect(onboardingUrl("/ask"));
+  if (user && profileIncomplete(user)) redirect(onboardingUrl(here));
   const access = await pickbotAccess(user);
   if (!access.ok) {
     const signin = access.reason === "signin";
@@ -27,7 +31,7 @@ export default async function AskPage() {
           {signin ? (
             <>
               <p className="text-[15px] text-ink/80">Sign up to ask Pickbot. It learns your taste from the battles you vote on, so your answers fit you.</p>
-              <Link href="/signin?callbackUrl=/ask" className="btn-primary inline-flex">
+              <Link href={`/signin?callbackUrl=${encodeURIComponent(here)}`} className="btn-primary inline-flex">
                 Sign up to ask
               </Link>
             </>
@@ -46,7 +50,7 @@ export default async function AskPage() {
     <div className="space-y-5 pt-2">
       {progress && !progress.complete && <ProfileBar p={progress} place="ask" />}
       <Intro />
-      <AskComposer examples />
+      {preset ? <AskComposer initialText={preset.q} preset={preset.id} /> : <AskComposer examples />}
       <p className="flex items-center gap-1.5 text-[12px] text-ink/50">
         <Lock className="size-3.5" /> Your questions stay private unless you choose to ask the crowd.
         {left != null && !isPlus(user) && (

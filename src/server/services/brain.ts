@@ -135,7 +135,7 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
   const votePlaces = await db.execute<{ place: string; kind: string; n: number }>(sql`
     SELECT CASE COALESCE(v.source, '')
         WHEN 'feed' THEN 'Vote deck' WHEN 'home' THEN 'Homepage card' WHEN 'discover' THEN 'Discover'
-        WHEN 'search' THEN 'Search' WHEN 'profile' THEN 'Profile' WHEN 'seed' THEN 'Seed votes (fake, All view only)' ELSE 'Battle page / shared link' END AS place,
+        WHEN 'search' THEN 'Search' WHEN 'profile' THEN 'Profile' WHEN 'asking' THEN 'People like you are asking' WHEN 'seed' THEN 'Seed votes (fake, All view only)' ELSE 'Battle page / shared link' END AS place,
       CASE WHEN EXISTS (SELECT 1 FROM "option" o WHERE o.battle_id = v.battle_id AND o.image_url IS NOT NULL) THEN 'photo' ELSE 'text' END AS kind,
       count(*)::int AS n
     FROM vote v WHERE v.created_at > ${since} AND ${voteOK} AND NOT v.flagged
