@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getFinance, type ProviderRow } from "@/server/services/finance";
 
 export const dynamic = "force-dynamic";
@@ -6,14 +7,17 @@ export const metadata = { title: "Finance" };
 const usd = (n: number | null | undefined, digits = 2) =>
   n == null ? "—" : `$${n.toLocaleString("en-US", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="card p-3">
-      <div className="text-xs text-zinc-500">{label}</div>
+/** With `href` the whole tile opens what's behind the number (Alex, Nov 26: drill down from anywhere). */
+function Tile({ label, value, sub, href }: { label: string; value: string; sub?: string; href?: string }) {
+  const body = (
+    <>
+      <div className="text-xs text-zinc-500">{label}{href ? " ›" : ""}</div>
       <div className="mt-0.5 text-2xl tabular-nums">{value}</div>
       {sub && <div className="mt-0.5 text-[11px] text-zinc-500">{sub}</div>}
-    </div>
+    </>
   );
+  if (href) return <Link href={href} className="card block p-3 transition hover:ring-1 hover:ring-accent">{body}</Link>;
+  return <div className="card p-3">{body}</div>;
 }
 
 function Status({ r }: { r: ProviderRow }) {
@@ -29,6 +33,8 @@ export default async function FinancePage() {
   const asOf = new Date(f.asOf).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" });
   const paid = f.rows.filter((r) => r.projected > 0 || r.live.state !== "none");
   const free = f.rows.filter((r) => !paid.includes(r));
+  // This month's people / votes / sign-ups in the Brain's lists (Clean view, from the 1st), with a way back here.
+  const list = (kind: string) => `/admin/brain/list/${kind}?${new URLSearchParams({ from: f.monthStart, back: "/admin/finance" })}`;
 
   return (
     <div className="space-y-5">
@@ -40,14 +46,15 @@ export default async function FinancePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile label="Spent this month" value={usd(f.total.mtd)} sub="month to date" />
-        <Tile label="Projected month end" value={usd(f.total.projected)} sub="at the current pace" />
-        <Tile label="Fixed plans" value={usd(f.total.fixed)} sub="per month, before usage" />
-        <Tile label="Run rate per year" value={usd(f.total.projected * 12, 0)} sub="projected × 12" />
+        <Tile label="Spent this month" value={usd(f.total.mtd)} sub="month to date" href="#providers" />
+        <Tile label="Projected month end" value={usd(f.total.projected)} sub="at the current pace" href="#providers" />
+        <Tile label="Fixed plans" value={usd(f.total.fixed)} sub="per month, before usage" href="#providers" />
+        <Tile label="Run rate per year" value={usd(f.total.projected * 12, 0)} sub="projected × 12" href="#providers" />
       </div>
 
-      <section className="card p-4">
+      <section id="providers" className="card scroll-mt-4 p-4">
         <h3 className="mb-2 font-sans font-medium">By provider</h3>
+        <p className="mb-2 text-xs text-zinc-500">Tap a service name to open its own billing page.</p>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -112,12 +119,15 @@ export default async function FinancePage() {
 
       <section className="card space-y-2 p-4">
         <h3 className="font-sans font-medium">Unit costs this month</h3>
-        <p className="text-xs text-zinc-500">Spend so far divided by real activity so far (seed votes and seed battles left out).</p>
+        <p className="text-xs text-zinc-500">
+          Spend so far divided by real activity so far, counted like the Brain&apos;s Clean view (no seed votes or accounts, no admins). Tap a
+          tile to see the people or votes behind it.
+        </p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Tile label="Real voters" value={f.counts.voters.toLocaleString()} sub={`${f.counts.votes.toLocaleString()} votes`} />
-          <Tile label="Cost per voter" value={usd(f.unit.perVoter)} />
-          <Tile label="Cost per 1,000 votes" value={usd(f.unit.perThousandVotes)} />
-          <Tile label="Cost per sign-up" value={usd(f.unit.perSignup)} sub={`${f.counts.signups.toLocaleString()} sign-ups`} />
+          <Tile label="Real voters" value={f.counts.voters.toLocaleString()} sub={`${f.counts.votes.toLocaleString()} votes`} href={list("voters")} />
+          <Tile label="Cost per voter" value={usd(f.unit.perVoter)} href={list("voters")} />
+          <Tile label="Cost per 1,000 votes" value={usd(f.unit.perThousandVotes)} sub={`${f.counts.votes.toLocaleString()} votes`} href={list("votes")} />
+          <Tile label="Cost per sign-up" value={usd(f.unit.perSignup)} sub={`${f.counts.signups.toLocaleString()} sign-ups`} href={list("signups")} />
         </div>
       </section>
 

@@ -358,7 +358,7 @@ export type PinnedDay = { votesPerVisitor: number | null; votersPerVisitor: numb
  * as Day by day. New voters = people whose first counted vote ever fell on that day (in Clean view: their first real
  * vote since the clean start date).
  */
-export async function pinnedNumbers(view: BrainView): Promise<{ today: PinnedDay; yesterday: PinnedDay; todayDay: string }> {
+export async function pinnedNumbers(view: BrainView): Promise<{ today: PinnedDay; yesterday: PinnedDay; todayDay: string; yesterdayDay: string }> {
   const scope = await brainScope(view, 2);
   const [daily, firsts, [t]] = await Promise.all([
     dailyNumbers(scope),
@@ -380,5 +380,5 @@ export async function pinnedNumbers(view: BrainView): Promise<{ today: PinnedDay
       posts: Number(d?.posts ?? 0),
     };
   };
-  return { today: pin(t.today), yesterday: pin(t.yesterday), todayDay: t.today };
+  return { today: pin(t.today), yesterday: pin(t.yesterday), todayDay: t.today, yesterdayDay: t.yesterday };
 }

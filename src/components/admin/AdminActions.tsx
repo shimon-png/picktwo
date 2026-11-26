@@ -82,30 +82,6 @@ export function ConfigEditor({ economy, features }: { economy: Record<string, nu
   );
 }
 
-export function AdminSeed() {
-  const [busy, setBusy] = useState(false);
-  const router = useRouter();
-  async function run() {
-    setBusy(true);
-    try {
-      const r = await api<{ demo: unknown }>("/api/admin/seed", { method: "POST" });
-      toast(`Seed: ${JSON.stringify(r.demo)}`, "ok");
-      router.refresh();
-    } catch (e) {
-      toast((e as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <section className="card space-y-2 p-4">
-      <h2 className="font-sans font-medium">Demo content</h2>
-      <p className="text-sm text-zinc-500">Adds ~18 sample gift/name/purchase battles (some with outcomes) so the feed isn’t empty at launch. Safe to run once.</p>
-      <button className="btn-outline" disabled={busy} onClick={run}>Seed demo battles</button>
-    </section>
-  );
-}
-
 export function RecomputeEngagement() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);

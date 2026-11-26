@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/server/viewer";
 import type { BrainView } from "@/server/services/brain";
-import { BRAIN_LISTS, brainList, type BrainListKind } from "@/server/services/brain-lists";
+import { BRAIN_LISTS, brainList, describeFilters, parseFilters, type BrainListKind } from "@/server/services/brain-lists";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain list" };
@@ -30,7 +30,7 @@ export default async function BrainListPage({
   searchParams,
 }: {
   params: Promise<{ kind: string }>;
-  searchParams: Promise<{ days?: string; view?: string; day?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const { kind } = await params;
   if (!(kind in BRAIN_LISTS)) notFound();
@@ -39,17 +39,25 @@ export default async function BrainListPage({
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const day = sp.day && /^\d{4}-\d{2}-\d{2}$/.test(sp.day) ? sp.day : null;
   const me = await getCurrentUser();
-  const list = await brainList(kind as BrainListKind, view, days, day, me?.id ?? null);
-  const back = `/admin/brain?days=${days}${view === "all" ? "&view=all" : ""}`;
-  const span = day ?? (days === 1 ? "last 24h" : `last ${days} days`);
+  const filters = parseFilters(sp);
+  const list = await brainList(kind as BrainListKind, view, days, day, me?.id ?? null, filters);
+  // Back to wherever the number was (Brain, Finance, …); only admin paths.
+  const back = sp.back?.startsWith("/admin") ? sp.back : `/admin/brain?days=${days}${view === "all" ? "&view=all" : ""}`;
+  const backLabel = back.startsWith("/admin/finance") ? "Finance" : back.startsWith("/admin/journey") ? "Journey" : "Brain";
+  const span =
+    kind === "seedvotes"
+      ? day ?? "all time"
+      : day ?? (filters.from ? `since ${nyTime(filters.from)}` : days === 1 ? "last 24h" : `last ${days} days`);
+  const narrowed = describeFilters(filters);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Link href={back} className="chip !py-1 text-xs">← Brain</Link>
+        <Link href={back} className="chip !py-1 text-xs">← {backLabel}</Link>
         <h2 className="text-[22px]">{BRAIN_LISTS[kind as BrainListKind]}</h2>
         <span className="text-sm text-zinc-500">
           {list.total} · {span} · {view === "clean" ? "Clean view" : "All data"}
+          {narrowed.length > 0 && ` · ${narrowed.join(" · ")}`}
           {list.rows.length < list.total && ` · showing the newest ${list.rows.length}`}
         </span>
       </div>
@@ -100,7 +108,80 @@ export default async function BrainListPage({
               </tbody>
             </table>
           </>
-        ) : list.kind === "votes" ? (
+        ) : list.kind === "cards" ? (
+          <>
+            <p className="mb-2 text-xs text-zinc-500">
+              One row per person and battle they were shown in the Vote deck (a card shown twice to the same person counts once), and how it
+              ended: voted, skipped, or neither (they left).
+            </p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-zinc-500">
+                  <th className="py-1 pr-2 font-normal">First shown</th>
+                  <th className="py-1 pr-2 font-normal">Who</th>
+                  <th className="py-1 pr-2 font-normal">Battle</th>
+                  <th className="py-1 pr-2 text-right font-normal">Position</th>
+                  <th className="py-1 pr-2 font-normal">Ended</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.rows.map((c, i) => (
+                  <tr key={i} className="border-t border-ink/10 align-top">
+                    <td className="py-1.5 pr-2 text-xs text-zinc-500">{nyTime(c.at)}</td>
+                    <td className="py-1.5 pr-2"><Person who={c.who} handle={c.handle} /></td>
+                    <td className="py-1.5 pr-2">
+                      <Link href={`/b/${c.slug}`} className="underline-offset-2 hover:underline">{c.title}</Link>
+                      <span className="ml-1 text-xs text-zinc-500">{c.kind ?? ""}</span>
+                    </td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">{c.pos ?? "—"}</td>
+                    <td className={`py-1.5 pr-2 text-xs ${c.outcome === "voted" ? "text-green" : c.outcome === "skipped" ? "text-b" : "text-zinc-500"}`}>{c.outcome}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        ) : list.kind === "skips" ? (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-zinc-500">
+                <th className="py-1 pr-2 font-normal">When</th>
+                <th className="py-1 pr-2 font-normal">Who</th>
+                <th className="py-1 pr-2 font-normal">Battle skipped</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.rows.map((r, i) => (
+                <tr key={i} className="border-t border-ink/10 align-top">
+                  <td className="py-1.5 pr-2 text-xs text-zinc-500">{nyTime(r.at)}</td>
+                  <td className="py-1.5 pr-2"><Person who={r.who} handle={r.handle} /></td>
+                  <td className="py-1.5 pr-2"><Link href={`/b/${r.slug}`} className="underline-offset-2 hover:underline">{r.title}</Link></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : list.kind === "changes" ? (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-zinc-500">
+                <th className="py-1 pr-2 font-normal">When</th>
+                <th className="py-1 pr-2 font-normal">Who</th>
+                <th className="py-1 pr-2 font-normal">Battle: from → to</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.rows.map((r, i) => (
+                <tr key={i} className="border-t border-ink/10 align-top">
+                  <td className="py-1.5 pr-2 text-xs text-zinc-500">{nyTime(r.at)}</td>
+                  <td className="py-1.5 pr-2"><Person who={r.who} handle={r.handle} /></td>
+                  <td className="py-1.5 pr-2">
+                    {r.slug ? <Link href={`/b/${r.slug}`} className="underline-offset-2 hover:underline">{r.title}</Link> : <span className="text-zinc-500">Deleted battle</span>}
+                    <span className="text-zinc-500"> : {r.from ?? "?"} → {r.to ?? "?"}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : list.kind === "votes" || list.kind === "seedvotes" ? (
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-zinc-500">
@@ -153,10 +234,10 @@ export default async function BrainListPage({
               <tr className="text-left text-xs text-zinc-500">
                 <th className="py-1 pr-2 font-normal">Person</th>
                 <th className="py-1 pr-2 text-right font-normal">
-                  {list.kind === "voters" ? "Votes" : list.kind === "visitors" ? "Visits" : list.kind === "askers" ? "Questions" : "Times"}
+                  {list.kind === "voters" ? "Votes" : list.kind === "newvoters" ? "Votes in window" : list.kind === "visitors" ? "Visits" : list.kind === "askers" ? "Questions" : "Times"}
                 </th>
                 {list.kind !== "askers" && <th className="py-1 pr-2 text-right font-normal">Asked Pickbot</th>}
-                <th className="py-1 pr-2 font-normal">First</th>
+                <th className="py-1 pr-2 font-normal">{list.kind === "newvoters" ? "First vote" : "First"}</th>
                 <th className="py-1 pr-2 font-normal">Last</th>
               </tr>
             </thead>
