@@ -145,9 +145,10 @@ function sinceV2(versions: { version: string; from: string; cards: ArmNumbers; h
 /** Pinned big numbers (Alex, Nov 25): today so far, yesterday underneath. */
 function PinnedRow({ today, yesterday, since }: { today: PinnedDay; yesterday: PinnedDay; since?: { now: string; before: string; from: string } }) {
   const r = (x: number | null) => (x == null ? "—" : x.toFixed(2));
+  const pct = (x: number | null) => (x == null ? "—" : `${Math.round(x * 100)}%`);
   const items: [string, string | number, string | number][] = [
     ["Votes per visitor", r(today.votesPerVisitor), r(yesterday.votesPerVisitor)],
-    ["Voters per visitor", r(today.votersPerVisitor), r(yesterday.votersPerVisitor)],
+    ["% of visitors who voted", pct(today.votersPerVisitor), pct(yesterday.votersPerVisitor)],
     ["New voters", today.newVoters, yesterday.newVoters],
     ["New sign-ups", today.signups, yesterday.signups],
     ["New battles posted", today.posts, yesterday.posts],
