@@ -4,9 +4,10 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, diversify, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, type ViewerProfile } from "./ranking";
+import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, type ViewerProfile } from "./ranking";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 import { matchesTarget } from "./targeting";
+import { isHumanBattle } from "@/lib/auto-seed";
 
 export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; featured?: boolean; debug?: Record<string, number> };
 
@@ -47,6 +48,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       authorCountry: users.country,
       authorKidAges: users.kidAges,
       authorPP: users.ppBalance,
+      authorHasEmail: sql<boolean>`${users.email} IS NOT NULL`,
       oChosen: outcomes.chosen,
       oThumb: outcomes.thumb,
       oNote: outcomes.note,
@@ -66,7 +68,11 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
         seenCond,
       ),
     )
-    .orderBy(desc(battles.createdAt))
+    // Real people's battles first, so the 500 cap never cuts one off when there's lots of seed content.
+    .orderBy(
+      sql`CASE WHEN ${battles.id} NOT LIKE 'seed\_%' AND (${users.email} IS NOT NULL OR COALESCE((${battles.tags}->>'pickbot')::boolean, false)) THEN 0 ELSE 1 END`,
+      desc(battles.createdAt),
+    )
     .limit(500);
   // "Target a specific group": only viewers whose profile matches see a targeted battle in the deck.
   const rows = allRows.filter((r) => matchesTarget(r.b.tags?.target, user));
@@ -112,12 +118,14 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     const engaged = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
     const d = decisions.get(r.b.id);
     const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight);
-    return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
+    const featured = !!r.b.tags?.featured;
+    const human = isHumanBattle({ id: r.b.id, authorHasEmail: !!r.authorHasEmail, pickbot: r.b.tags?.pickbot });
+    return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, featured, human, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
-  // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet.
-  const feat = (x: (typeof scored)[number]) => (x.row.b.tags?.featured ? 1 : 0);
-  scored.sort((a, b) => feat(b) - feat(a) || b.score - a.score);
-  const picked = diversify(scored, limit);
+  // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet; then every battle a
+  // real person posted, above all seed content (Alex + Shimon, Nov 26 2026). Same for the holdout.
+  scored.sort((a, b) => b.score - a.score);
+  const picked = tieredPick(scored, limit);
   const cards = await hydrateCards(picked.map((p) => p.row));
   return cards.map((c, i) => ({
     ...c,

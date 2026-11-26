@@ -52,6 +52,18 @@ export function diversify<T extends { categoryId: string; authorId: string }>(so
   return out;
 }
 
+/**
+ * Deck order in tiers (Alex + Shimon, Nov 26 2026: "always prioritize the battles that humans have created"):
+ * featured battles first, then battles real people posted, then seed content. Score order and `diversify()`
+ * apply within each tier, so a seed battle never jumps ahead of a real person's.
+ */
+export function tieredPick<T extends { categoryId: string; authorId: string; featured: boolean; human: boolean }>(sorted: T[], limit: number): T[] {
+  const tiers = [sorted.filter((x) => x.featured), sorted.filter((x) => !x.featured && x.human), sorted.filter((x) => !x.featured && !x.human)];
+  const out: T[] = [];
+  for (const t of tiers) if (out.length < limit) out.push(...diversify(t, limit - out.length));
+  return out;
+}
+
 /** FNV-1a 32-bit hash → [0, 1). Deterministic, so a seed gives a stable order. */
 export function hashUnit(s: string): number {
   let h = 0x811c9dc5;
