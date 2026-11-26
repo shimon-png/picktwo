@@ -285,6 +285,7 @@ html[data-theme="arcade"] {
 html[data-theme="arcade"] body { background: radial-gradient(120% 60% at 50% 0%, #2a1d5c, #120e26 60%) fixed; }
 html[data-theme="arcade"] :is(h1, h2, h3, .display) { font-weight: 700; letter-spacing: 0; font-size-adjust: none; }
 html[data-theme="arcade"] .deck-card h1 { color: #c6ff3d; text-shadow: 0 0 18px rgba(198, 255, 61, 0.35); }
+html[data-theme="arcade"] .pickbot-word { color: #c4b5fd; }
 /* Panels: everything that is white in Prompt becomes the night panel. Photo text stays white. */
 html[data-theme="arcade"] :is(.bg-white, .card, .card-ring, .input, .chip, .btn-outline, .deck-card, .deck-peek) { background-color: #1f1940; }
 html[data-theme="arcade"] :is(.bg-white\/90, .bg-white\/80, .bg-white\/60) { background-color: rgb(31 25 64 / 0.85); }

@@ -53,10 +53,10 @@ describe("People like you are asking: picking", () => {
     expect(presetScore(p({ months: [1] }), { month: 1 })).toBeGreaterThan(presetScore(plain, { month: 1 }));
   });
 
-  it("returns three different topics, never an excluded (retired or voted) one", () => {
+  it("returns five questions on five different topics, never an excluded (retired or voted) one", () => {
     const out = pickAsking({ ...base, exclude: new Set(["w_party", "g_santa"]) });
-    expect(out).toHaveLength(3);
-    expect(new Set(out.map((x) => x.topic)).size).toBe(3);
+    expect(out).toHaveLength(5);
+    expect(new Set(out.map((x) => x.topic)).size).toBe(5);
     expect(out.map((x) => x.id)).not.toContain("w_party");
     expect(out.map((x) => x.id)).not.toContain("g_santa");
   });
@@ -73,6 +73,7 @@ describe("People like you are asking: picking", () => {
     expect(seen.size).toBeGreaterThan(20);
     // No question takes the first slot for more than a fifth of people.
     for (const n of firsts.values()) expect(n).toBeLessThan(400);
+    expect(pickAsking({ ...base, seed: "x", n: 3 })).toHaveLength(3);
   });
 
   it("leans on what we know: a woman from a dating ad mostly sees dating", () => {
