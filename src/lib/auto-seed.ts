@@ -1,7 +1,7 @@
 /**
  * Auto-seeding (Alex + Shimon, Nov 26 2026): when the person ranked `autoSeedRank` (10th) by votes this week has
  * `autoSeedAt` (50) or fewer battles left in their deck, write `autoSeedCount` (100) more seed battles in the voice
- * of the earlier batches, `autoSeedPhotoPct` (33%) with photos. Pure rules only; the service is
+ * of the earlier batches, `autoSeedPhotoPct` (30%) with photos. Pure rules only; the service is
  * `server/services/auto-seed.ts`. Seed rules (project memory): no cartoon/emoji images, real photos that fit the
  * headline, no comparisons of a person's looks in photo battles (both photos would have to show the same person),
  * believable usernames that fit the post's voice, no line under answers by default, the story never repeats the title.
@@ -12,25 +12,26 @@ export type Voice = "F" | "M" | "N";
 export type SeedKind = "text" | "photo";
 
 /**
- * Topic mix for new batches. Alex (Nov 27 2026): weigh heavily toward money and affordability, jobs and layoffs
- * (AI too), the economy, and political differences in families, because that's what people are worried about.
- * Those four are ~72% of every batch; the earlier batches' couples / cheating / dating / wedding / parenting mix
- * fills the rest. Photo battles follow the same mix.
+ * Topic mix for new batches. Alex (Nov 27 2026): half of every batch is money and affordability, jobs and layoffs
+ * (AI too), the economy and political differences in families (`FOCUS_TOPICS`), the other half relationships and
+ * everything else. Within each half about 30% are photo battles (`planSlots`).
  */
 export const TOPIC_MIX: [topic: string, weight: number, brief: string][] = [
-  ["money", 22, "affordability: rent going up, groceries, gas, credit card debt, student loans, splitting costs with a partner or friends, saying no to plans I can't afford, lending money to family"],
-  ["jobs", 20, "jobs: layoffs, scared of losing my job (incl. to AI), my partner got laid off, job hunting for months, a lower-paying offer vs waiting, side hustles, asking for a raise when everyone's cutting back"],
-  ["politics", 17, "political differences in families and couples: Republican parents and a Democrat kid or the other way round, a partner whose family votes the other way, holidays with relatives who vote differently, whether to invite them over, how to keep loving each other. About the relationship, never which party is right"],
-  ["economy", 13, "the economy and prices: buy now or wait, recession worries, saving vs spending, moving somewhere cheaper, moving back in with parents, cutting back on holidays, weddings or trips because everything costs more"],
-  ["couples", 8, "couples fights, 'who's right?' between me and my partner (often about money)"],
-  ["cheating", 6, "cheating, flirting, exes, phones, DMs, trust"],
-  ["dating", 6, "dating apps (Hinge, Bumble, Tinder), first dates, who pays, situationships, texting"],
-  ["wedding", 4, "weddings, bachelorettes, bridesmaids, proposals, rings, and what they all cost"],
-  ["parenting", 4, "parenting, daycare costs, grandparents, school (kids by age only, never names)"],
+  ["money", 15, "affordability: rent going up, groceries, gas, credit card debt, student loans, splitting costs with a partner or friends, saying no to plans I can't afford, lending money to family"],
+  ["jobs", 14, "jobs: layoffs, scared of losing my job (incl. to AI), my partner got laid off, job hunting for months, a lower-paying offer vs waiting, side hustles, asking for a raise when everyone's cutting back"],
+  ["politics", 12, "political differences in families and couples: Republican parents and a Democrat kid or the other way round, a partner whose family votes the other way, holidays with relatives who vote differently, whether to invite them over, how to keep loving each other. About the relationship, never which party is right"],
+  ["economy", 9, "the economy and prices: buy now or wait, recession worries, saving vs spending, moving somewhere cheaper, moving back in with parents, cutting back on holidays, weddings or trips because everything costs more"],
+  ["couples", 14, "couples fights, 'who's right?' between me and my partner"],
+  ["cheating", 10, "cheating, flirting, exes, phones, DMs, trust"],
+  ["dating", 10, "dating apps (Hinge, Bumble, Tinder), first dates, who pays, situationships, texting"],
+  ["wedding", 7, "weddings, bachelorettes, bridesmaids, proposals, rings, in-laws at weddings"],
+  ["parenting", 5, "parenting, pregnancy, baby names, grandparents, school, chores (kids by age only, never names)"],
+  ["life", 4, "roommates, friends, family drama, home, pets, everyday etiquette (little food)"],
 ];
 
-/** The topics Alex wants most of (Nov 27 2026). */
+/** The topics Alex wants half of every batch on (Nov 27 2026). */
 export const FOCUS_TOPICS = ["money", "jobs", "politics", "economy"] as const;
+export const isFocusTopic = (t: string) => (FOCUS_TOPICS as readonly string[]).includes(t);
 
 /** Topics for a batch of `n`, in proportion to TOPIC_MIX, largest remainders first. */
 export function topicPlan(n: number): string[] {
@@ -40,6 +41,23 @@ export function topicPlan(n: number): string[] {
   let left = n - out.reduce((s, r) => s + r.k, 0);
   for (const r of [...out].sort((a, b) => b.rem - a.rem)) if (left-- > 0) r.k++;
   return out.flatMap((r) => Array<string>(r.k).fill(r.t));
+}
+
+/**
+ * Kinds for a chunk of `topics` with `nPhoto` photo battles, spread evenly over the focus half and the rest
+ * (Alex, Nov 27: ~30% photos in each half), then shuffled. Pure with a given `rand`.
+ */
+export function planSlots(topics: readonly string[], nPhoto: number, rand: () => number = Math.random): { kind: SeedKind; topic: string }[] {
+  const shuffle = <T,>(xs: T[]) => xs.map((x) => ({ x, r: rand() })).sort((p, q) => p.r - q.r).map((p) => p.x);
+  const focus = shuffle(topics.filter(isFocusTopic));
+  const rest = shuffle(topics.filter((t) => !isFocusTopic(t)));
+  const k = Math.max(0, Math.min(topics.length, nPhoto));
+  let kf = topics.length ? Math.round((k * focus.length) / topics.length) : 0;
+  kf = Math.min(kf, focus.length, k);
+  const kr = Math.min(rest.length, k - kf);
+  kf = Math.min(focus.length, k - kr);
+  const tag = (xs: string[], n: number) => xs.map((topic, i) => ({ kind: (i < n ? "photo" : "text") as SeedKind, topic }));
+  return shuffle([...tag(focus, kf), ...tag(rest, kr)]);
 }
 
 /** How many of a batch are photo battles. */

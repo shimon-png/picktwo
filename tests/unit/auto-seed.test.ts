@@ -10,7 +10,8 @@ import {
   shouldStartBatch,
   storyRepeat,
   topicPlan,
-  FOCUS_TOPICS,
+  isFocusTopic,
+  planSlots,
   voiceFromLabels,
   watchedRank,
   type SeedDraft,
@@ -56,16 +57,23 @@ describe("batch mix", () => {
     expect(photoCount(100, 33)).toBe(33);
     expect(photoCount(10, 0)).toBe(0);
   });
-  it("plans exactly n topics, heaviest on money, jobs, politics and the economy (Alex, Nov 27)", () => {
+  it("plans exactly n topics, half on money, jobs, politics and the economy (Alex, Nov 27)", () => {
     const t = topicPlan(100);
     expect(t).toHaveLength(100);
     const n = (k: string) => t.filter((x) => x === k).length;
-    const focus = FOCUS_TOPICS.reduce((s, k) => s + n(k), 0);
-    expect(focus).toBeGreaterThanOrEqual(70);
-    expect(n("money")).toBeGreaterThan(n("couples"));
-    expect(n("politics")).toBeGreaterThan(n("cheating"));
+    expect(t.filter(isFocusTopic)).toHaveLength(50);
+    expect(n("money")).toBeGreaterThan(n("cheating"));
     expect(topicPlan(7)).toHaveLength(7);
-    expect(topicPlan(7).filter((k) => (FOCUS_TOPICS as readonly string[]).includes(k)).length).toBeGreaterThanOrEqual(5);
+  });
+  it("puts about 30% photos in each half", () => {
+    const slots = planSlots(topicPlan(100), 30, mulberry32(3));
+    expect(slots).toHaveLength(100);
+    const photos = (focus: boolean) => slots.filter((s) => s.kind === "photo" && isFocusTopic(s.topic) === focus).length;
+    expect(photos(true)).toBe(15);
+    expect(photos(false)).toBe(15);
+    const small = planSlots(topicPlan(10), 3, mulberry32(1));
+    expect(small.filter((s) => s.kind === "photo")).toHaveLength(3);
+    expect(planSlots(["money"], 5)).toEqual([{ kind: "photo", topic: "money" }]);
   });
 });
 
