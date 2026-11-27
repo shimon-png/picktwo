@@ -48,7 +48,7 @@ export async function voteTotal(v: Viewer): Promise<number> {
 export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = {}) {
   const e = await getEconomy();
   if (!v.user && !v.deviceId) return null;
-  const [votes, rows, crowd] = await Promise.all([
+  const [votes, rows, crowd, crowdRows] = await Promise.all([
     voteTotal(v),
     db.execute<PickRow>(sql`
       SELECT v.battle_id, b.slug, b.title, v.side, b.votes_a, b.votes_b,
@@ -58,31 +58,23 @@ export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = 
       WHERE ${owner(v)} AND NOT v.flagged AND b.tags ? 'brain'
       ORDER BY v.created_at DESC LIMIT 2000`),
     crowdAxes(),
+    // Against the crowd uses every pick, tagged or not (it used to read only AI-tagged battles, so it often said 0 of 0).
+    db.execute<{ settled: number; against: number }>(sql`
+      SELECT count(*)::int AS settled,
+        count(*) FILTER (WHERE (v.side = 'A' AND b.votes_a < b.votes_b) OR (v.side = 'B' AND b.votes_b < b.votes_a))::int AS against
+      FROM vote v JOIN battle b ON b.id = v.battle_id
+      WHERE ${owner(v)} AND NOT v.flagged AND b.votes_a + b.votes_b >= 10`),
   ]);
   const picks = [...rows];
   const axes = scoreAxes(picks.map((r) => toPick(r.side, r.ta, r.tb)));
   const shown = visibleAxes(axes, votes, e.tasteFirstAt, e.tasteFullAt);
   // Against the crowd: picks on the side that is currently the minority (battles with 10+ votes).
-  const settled = picks.filter((p) => p.votes_a + p.votes_b >= 10);
-  const against = settled.filter((p) => (p.side === "A" ? p.votes_a < p.votes_b : p.votes_b < p.votes_a)).length;
+  const settled = Number(crowdRows[0]?.settled ?? 0);
+  const against = Number(crowdRows[0]?.against ?? 0);
 
-  // Agreement with people like you (accounts with the same sex × age range), on battles with 3+ of them voting.
-  let likeYou: { label: string; agree: number; battles: number } | null = null;
-  const label = likeYouLabel(v.user?.sex, v.user?.ageRange);
-  if (v.user && label && v.user.ageRange) {
-    const g = await db.execute<{ mine: "A" | "B"; ga: number; gb: number }>(sql`
-      SELECT v.side AS mine, count(*) FILTER (WHERE g.side = 'A')::int AS ga, count(*) FILTER (WHERE g.side = 'B')::int AS gb
-      FROM vote v
-      JOIN vote g ON g.battle_id = v.battle_id AND g.id <> v.id AND NOT g.flagged
-      JOIN "user" gu ON gu.id = g.user_id AND gu.sex = ${v.user.sex} AND gu.age_range = ${v.user.ageRange}
-      WHERE v.user_id = ${v.user.id} AND NOT v.flagged
-      GROUP BY v.battle_id, v.side HAVING count(*) >= 3`);
-    const decided = [...g].filter((r) => r.ga !== r.gb);
-    if (decided.length >= 5) {
-      const agree = decided.filter((r) => (r.ga > r.gb ? "A" : "B") === r.mine).length;
-      likeYou = { label, agree: Math.round((100 * agree) / decided.length), battles: decided.length };
-    }
-  }
+  // Agreement with people like you: the narrowest group (same sex × age range, else same sex) that has voted with
+  // them on enough battles. Counts every vote from accounts in that group, seed accounts included.
+  const likeYou = v.user ? await likeYouAgreement(v.user) : null;
 
   const crowdById = new Map(crowd.map((c) => [c.id, c.score]));
   const examples = opts.examples
@@ -112,9 +104,39 @@ export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = 
     name: shown.length >= 6 ? typeName(axes) : null,
     axes: shown.map((a) => ({ ...a, crowd: crowdById.get(a.id) ?? 0, why: axisWhy(a), examples: (examples as Record<string, unknown[]>)[a.id] ?? [] })),
     against,
-    settled: settled.length,
+    settled,
     likeYou,
+    /** False when the account has no sex saved, so there's no "people like you" group to compare with. */
+    canCompare: !!v.user?.sex,
   };
+}
+
+/** Min. group votes on a battle for it to count, and min. such battles for a percentage. */
+const LIKE_YOU_PER_BATTLE = 2;
+const LIKE_YOU_BATTLES = 3;
+
+async function likeYouAgreement(user: User): Promise<{ label: string; agree: number; battles: number } | null> {
+  if (!user.sex) return null;
+  const groups: { label: string | null; age: string | null }[] = [];
+  if (user.ageRange) groups.push({ label: likeYouLabel(user.sex, user.ageRange), age: user.ageRange });
+  groups.push({ label: likeYouLabel(user.sex, null), age: null });
+  for (const grp of groups) {
+    if (!grp.label) continue;
+    const g = await db.execute<{ mine: "A" | "B"; ga: number; gb: number }>(sql`
+      SELECT v.side AS mine, count(*) FILTER (WHERE g.side = 'A')::int AS ga, count(*) FILTER (WHERE g.side = 'B')::int AS gb
+      FROM vote v
+      JOIN vote g ON g.battle_id = v.battle_id AND g.id <> v.id AND NOT g.flagged
+      JOIN "user" gu ON gu.id = g.user_id AND gu.id <> ${user.id} AND gu.sex = ${user.sex}
+        ${grp.age ? sql`AND gu.age_range = ${grp.age}` : sql``}
+      WHERE v.user_id = ${user.id} AND NOT v.flagged
+      GROUP BY v.battle_id, v.side HAVING count(*) >= ${LIKE_YOU_PER_BATTLE}`);
+    const decided = [...g].filter((r) => r.ga !== r.gb);
+    if (decided.length >= LIKE_YOU_BATTLES) {
+      const agree = decided.filter((r) => (r.ga > r.gb ? "A" : "B") === r.mine).length;
+      return { label: grp.label, agree: Math.round((100 * agree) / decided.length), battles: decided.length };
+    }
+  }
+  return null;
 }
 
 export type TasteProfile = NonNullable<Awaited<ReturnType<typeof tasteProfileFor>>>;
