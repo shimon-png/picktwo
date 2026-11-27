@@ -87,10 +87,12 @@ async function recentlyShown(v: Viewer, days = 3): Promise<Set<string>> {
 /** Topics of the battles this person voted on lately (AI themes). */
 async function recentVoteThemes(v: Viewer): Promise<{ themes: (string | null)[]; titles: string[] }> {
   if (!v.user && !v.deviceId) return { themes: [], titles: [] };
-  const rows = await db.execute<{ theme: string | null; title: string }>(sql`
-    SELECT b.tags->'brain'->>'theme' AS theme, b.title FROM vote v JOIN battle b ON b.id = v.battle_id
-    WHERE ${who(v, "v.")} AND b.id NOT LIKE 'ask\_%' ORDER BY v.created_at DESC LIMIT 30`);
-  return { themes: rows.map((r) => r.theme), titles: rows.slice(0, 15).map((r) => r.title) };
+  const rows = await db.execute<{ theme: string | null; title: string; picked: string | null }>(sql`
+    SELECT b.tags->'brain'->>'theme' AS theme, b.title, o.label AS picked FROM vote v JOIN battle b ON b.id = v.battle_id
+    LEFT JOIN option o ON o.battle_id = v.battle_id AND o.side = v.side
+    WHERE ${who(v, "v.")} AND b.id NOT LIKE 'ask\\_%' ORDER BY v.created_at DESC LIMIT 30`);
+  // "title → what they picked", so the questions follow how they vote, not just what they saw.
+  return { themes: rows.map((r) => r.theme), titles: rows.slice(0, 15).map((r) => (r.picked ? `${r.title} → picked "${r.picked}"` : r.title)) };
 }
 
 /** What this person took to Pickbot lately: themes (to change the subject), titles and presets (never re-shown). */
