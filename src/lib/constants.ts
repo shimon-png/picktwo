@@ -257,6 +257,12 @@ export const ECONOMY_DEFAULTS = {
   engagementHoldoutPct: 10,
   /** How much the deck's vote-vs-skip rate moves the order (Shimon, Nov 25 2026): battles people vote on rise, ones they skip sink. 0 = off. Same holdout as engagementWeight. */
   skipWeight: 1.5,
+  /** Opener (Alex, Nov 27 2026): 1 = someone who hasn't voted or skipped yet gets the proven battle most people vote on as their first card (after a featured one, ahead of real people's battles for that one card). 0 = off. The engagement holdout keeps the old order. */
+  openerOn: 1,
+  /** A battle needs this many deck decisions (votes + skips by real people) to count as proven for the opener. */
+  openerMinDecisions: 20,
+  /** Skip-streak rescue: after this many skips in a row, the deck brings the remaining card people vote on most to the front. 0 = off. */
+  skipRescueAfter: 2,
   /** Data brain Phase 4: win-back emails to people drifting away. 0 = off (default), 1 = on. */
   winbackEmails: 0,
   /** Percent of lapsing people who get no email (stable per account), to measure whether the emails bring people back. */

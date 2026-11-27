@@ -158,3 +158,43 @@ export function gapFactor(tests: readonly string[], missing: readonly string[], 
   if (!(boost > 1) || !missing.length) return 1;
   return tests.some((t) => missing.includes(t)) ? boost : 1;
 }
+
+/**
+ * Opener (Alex, Nov 27 2026: 73% of visitors never vote, and the first deck card is skipped 25% of the time and left
+ * on 23%): the first card for someone who hasn't voted or skipped anything yet is the proven battle most people vote
+ * on. Proven = at least `minDecisions` deck decisions (votes + skips). Highest smoothed pick rate wins; ties go to the
+ * one with more decisions. null when nothing is proven yet.
+ */
+export function pickOpener<T extends { votes: number; skips: number }>(items: T[], minDecisions: number, prior: number): T | null {
+  let best: T | null = null;
+  let bestRate = -1;
+  for (const x of items) {
+    const n = Math.max(0, x.votes) + Math.max(0, x.skips);
+    if (n < Math.max(1, minDecisions)) continue;
+    const rate = pickRate(x.votes, x.skips, prior);
+    const bn = best ? best.votes + best.skips : 0;
+    if (rate > bestRate || (rate === bestRate && n > bn)) {
+      best = x;
+      bestRate = rate;
+    }
+  }
+  return best;
+}
+
+/**
+ * Skip-streak rescue (Alex, Nov 27 2026): after `after` skips in a row, the deck moves the remaining card with the
+ * highest pick rate to the front. Returns the index in `rest` to bring forward, or -1 (rescue off, no streak yet, no
+ * rates, or the next card is already the best).
+ */
+export function rescueIndex(rest: { pickRate?: number }[], skipStreak: number, after: number): number {
+  if (!(after > 0) || skipStreak < after || rest.length < 2) return -1;
+  let idx = -1;
+  let best = -1;
+  rest.forEach((c, i) => {
+    if (typeof c.pickRate === "number" && c.pickRate > best) {
+      best = c.pickRate;
+      idx = i;
+    }
+  });
+  return idx > 0 ? idx : -1;
+}

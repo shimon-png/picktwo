@@ -40,6 +40,7 @@ export default async function VotePage() {
       progress={progress}
       pickbotPromo={promo}
       asking={asking}
+      skipRescueAfter={economy.skipRescueAfter}
       />
       <Tutorial signedIn={!!viewer.user} accountSeen={!!viewer.user?.tourSeenAt} />
     </>

@@ -567,6 +567,10 @@ export type BattleCard = {
   outcome: { chosen: string; thumb: string | null; note: string | null } | null;
   /** Data brain: which deck ranking produced this card (engine vs holdout), when it came from the feed. */
   arm?: "engine" | "holdout";
+  /** Smoothed share of this battle's deck decisions that were votes (feed only; for the skip-streak rescue). */
+  pickRate?: number;
+  /** This card is the opener: the proven first card for someone new (feed only). */
+  opener?: boolean;
 };
 
 export async function battleCards(where: ReturnType<typeof and>, limit = 20): Promise<BattleCard[]> {
