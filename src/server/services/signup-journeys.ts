@@ -85,10 +85,16 @@ async function buildJourney(u: UserRow | null, deviceId: string | null): Promise
       AND (e.user_id = ${uid} OR e.device_id IN ${devs})
     ORDER BY e.created_at ASC LIMIT 1`);
   const votes = await db.execute<{ at: string; title: string; slug: string; picked: string; after: boolean; method: string | null }>(sql`
-    SELECT v.created_at::text AS at, b.title, b.slug, o.label AS picked, v.created_at >= ${signedCmp} AS after,
-      (SELECT a.props->>'method' FROM analytics_event a WHERE a.name = 'vote_cast' AND a.props->>'battleId' = v.battle_id
-         AND (a.user_id = ${uid} OR a.device_id IN ${devs}) LIMIT 1) AS method
+    -- This person's vote_cast events, read once through the user / device indexes (Nov 27 speed-up: a lookup per
+    -- vote by event name walked every vote_cast in the table).
+    WITH m AS (
+      SELECT DISTINCT ON (a.props->>'battleId') a.props->>'battleId' AS battle_id, a.props->>'method' AS method
+      FROM analytics_event a
+      WHERE a.name = 'vote_cast' AND (a.user_id = ${uid} OR a.device_id IN ${devs})
+    )
+    SELECT v.created_at::text AS at, b.title, b.slug, o.label AS picked, v.created_at >= ${signedCmp} AS after, m.method
     FROM vote v JOIN battle b ON b.id = v.battle_id
+    LEFT JOIN m ON m.battle_id = v.battle_id
     LEFT JOIN "option" o ON o.battle_id = v.battle_id AND o.side = v.side
     WHERE (v.user_id = ${uid} OR v.device_id IN ${devs}) AND COALESCE(v.source, '') <> 'seed'
     ORDER BY v.created_at ASC LIMIT 200`);
