@@ -169,7 +169,11 @@ Voice and style (copy the examples closely):
 - Never: emoji, em dashes, "not X, not Y" or "not just X, but Y" phrasing, therapy-speak, AI words (journey, navigate, delve), hashtags, real people's names (first names of partners are ok sparingly), celebrities as the subject, kids' names, anything about self-harm.
 - Every post is a different situation. Don't reuse the examples' situations.
 
-Photo posts (kind "photo"): the two options are things or places a real photo can show side by side: venues, rooms, houses, couches, cars, cakes, flowers, rings, dogs, cats, trips, gifts, decor. Never compare how a person looks (hair, makeup, outfits, tattoos, bodies, selfies), never photos of kids.
+Topics: most posts are about money and affordability, jobs and layoffs, the economy, and political differences in families. These are real day-to-day worries: rent, groceries, debt, a partner losing their job, AI coming for my job, whether to have a wedding or a baby now or wait. Keep them personal and specific (my rent, my dad, my job), never news commentary.
+Political posts: the fight is inside a family or couple (my dad's a Republican and I'm a Democrat, or the other way round; my in-laws vote the other way; do I invite them for the holidays; how do I talk to my mom without fighting). Party names are fine. Half the posters lean right and half lean left, and both sides come across as people who love their family. Never name politicians, never argue a policy, never mock either side's voters, no slurs, nothing about violence or elections being stolen.
+
+
+Photo posts (kind "photo"): the two options are things or places a real photo can show side by side: apartments, houses, rooms, cars, couches, venues, cakes, flowers, rings, dogs, cats, trips, gifts, decor, groceries, meals. Give them the same money / jobs / economy / family angle: the cheaper apartment vs the nicer one, a used car vs a new one, a backyard wedding vs a venue, cooking at home vs takeout, a home office vs going back to the office, hosting the family at our small place vs a restaurant, a cheaper trip vs the dream trip. Never compare how a person looks (hair, makeup, outfits, tattoos, bodies, selfies), never photos of kids.
 queryA / queryB: a plain 2–5 word photo search for what each option's photo shows ("rustic barn wedding venue", "grey sectional couch"). Text posts: empty strings.`;
 
 type Example = { title: string; story: string | null; a: string; b: string; aLine: string | null; bLine: string | null; photo: boolean };

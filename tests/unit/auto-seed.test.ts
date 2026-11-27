@@ -10,6 +10,7 @@ import {
   shouldStartBatch,
   storyRepeat,
   topicPlan,
+  FOCUS_TOPICS,
   voiceFromLabels,
   watchedRank,
   type SeedDraft,
@@ -55,12 +56,16 @@ describe("batch mix", () => {
     expect(photoCount(100, 33)).toBe(33);
     expect(photoCount(10, 0)).toBe(0);
   });
-  it("plans exactly n topics, heaviest on couples", () => {
+  it("plans exactly n topics, heaviest on money, jobs, politics and the economy (Alex, Nov 27)", () => {
     const t = topicPlan(100);
     expect(t).toHaveLength(100);
     const n = (k: string) => t.filter((x) => x === k).length;
-    expect(n("couples")).toBeGreaterThan(n("life"));
+    const focus = FOCUS_TOPICS.reduce((s, k) => s + n(k), 0);
+    expect(focus).toBeGreaterThanOrEqual(70);
+    expect(n("money")).toBeGreaterThan(n("couples"));
+    expect(n("politics")).toBeGreaterThan(n("cheating"));
     expect(topicPlan(7)).toHaveLength(7);
+    expect(topicPlan(7).filter((k) => (FOCUS_TOPICS as readonly string[]).includes(k)).length).toBeGreaterThanOrEqual(5);
   });
 });
 
@@ -75,6 +80,8 @@ describe("draft checks", () => {
   });
   it("catches AI phrasing, emoji, long labels and profanity", () => {
     expect(draftProblems({ ...text, story: "Not a fight, not a breakup." }, clean)).toContain("sounds like AI");
+    expect(draftProblems({ ...text, title: "My dad loves Trump and I can't stand it. Skip Christmas?" }, clean)).toContain("names a politician");
+    expect(draftProblems({ ...text, title: "My dad is a Republican and I'm a Democrat. Invite him for Christmas?" }, clean)).toEqual([]);
     expect(draftProblems({ ...text, story: "ugh 😩" }, clean)).toContain("emoji");
     expect(draftProblems({ ...text, a: "x".repeat(61) }, clean)).toContain("option label over 60");
     expect(draftProblems(text, () => true)).toContain("profanity filter");

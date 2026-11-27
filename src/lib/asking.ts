@@ -33,6 +33,11 @@ export type AskingPreset = {
   months?: number[];
   /** Extra words that, found in the ad / campaign tags, mark it as a likely worry (the topic id always counts). */
   keys?: string[];
+  /**
+   * One of the worries Alex wants front and centre (Nov 27 2026): money and affordability, jobs and layoffs (AI too),
+   * the economy, political differences in families. Scores higher and up to two per topic can show.
+   */
+  hot?: boolean;
 };
 
 const YOUNG: Age[] = ["AGE_18_24", "AGE_25_34"];
@@ -49,6 +54,13 @@ export const ASKING_PRESETS: AskingPreset[] = [
   { id: "m_split", topic: "money", q: "Split the dinner bill evenly or just pay for what I ordered?", context: "I had a salad. They each had three cocktails.", a: "Split evenly", b: "Pay my part", keys: ["bill", "friends"] },
   { id: "m_house", topic: "money", q: "Save for a house or put the money in the market?", a: "Save for a house", b: "Invest it", ages: MID, keys: ["invest", "house", "saving", "finance"] },
   { id: "m_gym", topic: "money", q: "Is a $90 gym membership worth it if I only go twice a week?", a: "Worth it", b: "Cancel it", keys: ["fitness", "gym", "subscription"] },
+
+  { id: "m_groceries", hot: true, topic: "money", q: "Groceries are eating my whole paycheck. Cut takeout completely or just cut back?", a: "Cut it completely", b: "Just cut back", keys: ["grocer", "food", "prices", "inflation", "afford"] },
+  { id: "m_debt_tell", hot: true, topic: "money", q: "Do I tell my partner about my $8k credit card debt before we move in together?", a: "Tell them now", b: "Pay it down first", ages: YOUNG, keys: ["debt", "credit", "relationship"] },
+  { id: "m_moveback", hot: true, topic: "money", q: "Rent is insane. Move back in with my parents for a year to save?", context: "I'm 27 and my mom already cleared out my old room.", a: "Move back", b: "Keep my place", ages: YOUNG, keys: ["rent", "housing", "saving", "afford"] },
+  { id: "m_gift_limit", hot: true, topic: "money", q: "Money's tight this year. Tell my family I'm doing a $25 gift limit?", a: "Tell them", b: "Just spend it", months: HOLIDAYS, keys: ["gift", "christmas", "budget", "afford"] },
+  { id: "m_recession", hot: true, topic: "money", q: "Everyone keeps saying recession. Keep putting money in my 401k or build up cash?", a: "Keep investing", b: "Build up cash", keys: ["recession", "economy", "invest", "401k", "saving"] },
+  { id: "m_baby_afford", hot: true, topic: "money", q: "Not sure we can afford a baby right now. Wait a couple of years or go for it?", context: "Daycare near us is $1,900 a month.", a: "Wait", b: "Go for it", ages: MID, keys: ["baby", "daycare", "afford", "kids"] },
 
   // Dating
   { id: "d_text_him", topic: "dating", q: "He hasn't texted back in two days. Text again or wait?", a: "Text again", b: "Wait", sex: "FEMALE", ages: YOUNG, keys: ["text", "relationship", "love"] },
@@ -76,6 +88,12 @@ export const ASKING_PRESETS: AskingPreset[] = [
   { id: "w_sidehustle", topic: "work", q: "Start a side hustle on weekends or actually rest?", a: "Side hustle", b: "Rest", keys: ["side hustle", "business", "money"] },
   { id: "w_credit", topic: "work", q: "Coworker took credit for my idea in a meeting. Say something or let it go?", a: "Say something", b: "Let it go", keys: ["coworker", "office", "boss"] },
 
+  { id: "w_layoffs", hot: true, topic: "work", q: "Layoffs keep happening at my company. Start job hunting now or wait it out?", context: "They cut 10% in March and there are rumors again.", a: "Start looking", b: "Wait it out", keys: ["layoff", "laid off", "job", "career", "economy"] },
+  { id: "w_ai", hot: true, topic: "work", q: "Scared AI is going to replace my job. Learn the AI tools or start switching careers?", a: "Learn the tools", b: "Switch careers", keys: ["ai", "automation", "chatgpt", "job", "career"] },
+  { id: "w_partner_laidoff", hot: true, topic: "work", q: "My partner just got laid off. Cancel our trip or keep it so we have something to look forward to?", a: "Cancel it", b: "Keep it", keys: ["laid off", "layoff", "trip", "money"] },
+  { id: "w_lower_offer", hot: true, topic: "work", q: "Out of work four months. Take an offer that pays $15k less than my last job?", a: "Take it", b: "Keep looking", keys: ["job", "hiring", "unemployed", "salary", "offer"] },
+  { id: "w_raise_cuts", hot: true, topic: "work", q: "Ask for a raise even though my company just did layoffs?", context: "Rent went up $250 and I'm doing two people's work now.", a: "Ask anyway", b: "Wait it out", keys: ["raise", "salary", "layoff", "afford"] },
+
   // Family
   { id: "f_host", topic: "family", q: "Host Thanksgiving this year or let my sister do it again?", a: "Host it", b: "Let her", months: [10, 11], keys: ["thanksgiving", "holiday", "hosting"] },
   { id: "f_xmas_his", topic: "family", q: "Christmas with my family or his this year?", context: "We did his last year but my mom is already asking.", a: "Mine", b: "His", sex: "FEMALE", months: HOLIDAYS, keys: ["christmas", "holiday", "in-laws"] },
@@ -85,7 +103,14 @@ export const ASKING_PRESETS: AskingPreset[] = [
   { id: "f_daycare", topic: "family", q: "Daycare or let my mom watch the baby three days a week?", a: "Daycare", b: "Grandma", ages: MID, keys: ["baby", "daycare", "parenting", "mom"] },
   { id: "f_wedding_gf", topic: "family", q: "Do I invite my dad's new girlfriend to my wedding?", a: "Invite her", b: "Don't", ages: MID, keys: ["wedding", "dad", "family"] },
   { id: "f_skip_home", topic: "family", q: "Tell my parents I'm not coming home for the holidays this year?", a: "Tell them", b: "Just go", months: [10, 11, 12], keys: ["holiday", "parents", "christmas", "travel"] },
-  { id: "f_politics", topic: "family", q: "My uncle always starts on politics at Thanksgiving. Push back or change the subject?", a: "Push back", b: "Change the subject", months: [11], keys: ["thanksgiving", "politics", "family"] },
+  { id: "f_politics", hot: true, topic: "family", q: "My uncle always starts on politics at Thanksgiving. Push back or change the subject?", a: "Push back", b: "Change the subject", months: [11], keys: ["thanksgiving", "politics", "family"] },
+
+  { id: "f_dad_rep", hot: true, topic: "family", q: "My dad's a Republican and I'm a Democrat. Invite him over for the holidays or skip the stress?", context: "Last time it ended with my mom crying in the kitchen.", a: "Invite him", b: "Skip it this year", keys: ["politics", "family", "holiday", "dad"] },
+  { id: "f_parents_dem", hot: true, topic: "family", q: "I'm a Republican and my parents are Democrats. Bring up politics with them or keep it off limits?", a: "Talk about it", b: "Keep it off limits", keys: ["politics", "family", "parents"] },
+  { id: "f_inlaws_vote", hot: true, topic: "family", q: "My in-laws vote the opposite way and it comes up at every dinner. Say something or let my partner handle it?", a: "Say something", b: "Let my partner handle it", keys: ["politics", "in-laws", "family"] },
+  { id: "f_mom_posts", hot: true, topic: "family", q: "My mom keeps posting political stuff that makes me so mad. Mute her or actually talk to her about it?", a: "Mute her", b: "Talk to her", keys: ["politics", "mom", "facebook", "family"] },
+  { id: "f_brother_reach", hot: true, topic: "family", q: "Haven't talked to my brother since we fought about politics. Reach out first or wait for him?", context: "I love him. I just don't know how to start.", a: "Reach out", b: "Wait for him", keys: ["politics", "brother", "family"] },
+  { id: "f_wedding_wait", hot: true, topic: "family", q: "Everything costs so much. Push the wedding back a year to save, or do a small one now?", a: "Wait and save", b: "Small one now", ages: MID, keys: ["wedding", "budget", "afford", "engaged"] },
 
   // Gifts
   { id: "g_bf", topic: "gifts", q: "Gift for my boyfriend: something he needs or something fun?", a: "Something he needs", b: "Something fun", sex: "FEMALE", months: HOLIDAYS, keys: ["gift", "christmas", "boyfriend"] },
@@ -103,6 +128,7 @@ export const ASKING_PRESETS: AskingPreset[] = [
   { id: "l_flaky", topic: "life", q: "My friend keeps canceling last minute. Say something or let it fade?", a: "Say something", b: "Let it fade", keys: ["friend", "friendship"] },
   { id: "l_move", topic: "life", q: "Move to a new city for a fresh start, or stay near my friends?", a: "Move", b: "Stay", ages: YOUNG, keys: ["move", "city", "relocate"] },
   { id: "l_summer", topic: "life", q: "This summer: one big vacation or a few long weekends?", a: "One big trip", b: "Long weekends", months: [3, 4, 5, 6, 7], keys: ["travel", "vacation", "summer"] },
+  { id: "l_cheaper", hot: true, topic: "life", q: "Everything costs too much here. Move somewhere cheaper or stay near my friends?", context: "Same job, remote, and I'd save about $900 a month.", a: "Move somewhere cheaper", b: "Stay", keys: ["rent", "move", "afford", "city", "housing"] },
   { id: "l_vegas", topic: "life", q: "Friend's bachelorette in Vegas is $1,200 all in. Go or skip?", a: "Go", b: "Skip it", sex: "FEMALE", ages: YOUNG, keys: ["bachelorette", "wedding", "vegas", "travel"] },
 ];
 
@@ -153,12 +179,13 @@ export function presetScore(p: AskingPreset, a: Omit<AskingInput, "exclude" | "s
   if (p.months) s += 0.75;
   if (p.sex && a.sex === p.sex) s += 0.75;
   if (p.ages && a.age && p.ages.includes(a.age as Age)) s += 0.75;
+  if (p.hot) s += 1.5;
   return s;
 }
 
 /**
  * The questions to show: the most likely worries, with a per-person random factor so people don't all get the same
- * top three (Shimon), at most one per topic unless they picked a topic, in a shuffled order so the first slot isn't
+ * top three (Shimon), at most one per topic (two for the hot worries) unless they picked a topic, in a shuffled order so the first slot isn't
  * always the best match.
  */
 export function pickAsking(a: AskingInput, bank: readonly AskingPreset[] = ASKING_PRESETS): AskingPreset[] {
@@ -168,12 +195,14 @@ export function pickAsking(a: AskingInput, bank: readonly AskingPreset[] = ASKIN
     .map((p) => ({ p, s: presetScore(p, a) * (0.2 + 0.8 * unit(`${a.seed}:${p.id}`)) }))
     .sort((x, y) => y.s - x.s);
   const out: AskingPreset[] = [];
-  const topics = new Set<string>();
+  const perTopic = new Map<string, number>();
   for (const { p } of ranked) {
     if (out.length >= n) break;
-    if (topics.has(p.topic) && p.topic !== a.topic) continue;
+    const had = perTopic.get(p.topic) ?? 0;
+    // One per topic, two for the hot worries (Alex, Nov 27), any number for the topic they picked.
+    if (had >= (p.hot ? 2 : 1) && p.topic !== a.topic) continue;
     out.push(p);
-    topics.add(p.topic);
+    perTopic.set(p.topic, had + 1);
   }
   // Not enough different topics left: fill with the next best.
   for (const { p } of ranked) {

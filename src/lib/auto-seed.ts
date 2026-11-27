@@ -11,16 +11,26 @@ import { TITLE_MAX } from "./constants";
 export type Voice = "F" | "M" | "N";
 export type SeedKind = "text" | "photo";
 
-/** Topic mix of the earlier batches (seed-batch-2-plan.md), heavy on couples, cheating and weddings, light on food. */
+/**
+ * Topic mix for new batches. Alex (Nov 27 2026): weigh heavily toward money and affordability, jobs and layoffs
+ * (AI too), the economy, and political differences in families, because that's what people are worried about.
+ * Those four are ~72% of every batch; the earlier batches' couples / cheating / dating / wedding / parenting mix
+ * fills the rest. Photo battles follow the same mix.
+ */
 export const TOPIC_MIX: [topic: string, weight: number, brief: string][] = [
-  ["couples", 20, "couples fights, 'who's right?' between me and my partner"],
-  ["cheating", 17, "cheating, flirting, exes, phones, DMs, trust"],
-  ["wedding", 16, "weddings, bachelorettes, bridesmaids, proposals, rings, in-laws at weddings"],
-  ["dating", 15, "dating apps (Hinge, Bumble, Tinder), first dates, situationships, texting"],
-  ["parenting", 11, "parenting, pregnancy, baby names, grandparents, school, chores (kids by age only, never names)"],
-  ["money", 12, "money between partners and friends, jobs, salary, bosses, coworkers"],
-  ["life", 9, "roommates, friends, family drama, home, pets, everyday etiquette (little food)"],
+  ["money", 22, "affordability: rent going up, groceries, gas, credit card debt, student loans, splitting costs with a partner or friends, saying no to plans I can't afford, lending money to family"],
+  ["jobs", 20, "jobs: layoffs, scared of losing my job (incl. to AI), my partner got laid off, job hunting for months, a lower-paying offer vs waiting, side hustles, asking for a raise when everyone's cutting back"],
+  ["politics", 17, "political differences in families and couples: Republican parents and a Democrat kid or the other way round, a partner whose family votes the other way, holidays with relatives who vote differently, whether to invite them over, how to keep loving each other. About the relationship, never which party is right"],
+  ["economy", 13, "the economy and prices: buy now or wait, recession worries, saving vs spending, moving somewhere cheaper, moving back in with parents, cutting back on holidays, weddings or trips because everything costs more"],
+  ["couples", 8, "couples fights, 'who's right?' between me and my partner (often about money)"],
+  ["cheating", 6, "cheating, flirting, exes, phones, DMs, trust"],
+  ["dating", 6, "dating apps (Hinge, Bumble, Tinder), first dates, who pays, situationships, texting"],
+  ["wedding", 4, "weddings, bachelorettes, bridesmaids, proposals, rings, and what they all cost"],
+  ["parenting", 4, "parenting, daycare costs, grandparents, school (kids by age only, never names)"],
 ];
+
+/** The topics Alex wants most of (Nov 27 2026). */
+export const FOCUS_TOPICS = ["money", "jobs", "politics", "economy"] as const;
 
 /** Topics for a batch of `n`, in proportion to TOPIC_MIX, largest remainders first. */
 export function topicPlan(n: number): string[] {
@@ -114,6 +124,8 @@ const AI_TELLS = [
 const EMOJI = /\p{Extended_Pictographic}/u;
 /** Photo battles can't compare a person's looks: both photos would need the same person (Alex, Nov 23). */
 const LOOKS = /\b(hair|haircut|bangs|bob|makeup|lipstick|lip|nails?|manicure|tattoo|outfit|dress|top|jeans|suit|tux|beard|shave|look|selfie|wear|bikini|swimsuit|heels|shoes|boots|sneakers|profile pic|photo of me)\b/i;
+/** Political posts are about families, never about politicians or elections being stolen (Alex, Nov 27). */
+const POLITICIANS = /\b(trump|biden|kamala|obama|vance|desantis|newsom|pelosi|aoc|maga|rigged|stolen election)\b/i;
 const KIDS_IN_PHOTO = /\b(kid|kids|child|children|son|daughter|baby|toddler|newborn|teen|boy|girl)\b/i;
 
 const words = (s: string) => (s.toLowerCase().match(/[a-z0-9']+/g) ?? []).filter((w) => w.length > 2);
@@ -159,6 +171,7 @@ export function draftProblems(d: SeedDraft, abusive: (s: string) => boolean): st
   if (all.some((s) => abusive(s))) p.push("profanity filter");
   if (all.some((s) => EMOJI.test(s))) p.push("emoji");
   if (all.some((s) => AI_TELLS.some((r) => r.test(s)))) p.push("sounds like AI");
+  if (all.some((s) => POLITICIANS.test(s))) p.push("names a politician");
   if (d.kind === "photo") {
     if (!d.queryA?.trim() || !d.queryB?.trim()) p.push("photo search missing");
     if (LOOKS.test(`${d.a} ${d.b} ${d.queryA} ${d.queryB}`)) p.push("photo battle compares looks");
