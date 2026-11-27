@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { ASKING_PRESETS, ASKING_TOPICS, askingDue, eligible, pickAsking, presetBattleId, presetScore, type AskingPreset } from "@/lib/asking";
+import { ASKING_PRESETS, ASKING_TOPICS, askingDue, askingMemory, eligible, pickAsking, presetBattleId, presetScore, type AskingPreset } from "@/lib/asking";
 import { TITLE_MAX } from "@/lib/constants";
 
 const base = { exclude: new Set<string>(), month: 11, seed: "s" };
@@ -93,13 +93,27 @@ describe("People like you are asking: picking", () => {
 
   it("shows at the set pick, then every N picks, a limited number of times, never over another card", () => {
     const d = { at: 6, every: 12, rounds: 3 };
-    expect(askingDue({ ...d, picks: 5, shown: 0, busy: false })).toBe(false);
-    expect(askingDue({ ...d, picks: 6, shown: 0, busy: false })).toBe(true);
-    expect(askingDue({ ...d, picks: 6, shown: 0, busy: true })).toBe(false);
-    expect(askingDue({ ...d, picks: 7, shown: 0, busy: false })).toBe(true);
-    expect(askingDue({ ...d, picks: 10, shown: 1, busy: false })).toBe(false);
-    expect(askingDue({ ...d, picks: 18, shown: 1, busy: false })).toBe(true);
-    expect(askingDue({ ...d, picks: 99, shown: 3, busy: false })).toBe(false);
-    expect(askingDue({ ...d, at: 0, picks: 99, shown: 0, busy: false })).toBe(false);
+    const n = { lastAt: null };
+    expect(askingDue({ ...d, ...n, picks: 5, shown: 0, busy: false })).toBe(false);
+    expect(askingDue({ ...d, ...n, picks: 6, shown: 0, busy: false })).toBe(true);
+    expect(askingDue({ ...d, ...n, picks: 6, shown: 0, busy: true })).toBe(false);
+    expect(askingDue({ ...d, ...n, picks: 7, shown: 0, busy: false })).toBe(true);
+    expect(askingDue({ ...d, picks: 10, shown: 1, lastAt: 6, busy: false })).toBe(false);
+    expect(askingDue({ ...d, picks: 18, shown: 1, lastAt: 6, busy: false })).toBe(true);
+    expect(askingDue({ ...d, picks: 99, shown: 3, lastAt: 90, busy: false })).toBe(false);
+    expect(askingDue({ ...d, ...n, at: 0, picks: 99, shown: 0, busy: false })).toBe(false);
+  });
+  it("waits a full gap after it last showed, even when the tab's pick count is far past it (coming back from Pickbot)", () => {
+    const d = { at: 6, every: 12, rounds: 3 };
+    // Shown at pick 20, back in the deck at pick 21: not again until pick 32.
+    expect(askingDue({ ...d, picks: 21, shown: 1, lastAt: 20, busy: false })).toBe(false);
+    expect(askingDue({ ...d, picks: 31, shown: 1, lastAt: 20, busy: false })).toBe(false);
+    expect(askingDue({ ...d, picks: 32, shown: 1, lastAt: 20, busy: false })).toBe(true);
+  });
+  it("reads the tab's saved state, and drops it when it doesn't fit the pick count", () => {
+    expect(askingMemory(JSON.stringify({ shown: 1, lastAt: 20 }), 21)).toEqual({ shown: 1, lastAt: 20 });
+    expect(askingMemory(JSON.stringify({ shown: 1, lastAt: 20 }), 3)).toEqual({ shown: 0, lastAt: null });
+    expect(askingMemory("nope", 5)).toEqual({ shown: 0, lastAt: null });
+    expect(askingMemory(null, 5)).toEqual({ shown: 0, lastAt: null });
   });
 });

@@ -183,9 +183,27 @@ export function pickAsking(a: AskingInput, bank: readonly AskingPreset[] = ASKIN
   return out.sort((x, y) => unit(`${a.seed}:o:${x.id}`) - unit(`${a.seed}:o:${y.id}`));
 }
 
-/** Show the card now? At `at` picks this visit, then every `every` picks, up to `rounds` times; never on top of another card. */
-export function askingDue(a: { picks: number; at: number; every: number; rounds: number; shown: number; busy: boolean }): boolean {
+/**
+ * Show the card now? First at `at` picks, then only once `every` more picks have passed since it last showed, up to
+ * `rounds` times. `picks` is the tab's pick count (it keeps counting across deck visits, e.g. after a trip to
+ * Pickbot), and `shown` / `lastAt` are kept for the tab too, so coming back to Vote never re-shows it right away
+ * (Alex, Nov 27: it came back after one battle). Never on top of another card.
+ */
+export function askingDue(a: { picks: number; at: number; every: number; rounds: number; shown: number; lastAt: number | null; busy: boolean }): boolean {
   if (a.busy || a.at <= 0 || a.shown >= a.rounds) return false;
-  const next = a.at + a.shown * Math.max(1, a.every);
-  return a.picks >= next;
+  if (a.lastAt == null || a.shown === 0) return a.picks >= a.at;
+  return a.picks - a.lastAt >= Math.max(1, a.every);
+}
+
+/** The tab's saved asking-card state; dropped when it doesn't fit the pick count (a fresh count in a new tab). */
+export function askingMemory(raw: string | null, picks: number): { shown: number; lastAt: number | null } {
+  try {
+    const m = JSON.parse(raw ?? "null") as { shown?: unknown; lastAt?: unknown } | null;
+    const shown = Number(m?.shown);
+    const lastAt = Number(m?.lastAt);
+    if (!Number.isFinite(shown) || shown < 0 || !Number.isFinite(lastAt) || lastAt > picks) return { shown: 0, lastAt: null };
+    return { shown, lastAt };
+  } catch {
+    return { shown: 0, lastAt: null };
+  }
 }

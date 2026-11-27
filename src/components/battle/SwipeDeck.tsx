@@ -14,7 +14,9 @@ import { MindCard } from "./MindCard";
 import { MindNudgeCard, type MindNudge } from "./MindNudgeCard";
 import { promoDue } from "@/lib/pickbot-promo";
 import { AskingCard } from "./AskingCard";
-import { askingDue } from "@/lib/asking";
+import { askingDue, askingMemory } from "@/lib/asking";
+
+const ASKING_KEY = "cp:asking";
 import type { AskingCardData, AskingItem } from "@/server/services/asking";
 import { withAnswer, withVote, type ProfileProgress } from "@/lib/profile-progress";
 import { cn, pct, timeLeft, titleSizeClass } from "@/lib/utils";
@@ -123,7 +125,10 @@ export function SwipeDeck({
   const [promo, setPromo] = useState<{ at: number; picks: number } | null>(null);
   const promoShown = useRef(false);
   const [askingNow, setAskingNow] = useState<{ items: AskingItem[]; round: number; picks: number; mode: AskingCardData["mode"] } | null>(null);
+  // How many times the card showed this tab session, and at which pick (kept across deck visits, so it never comes
+  // straight back after a trip to Pickbot).
   const askingShown = useRef(0);
+  const askingLastAt = useRef<number | null>(null);
   // The questions are fetched one pick before they're due, so they use the sex / age cards answered so far.
   const askingNext = useRef<Promise<AskingCardData | null> | null>(null);
   // "You're on a roll" card: picks this tab session (survives switching tabs), and the milestone on screen.
@@ -132,6 +137,9 @@ export function SwipeDeck({
   useEffect(() => {
     try {
       rollCount.current = Number(sessionStorage.getItem(ROLL_KEY)) || 0;
+      const m = askingMemory(sessionStorage.getItem(ASKING_KEY), rollCount.current);
+      askingShown.current = m.shown;
+      askingLastAt.current = m.lastAt;
     } catch {}
   }, []);
   const shownAt = useRef(Date.now());
@@ -372,9 +380,13 @@ export function SwipeDeck({
       }
       // "People like you are asking" waits the same way, and never lands on the same pick as the Pickbot card.
       if (asking) {
-        const due = { at: asking.at, every: asking.every, rounds: asking.rounds.length, shown: askingShown.current };
+        const due = { at: asking.at, every: asking.every, rounds: asking.rounds.length, shown: askingShown.current, lastAt: askingLastAt.current };
         if (askingDue({ ...due, picks: n, busy: busy || promoNow })) {
           const round = askingShown.current++;
+          askingLastAt.current = n;
+          try {
+            sessionStorage.setItem(ASKING_KEY, JSON.stringify({ shown: askingShown.current, lastAt: n }));
+          } catch {}
           const fresh = askingNext.current ?? Promise.resolve(null);
           askingNext.current = null;
           const started = Date.now();
