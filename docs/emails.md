@@ -12,7 +12,7 @@ sender `services/mailer.ts`, triggers `services/lifecycle.ts`, templates `src/se
 | `needs_votes` | Your battle needs a few more votes | hourly: past halfway with fewer than `emailNeedsVotesUnder` votes | My battles |
 | `results_in` | Results are in + one-tap "I picked A / B / Neither" | hourly: deadline passed in the last 48h, has votes, no outcome (replaces the old +2h reminder email) | My battles |
 | `loop_reminder` | Which did you pick? | daily, with the +48h and +7d in-app reminders | My battles |
-| `voter_updates` | How it turned out / You called it / Your reason helped | items queued when a poster reports back (`voter_item`) or marks a reason helpful; the hourly job sends one combined email per person, 30+ min later | Battles I voted on |
+| `voter_updates` | How it turned out / You called it / Your reason helped / **Results are in** (final split + with or against the crowd, for battles that closed with no outcome; Nov 27 2026, economy `finalResultsEmails`, `finalResultsMinVotes` 5, `finalResultsHoldoutPct` 20, hourly `queueFinalResults`, max 5 per email) | items queued when a poster reports back (`voter_item`), marks a reason helpful, or a voted battle closes without an outcome; the hourly job sends one combined email per person, 30+ min later | Battles I voted on |
 | `welcome` | Welcome to crowdpick | once, when sign-up finishes | always |
 | `first_battle_nudge` | Stuck between two? (3 live battles) | daily: 3–5 days after sign-up, no battle posted | Tips & reminders |
 | `tier_up` | You're now High / Top priority | hourly: crossed into the tier in the last ~25h (points ledger), once per tier | Tips & reminders |

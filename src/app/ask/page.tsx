@@ -15,10 +15,13 @@ export const metadata = { title: "Ask Pickbot" };
 export const dynamic = "force-dynamic";
 
 /** Ask (Pickbot PRD S1): the profile bar, the question box with examples, and your past questions. */
-export default async function AskPage({ searchParams }: { searchParams: Promise<{ preset?: string }> }) {
+export default async function AskPage({ searchParams }: { searchParams: Promise<{ preset?: string; q?: string; mine?: string }> }) {
   // "People like you are asking" (lib/asking.ts): the tapped question comes filled in, through sign-up and onboarding.
-  const preset = presetById((await searchParams).preset);
-  const here = preset ? `/ask?preset=${preset.id}` : "/ask";
+  const sp = await searchParams;
+  const preset = presetById(sp.preset);
+  // An AI-written question from the deck card comes as plain text.
+  const typed = !preset && typeof sp.q === "string" ? sp.q.trim().slice(0, 200) : "";
+  const here = preset ? `/ask?preset=${preset.id}` : typed ? `/ask?q=${encodeURIComponent(typed)}` : "/ask";
   const user = await getCurrentUser();
   if (user && profileIncomplete(user)) redirect(onboardingUrl(here));
   const access = await pickbotAccess(user);
@@ -50,7 +53,7 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
     <div className="space-y-5 pt-2">
       {progress && !progress.complete && <ProfileBar p={progress} place="ask" />}
       <Intro />
-      {preset ? <AskComposer initialText={preset.q} preset={preset.id} /> : <AskComposer examples />}
+      {preset ? <AskComposer initialText={preset.q} preset={preset.id} /> : typed ? <AskComposer initialText={typed} /> : <AskComposer examples focus={sp.mine === "1"} />}
       <p className="flex items-center gap-1.5 text-[12px] text-ink/50">
         <Lock className="size-3.5" /> Your questions will be anonymized and get the crowd’s answer as well! You can always opt-out.
         {left != null && !isPlus(user) && (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { ASKING_PRESETS, ASKING_TOPICS, askingDue, askingMemory, eligible, pickAsking, presetBattleId, presetScore, type AskingPreset } from "@/lib/asking";
+import { ASKING_PRESETS, ASKING_TOPICS, askingDue, askingMemory, parseAiAsking, shownIds, topTopics, eligible, pickAsking, presetBattleId, presetScore, type AskingPreset } from "@/lib/asking";
 import { TITLE_MAX } from "@/lib/constants";
 
 const base = { exclude: new Set<string>(), month: 11, seed: "s" };
@@ -130,5 +130,39 @@ describe("People like you are asking: picking", () => {
     expect(askingMemory(JSON.stringify({ shown: 1, lastAt: 20 }), 3)).toEqual({ shown: 0, lastAt: null });
     expect(askingMemory("nope", 5)).toEqual({ shown: 0, lastAt: null });
     expect(askingMemory(null, 5)).toEqual({ shown: 0, lastAt: null });
+  });
+});
+
+describe("People like you are worried about: per person (Alex, Nov 27)", () => {
+  it("leans toward topics they voted on and away from what they took to Pickbot", () => {
+    const work = ASKING_PRESETS.find((p) => p.topic === "work" && !p.sex && !p.ages && !p.months)!;
+    const plain = presetScore(work, { month: 11 });
+    expect(presetScore(work, { month: 11, interests: ["work"] })).toBeGreaterThan(plain);
+    expect(presetScore(work, { month: 11, avoid: ["work"] })).toBeLessThan(plain);
+    // A topic they picked this week still wins over "change the subject".
+    expect(presetScore(work, { month: 11, topic: "work", avoid: ["work"] })).toBeGreaterThan(plain);
+  });
+  it("maps AI themes to topics, most common first", () => {
+    expect(topTopics(["career", "money", "career", null, "pets", "shopping"])).toEqual(["work", "money"]);
+    expect(topTopics([])).toEqual([]);
+  });
+  it("reads the ids shown recently", () => {
+    expect([...shownIds([{ ids: "a,b" }, { ids: "b,c" }, {}])].sort()).toEqual(["a", "b", "c"]);
+  });
+  it("cleans AI-written questions into rounds and drops repeats, links and what they already asked", () => {
+    const qs = [
+      "Rent is going up again. Get a roommate or move further out?",
+      "rent is going up again, get a roommate or move further out?",
+      "Check www.example.com for deals?",
+      "Too short?",
+      "Hearing layoff rumors at work. Start applying now or wait it out?",
+      "My dad votes the other way. Invite him for the holidays anyway?",
+      "Pay off my card first or build an emergency fund?",
+    ];
+    const rounds = parseAiAsking({ questions: qs }, { n: 2, rounds: 3, already: ["Pay off my card first or build an emergency fund?"] });
+    expect(rounds).toEqual([
+      ["Rent is going up again. Get a roommate or move further out?", "Hearing layoff rumors at work. Start applying now or wait it out?"],
+    ]);
+    expect(parseAiAsking(null, { n: 2, rounds: 1 })).toEqual([]);
   });
 });

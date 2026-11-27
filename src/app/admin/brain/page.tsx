@@ -9,7 +9,7 @@ import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
 import { brainChecks } from "@/server/services/brain-checks";
 import { themeEngagementData } from "@/server/services/brain-themes";
-import { themeHighlights } from "@/server/services/theme-engagement-rules";
+import { themeEngagement, themeHighlights } from "@/server/services/theme-engagement-rules";
 import { themeLabel } from "@/lib/theme-guess";
 import { signupJourneys } from "@/server/services/signup-journeys";
 import { gateTestResults } from "@/server/services/gate-test";
@@ -320,7 +320,13 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     profileBarStats(view, days),
     pickbotStats(view, days),
     mindStats(view, days),
-    themeEngagementData(days, view),
+    // A failure here must never take the whole Brain down: show the error in the theme section instead.
+    themeEngagementData(days, view)
+      .then((r) => ({ ...r, error: null as string | null }))
+      .catch((e: unknown) => {
+        console.error("[brain] theme engagement", e);
+        return { ...themeEngagement({ battles: new Map(), seen: [], votes: [], skips: [], people: new Map(), signups: 0 }), error: e instanceof Error ? e.message : String(e) };
+      }),
   ]);
   const themeHeadlines = themeHighlights(te, themeLabel);
   const t = s.tiles;
@@ -346,7 +352,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     rawSources: s.sources,
     signupSourcesTotal: acq.days === days ? acq.total.signups : undefined,
     skips: n("skips"),
-    themes: te.themes,
+    themes: te.error ? undefined : te.themes,
   });
   const failed = checks.filter((c) => !c.ok);
   // Third item = the list behind the number (/admin/brain/list/[kind]); everything with one is clickable.
@@ -859,6 +865,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         title="Which themes work"
         note={`Every battle real people saw, voted on or skipped in this window, grouped by theme (${te.totals.aiTagged} of ${te.totals.battles} battles have an AI tag; the rest, mostly seed battles, are matched by their words). Seen = a Vote deck card, once per person. Vote rate = seen cards the person voted on; Skip rate = Skip button presses ÷ seen; Left on it = seen, no vote, no skip (they closed the app on it). All votes = every counted vote from any screen (adds up to the Votes tile). % of voters = share of all ${te.totals.voters} people who voted that voted on this theme at least once; % of sign-ups = the same for the ${te.totals.signups} people who signed up in this window. Last card before bouncing = visitors with no account who never came back on another day, by the theme of the last battle they saw.`}
       >
+        {te.error && <p className="text-sm text-b">Couldn&apos;t load the theme numbers: {te.error}. Tell Claude.</p>}
         {themeHeadlines.length > 0 && (
           <ul className="list-disc space-y-0.5 pl-5 text-sm">
             {themeHeadlines.map((h) => (

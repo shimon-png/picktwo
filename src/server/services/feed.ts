@@ -4,7 +4,7 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, hotFactor, gapFactor, type ViewerProfile } from "./ranking";
+import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, hotFactor, gapFactor, pickOpener, pickRate, type ViewerProfile } from "./ranking";
 import { missingAxesFor } from "./taste-profile";
 import { battleAxes } from "@/lib/taste-profile";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
@@ -13,7 +13,7 @@ import { isHumanBattle } from "@/lib/auto-seed";
 import { activeMindTopic } from "./mind";
 import { mindFactor } from "@/lib/mind";
 
-export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; featured?: boolean; debug?: Record<string, number> };
+export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; featured?: boolean; opener?: boolean; pickRate?: number; debug?: Record<string, number> };
 
 export async function getFeed(viewer: { user: User | null; deviceId: string | null }, opts: { limit?: number; debug?: boolean } = {}) {
   const limit = opts.limit ?? 20;
@@ -104,7 +104,10 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   const eWeight = arm === "engine" ? economy.engagementWeight : 0;
   // Vote deck decisions per battle (votes made in the deck vs skips), for the skip signal.
   const sWeight = arm === "engine" ? economy.skipWeight : 0;
-  const decisions = sWeight ? await deckDecisions(rows.map((r) => r.b.id)) : new Map<string, { votes: number; skips: number }>();
+  // Opener: only for someone who hasn't voted or skipped anything yet (engine arm only).
+  const wantOpener = arm === "engine" && economy.openerOn > 0 && !(await hasDecided(viewer));
+  const wantRates = !!sWeight || wantOpener || economy.skipRescueAfter > 0;
+  const decisions = wantRates ? await deckDecisions(rows.map((r) => r.b.id)) : new Map<string, { votes: number; skips: number }>();
   const avgPick = averagePickRate([...decisions.values()]);
   const [loops, mind, hot, missing] = await Promise.all([
     openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy),
@@ -113,6 +116,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     economy.hotBoost > 1 ? recentRealVotes(rows.map((r) => r.b.id)) : new Map<string, number>(),
     economy.tasteGapBoost > 1 ? missingAxesFor(viewer).catch(() => [] as string[]) : ([] as string[]),
   ]);
+  let openerId: string | null = null;
   const scored = rows.map((r) => {
     const boostActive = !!r.b.boostUntil && r.b.boostUntil > now && r.b.boostVotesLeft > 0;
     const pf = priorityFactor({ ppBalance: r.authorPP, openLoops: loops.get(r.b.authorId) ?? 0, boostActive, cap: economy.priorityCap });
@@ -143,14 +147,44 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   // real person posted, above all seed content (Alex + Shimon, Nov 26 2026). Same for the holdout.
   scored.sort((a, b) => b.score - a.score);
   const picked = tieredPick(scored, limit);
+  if (wantOpener) {
+    const best = pickOpener(
+      scored.filter((x) => !x.featured).map((x) => ({ x, ...(decisions.get(x.row.b.id) ?? { votes: 0, skips: 0 }) })),
+      economy.openerMinDecisions,
+      avgPick,
+    );
+    if (best) {
+      const at = picked.indexOf(best.x);
+      if (at !== -1) picked.splice(at, 1);
+      else if (picked.length >= limit) picked.pop();
+      picked.splice(picked.filter((p) => p.featured).length, 0, best.x);
+      openerId = best.x.row.b.id;
+    }
+  }
   const cards = await hydrateCards(picked.map((p) => p.row));
   return cards.map((c, i) => ({
     ...c,
     arm,
     score: picked[i].score,
     ...(picked[i].row.b.tags?.featured ? { featured: true } : {}),
+    ...(openerId === picked[i].row.b.id ? { opener: true } : {}),
+    ...(wantRates ? { pickRate: Math.round(pickRate(decisions.get(picked[i].row.b.id)?.votes ?? 0, decisions.get(picked[i].row.b.id)?.skips ?? 0, avgPick) * 1000) / 1000 } : {}),
     ...(opts.debug ? { debug: { priorityFactor: picked[i].pf, openLoops: picked[i].openLoops } } : {}),
   })) as FeedItem[];
+}
+
+/** Has this person (account, else device and an account it was linked to) voted on or skipped anything yet? */
+async function hasDecided(viewer: { user: User | null; deviceId: string | null }) {
+  const u = viewer.user?.id ?? null;
+  const d = viewer.deviceId;
+  if (!u && !d) return false;
+  const who = (t: string) =>
+    u
+      ? sql`(${sql.raw(t)}.user_id = ${u}${d ? sql` OR ${sql.raw(t)}.device_id = ${d}` : sql``})`
+      : sql`(${sql.raw(t)}.device_id = ${d} OR ${sql.raw(t)}.user_id = (SELECT dv.user_id FROM device dv WHERE dv.id = ${d}))`;
+  const rows = await db.execute<{ yes: boolean }>(sql`
+    SELECT (EXISTS (SELECT 1 FROM vote v WHERE ${who("v")}) OR EXISTS (SELECT 1 FROM skip s WHERE ${who("s")})) AS yes`);
+  return !!rows[0]?.yes;
 }
 
 /** Per battle: real (non-seed) votes in the last 24 hours, for the hot boost. */
