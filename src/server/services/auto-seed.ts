@@ -7,7 +7,7 @@
  * - Writing: Claude (ANTHROPIC_API_KEY; model AUTO_SEED_MODEL, default Sonnet 5.5) with live seed battles as
  *   examples; every draft passes `draftProblems()` (lengths, profanity filter, story ≠ title, no emoji or AI
  *   phrasing, no looks comparisons in photo battles) and a duplicate check against every existing title.
- * - Photos: Pexels API (PEXELS_API_KEY, free; photos free to use), searched deep (page 2–4), and Claude Haiku looks
+ * - Photos: Pixabay API (PIXABAY_API_KEY, free; chosen photos copied to Vercel Blob) or an existing Pexels key, searched deep (page 2–4), and Claude Haiku looks
  *   at the candidates and keeps only real photos that fit the option and every fact in the headline (no
  *   illustrations, text overlays, kids, celebrities or nudity). No key = the photo share is written as text.
  * - Posters: ~35% older seed posters whose voice matches (≤2 posts per batch), the rest new believable accounts.
@@ -19,6 +19,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
+import { put } from "@vercel/blob";
 import { db } from "../db";
 import { appConfig } from "../db/schema";
 import { getEconomy } from "./config";
@@ -54,7 +55,7 @@ const PARALLEL = 3; // writing calls at once
 const SPECIAL_HANDLES = ["picktwo", "askedviapickbot", "crowdpick_trends"];
 
 export const writerConfigured = () => !!process.env.ANTHROPIC_API_KEY;
-export const photosConfigured = () => !!process.env.PEXELS_API_KEY;
+export const photosConfigured = () => !!(process.env.PIXABAY_API_KEY || process.env.PEXELS_API_KEY);
 
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }));
@@ -215,15 +216,46 @@ async function writeDrafts(slots: { kind: SeedKind; topic: string }[], ex: Examp
 
 // ---------- photos ----------
 
-type PexelsPhoto = { id: number; url: string; photographer: string; alt?: string; src: { original: string; medium: string } };
+/**
+ * A stock photo candidate. Pixabay (PIXABAY_API_KEY, free, instant; Pexels stopped issuing API keys in Nov 2026)
+ * or Pexels (PEXELS_API_KEY, if you already have one). Pixabay doesn't allow hotlinking, so a chosen Pixabay photo
+ * is copied to Vercel Blob before posting; Pexels photos are hotlinked like the earlier seed batches.
+ */
+type Photo = { key: string; page: string; by: string; thumb: string; full: string; rehost: boolean };
 
-async function pexels(query: string, page: number): Promise<PexelsPhoto[]> {
+async function pexels(query: string, page: number): Promise<Photo[]> {
   const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=10&page=${page}`, {
     headers: { Authorization: process.env.PEXELS_API_KEY! },
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`Pexels HTTP ${res.status}`);
-  return ((await res.json()) as { photos?: PexelsPhoto[] }).photos ?? [];
+  const photos = ((await res.json()) as { photos?: { id: number; url: string; photographer: string; src: { original: string; medium: string } }[] }).photos ?? [];
+  return photos.map((p) => ({ key: `px:${p.id}`, page: p.url, by: p.photographer, thumb: p.src.medium, full: `${p.src.original}?auto=compress&cs=tinysrgb&w=1080`, rehost: false }));
+}
+
+async function pixabay(query: string, page: number): Promise<Photo[]> {
+  const q = new URLSearchParams({ key: process.env.PIXABAY_API_KEY!, q: query.slice(0, 100), image_type: "photo", safesearch: "true", per_page: "10", page: String(page) });
+  const res = await fetch(`https://pixabay.com/api/?${q}`, { signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) throw new Error(`Pixabay HTTP ${res.status}`);
+  const hits = ((await res.json()) as { hits?: { id: number; pageURL: string; user: string; webformatURL: string; largeImageURL: string }[] }).hits ?? [];
+  return hits.map((h) => ({ key: `pb:${h.id}`, page: h.pageURL, by: h.user, thumb: h.webformatURL, full: h.largeImageURL, rehost: true }));
+}
+
+/** Search the configured source (Pixabay first, then Pexels). */
+const searchPhotos = (query: string, page: number) => (process.env.PIXABAY_API_KEY ? pixabay(query, page) : pexels(query, page));
+
+/** Where re-hosted photos go (swappable in local tests, since @vercel/blob uses its own HTTP client). */
+export const photoStore = { put };
+
+/** Copy a Pixabay photo to Vercel Blob (no hotlinking allowed). Returns the public URL. */
+async function rehost(p: Photo): Promise<string> {
+  if (!p.rehost) return p.full;
+  if (!process.env.BLOB_READ_WRITE_TOKEN) throw new Error("Pixabay photos need Vercel Blob (BLOB_READ_WRITE_TOKEN)");
+  const res = await fetch(p.full, { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error(`photo download HTTP ${res.status}`);
+  const type = res.headers.get("content-type") || "image/jpeg";
+  const ext = type.includes("png") ? "png" : "jpg";
+  return (await photoStore.put(`seed/${p.key.replace(":", "-")}-${createId()}.${ext}`, Buffer.from(await res.arrayBuffer()), { access: "public", contentType: type })).url;
 }
 
 const PICK_SCHEMA = {
@@ -234,7 +266,7 @@ const PICK_SCHEMA = {
 } as const;
 
 /** Claude looks at the candidates and returns the ones (best first) that fit the option and the headline. */
-async function judgePhotos(d: SeedDraft, side: "A" | "B", cands: PexelsPhoto[]): Promise<PexelsPhoto[]> {
+async function judgePhotos(d: SeedDraft, side: "A" | "B", cands: Photo[]): Promise<Photo[]> {
   if (!cands.length) return [];
   const label = side === "A" ? d.a : d.b;
   const query = side === "A" ? d.queryA : d.queryB;
@@ -248,7 +280,7 @@ async function judgePhotos(d: SeedDraft, side: "A" | "B", cands: PexelsPhoto[]):
         content: [
           ...cands.flatMap((c, i): Anthropic.ContentBlockParam[] => [
             { type: "text", text: `Photo ${i}:` },
-            { type: "image", source: { type: "url", url: c.src.medium } },
+            { type: "image", source: { type: "url", url: c.thumb } },
           ]),
           {
             type: "text",
@@ -268,30 +300,31 @@ Return the numbers of the photos that work, best first. Empty list if none.`,
   const t = msg.content.find((b): b is Anthropic.TextBlock => b.type === "text")?.text ?? "{}";
   try {
     const fits = (JSON.parse(t) as { fits?: number[] }).fits ?? [];
-    return fits.map((i) => cands[i]).filter((c): c is PexelsPhoto => !!c);
+    return fits.map((i) => cands[i]).filter((c): c is Photo => !!c);
   } catch {
     return [];
   }
 }
 
-const photoUrl = (p: PexelsPhoto) => `${p.src.original}?auto=compress&cs=tinysrgb&w=1080`;
+type Chosen = { photo: Photo; url: string };
 
-/** Two fitting, unused Pexels photos for a photo draft, or null. Searches deep first (pages 2–4), then page 1. */
-async function findPhotos(d: SeedDraft, used: Set<number>, rand: () => number): Promise<[PexelsPhoto, PexelsPhoto] | null> {
-  const out: PexelsPhoto[] = [];
+/** Two fitting, unused photos for a photo draft (copied to Blob when needed), or null. Searches deep first (pages 2–4), then page 1. */
+async function findPhotos(d: SeedDraft, used: Set<string>, rand: () => number): Promise<[Chosen, Chosen] | null> {
+  const out: Photo[] = [];
   for (const side of ["A", "B"] as const) {
     const query = (side === "A" ? d.queryA : d.queryB)!;
-    let found: PexelsPhoto | undefined;
+    let found: Photo | undefined;
     for (const page of [2 + Math.floor(rand() * 3), 1]) {
-      const cands = (await pexels(query, page)).filter((p) => !used.has(p.id) && !out.some((o) => o.id === p.id)).slice(0, 8);
+      const cands = (await searchPhotos(query, page)).filter((p) => !used.has(p.key) && !out.some((o) => o.key === p.key)).slice(0, 8);
       found = (await judgePhotos(d, side, cands))[0];
       if (found) break;
     }
     if (!found) return null;
     out.push(found);
   }
-  for (const p of out) used.add(p.id);
-  return [out[0]!, out[1]!];
+  const urls = await Promise.all(out.map(rehost));
+  for (const p of out) used.add(p.key);
+  return [{ photo: out[0]!, url: urls[0]! }, { photo: out[1]!, url: urls[1]! }];
 }
 
 // ---------- posting ----------
@@ -343,7 +376,7 @@ async function postSeed(o: {
   d: SeedDraft;
   batchId: string;
   author: string;
-  photos: [PexelsPhoto, PexelsPhoto] | null;
+  photos: [Chosen, Chosen] | null;
   voters: string[];
   rand: () => number;
 }) {
@@ -359,7 +392,7 @@ async function postSeed(o: {
       topic: d.topic,
       kind: o.photos ? ("photo" as const) : ("text" as const),
       pctA: d.pctA,
-      ...(o.photos ? { photos: o.photos.map((p) => ({ id: p.id, by: p.photographer, page: p.url })) } : {}),
+      ...(o.photos ? { photos: o.photos.map((c) => ({ id: c.photo.key, by: c.photo.by, page: c.photo.page })) } : {}),
     },
   };
   const others = o.voters.filter((v) => v !== o.author);
@@ -380,8 +413,8 @@ async function postSeed(o: {
       VALUES (${id}, ${slug}, ${o.author}, ${d.title.trim()}, ${d.story.trim() || null}, ${DEFAULT_CATEGORY_ID}, ${JSON.stringify(tags)}::jsonb,
         ${new Date(createdAt).toISOString()}, ${new Date(createdAt).toISOString()}, ${new Date(deadline).toISOString()}, ${votesA}, ${plan.length - votesA})`);
     const sides = [
-      { side: "A", label: d.a.trim(), line: d.aLine.trim() || null, img: o.photos ? photoUrl(o.photos[0]) : null },
-      { side: "B", label: d.b.trim(), line: d.bLine.trim() || null, img: o.photos ? photoUrl(o.photos[1]) : null },
+      { side: "A", label: d.a.trim(), line: d.aLine.trim() || null, img: o.photos ? o.photos[0].url : null },
+      { side: "B", label: d.b.trim(), line: d.bLine.trim() || null, img: o.photos ? o.photos[1].url : null },
     ];
     for (const s of sides)
       await tx.execute(sql`
@@ -405,10 +438,15 @@ async function existingTitles(): Promise<string[]> {
   return (await db.execute<{ title: string }>(sql`SELECT title FROM battle`)).map((r) => r.title);
 }
 
-async function usedPexelsIds(): Promise<Set<number>> {
-  const rows = await db.execute<{ id: string }>(sql`
+/** Stock photos already in use: Pexels ids in image URLs, plus every source key auto-seeding stored in tags.seed.photos. */
+async function usedPhotoKeys(): Promise<Set<string>> {
+  const px = await db.execute<{ id: string }>(sql`
     SELECT substring(image_url from 'pexels\\.com/photos/([0-9]+)/') AS id FROM option WHERE image_url LIKE '%pexels.com/photos/%'`);
-  return new Set(rows.map((r) => Number(r.id)).filter((n) => n > 0));
+  const tagged = await db.execute<{ id: string }>(sql`
+    SELECT p->>'id' AS id FROM battle b, jsonb_array_elements(b.tags->'seed'->'photos') p WHERE b.tags->'seed' ? 'photos'`);
+  const keys = new Set(px.filter((r) => r.id).map((r) => `px:${r.id}`));
+  for (const r of tagged) if (r.id) keys.add(/^\d+$/.test(r.id) ? `px:${r.id}` : r.id);
+  return keys;
 }
 
 export type AutoSeedResult = { check: SeedState["lastCheck"]; wrote: number; photos: number; batch: SeedState["batch"]; note: string };
@@ -467,7 +505,7 @@ export async function runAutoSeed(opts: { force?: boolean; budgetMs?: number } =
   state.lastError = null;
   try {
     const rand = Math.random;
-    const [titles, used, posters, voters] = await Promise.all([existingTitles(), usedPexelsIds(), loadPosters(), loadVoters()]);
+    const [titles, used, posters, voters] = await Promise.all([existingTitles(), usedPhotoKeys(), loadPosters(), loadVoters()]);
     const batchPosters: Poster[] = [];
     let ex = await examples();
     let rounds = 0;
@@ -493,7 +531,7 @@ export async function runAutoSeed(opts: { force?: boolean; budgetMs?: number } =
         return true;
       });
       // Photos: a few at a time.
-      const withPhotos = new Map<SeedDraft, [PexelsPhoto, PexelsPhoto]>();
+      const withPhotos = new Map<SeedDraft, [Chosen, Chosen]>();
       const photoDrafts = good.filter((d) => d.kind === "photo");
       for (let i = 0; i < photoDrafts.length; i += 5) {
         await Promise.all(

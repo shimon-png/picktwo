@@ -45,7 +45,7 @@ export function AutoSeedPanel({ s }: { s: AutoSeedView }) {
         <h2 className="text-[22px]">Auto-seeding</h2>
         <span className={`chip !py-0.5 text-xs ${s.on ? "chip-on" : ""}`}>{s.on ? "On" : "Off"}</span>
         {!s.writer && <span className="text-xs text-pink">Needs ANTHROPIC_API_KEY</span>}
-        {!s.photos && <span className="text-xs text-pink">No PEXELS_API_KEY: photo battles are written as text</span>}
+        {!s.photos && <span className="text-xs text-pink">No PIXABAY_API_KEY: photo battles are written as text</span>}
       </div>
       <p className="text-zinc-500">
         When the #{s.rank} voter of the last 7 days has {s.at} or fewer battles left, write {s.count} more ({s.photoPct}% photos), at most once every {s.cooldownHours}h. Real people&apos;s battles always come first in the deck. Settings: economy <code>autoSeed*</code>.
