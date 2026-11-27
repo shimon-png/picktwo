@@ -35,7 +35,7 @@ export type EmailData = {
   results_in: { title: string; slug: string; labelA: string; labelB: string; votesA: number; votesB: number; reasons: string[] };
   pickbot_results: { threadId: string; title: string; labelA: string; labelB: string; votesA: number; votesB: number; agreed: boolean | null };
   loop_reminder: { title: string; slug: string; labelA: string; labelB: string; n: number };
-  voter_updates: { outcomes: (Omit<T.VoterOutcome, "url"> & { slug: string })[]; helpful: (Omit<T.HelpfulItem, "url"> & { slug: string })[] };
+  voter_updates: { outcomes: (Omit<T.VoterOutcome, "url"> & { slug: string })[]; helpful: (Omit<T.HelpfulItem, "url"> & { slug: string })[]; results?: (Omit<T.FinalResult, "url"> & { slug: string })[] };
   welcome: { name: string };
   first_battle_nudge: { examples: { title: string; slug: string }[] };
   tier_up: { tier: string };
@@ -86,6 +86,8 @@ async function render<K extends EmailKind>(kind: K, d: EmailData[K]): Promise<T.
       return T.voterUpdates({
         outcomes: x.outcomes.map((o) => ({ ...o, url: link(`/b/${o.slug}`) })),
         helpful: x.helpful.map((h) => ({ ...h, url: link(`/b/${h.slug}`) })),
+        results: (x.results ?? []).map((r) => ({ ...r, url: link(`/b/${r.slug}`) })),
+        voteUrl: link("/vote"),
       });
     }
     case "welcome": {
@@ -271,7 +273,14 @@ export async function flushQueued(now = new Date()) {
 const VOTER_ITEM = "voter_item";
 
 /** Queue an outcome/helpful item for a voter; the hourly job sends one combined email per person. */
-export async function queueVoterItem(userId: string, ref: string, item: { type: "outcome"; data: EmailData["voter_updates"]["outcomes"][number] } | { type: "helpful"; data: EmailData["voter_updates"]["helpful"][number] }) {
+export async function queueVoterItem(
+  userId: string,
+  ref: string,
+  item:
+    | { type: "outcome"; data: EmailData["voter_updates"]["outcomes"][number] }
+    | { type: "helpful"; data: EmailData["voter_updates"]["helpful"][number] }
+    | { type: "result"; data: NonNullable<EmailData["voter_updates"]["results"]>[number] },
+) {
   try {
     await db
       .insert(emailLog)
@@ -295,12 +304,15 @@ export async function flushVoterUpdates(now = new Date()) {
   for (const [userId, items] of byUser) {
     const [u] = await db.select().from(users).where(eq(users.id, userId));
     if (!u) continue;
-    const data: EmailData["voter_updates"] = { outcomes: [], helpful: [] };
+    const data: EmailData["voter_updates"] = { outcomes: [], helpful: [], results: [] };
     for (const it of items) {
       const p = it.payload as { type: string; data: never };
       if (p.type === "outcome") data.outcomes.push(p.data);
+      else if (p.type === "result") data.results!.push(p.data);
       else data.helpful.push(p.data);
     }
+    // At most 5 final results in one email, closest splits first are just as good as any; keep the newest.
+    data.results = data.results!.slice(-5);
     const res = await deliver(u, "voter_updates", `batch:${items.map((i) => i.id).sort()[0]}`, data, { now });
     if (res === "sent") sent++;
     await db

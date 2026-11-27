@@ -265,6 +265,12 @@ export const ECONOMY_DEFAULTS = {
   skipRescueAfter: 2,
   /** Data brain Phase 4: win-back emails to people drifting away. 0 = off (default), 1 = on. */
   winbackEmails: 0,
+  /** "Results are in" for voters (Alex, Nov 27 2026): when a battle someone voted on closes without an outcome, the batched "How it turned out" email gives them the final split and whether they were with the crowd. 1 = on, 0 = off. */
+  finalResultsEmails: 1,
+  /** A battle needs this many real votes before its voters get the final result. */
+  finalResultsMinVotes: 5,
+  /** Percent of voters (stable per account) who never get final-result emails, to measure whether they bring people back. */
+  finalResultsHoldoutPct: 20,
   /** Percent of lapsing people who get no email (stable per account), to measure whether the emails bring people back. */
   winbackHoldoutPct: 20,
   /** Lapsing = away ≥ twice your usual gap between active days, at least this many days… */

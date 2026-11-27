@@ -165,3 +165,16 @@ export function withUtm(url: string, kind: EmailKind): string {
   u.searchParams.set("utm_campaign", kind);
   return u.toString();
 }
+
+/**
+ * Final result for someone who voted on a battle that closed without an outcome (Alex, Nov 27 2026: "Results are in"
+ * for voters). Percentages round to whole numbers and add up to 100; withCrowd = their side got more votes (null on a tie).
+ */
+export function finalResult(votesA: number, votesB: number, side: "A" | "B") {
+  const a = Math.max(0, votesA), b = Math.max(0, votesB);
+  const total = a + b;
+  const pctA = total ? Math.round((a / total) * 100) : 0;
+  const pctB = total ? 100 - pctA : 0;
+  const withCrowd = a === b ? null : (a > b) === (side === "A");
+  return { pctA, pctB, withCrowd };
+}

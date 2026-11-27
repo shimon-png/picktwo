@@ -5,7 +5,8 @@ import { getEconomy } from "./config";
 import { getFeed } from "./feed";
 import { pointsTier } from "./priority";
 import { deliver, deliverTo, flushQueued, flushVoterUpdates, queueVoterItem } from "./mailer";
-import { emailMilestones, isoWeekKey, localTime, pastHalfway, timeZoneFor } from "./email-rules";
+import { emailMilestones, finalResult, isoWeekKey, localTime, pastHalfway, timeZoneFor } from "./email-rules";
+import { inHoldout } from "./ranking";
 
 /**
  * When each lifecycle email fires (docs/emails.md). Instant ones are called from API routes with `after()` so the
@@ -152,6 +153,49 @@ async function resultsIn(now: Date) {
   return n;
 }
 
+/**
+ * "Results are in" for voters (Alex, Nov 27 2026): a battle closed in the last 6 hours with no outcome → each signed-in
+ * voter with an email gets a voter item with the final split (batched into "How it turned out" 30+ min later; the item
+ * ref makes it once per person per battle). Seed votes never count; `finalResultsHoldoutPct` of voters get none.
+ */
+async function queueFinalResults(now: Date) {
+  const e = await getEconomy();
+  if (!e.finalResultsEmails) return 0;
+  const rows = await db
+    .select({ b: battles })
+    .from(battles)
+    .leftJoin(outcomes, eq(outcomes.battleId, battles.id))
+    .where(
+      and(
+        isNull(outcomes.id),
+        lt(battles.deadline, now),
+        gt(battles.deadline, new Date(now.getTime() - 6 * 3600_000)),
+        notInArray(battles.status, ["DELETED", "HIDDEN"]),
+        gte(sql`${battles.votesA} + ${battles.votesB}`, e.finalResultsMinVotes),
+      ),
+    )
+    .limit(200);
+  let n = 0;
+  for (const { b } of rows) {
+    const { labelA, labelB } = await labels(b.id);
+    const voters = await db
+      .select({ userId: votes.userId, side: votes.side })
+      .from(votes)
+      .innerJoin(users, eq(users.id, votes.userId))
+      .where(and(eq(votes.battleId, b.id), isNotNull(votes.userId), hasEmail, sql`COALESCE(${votes.source}, '') <> 'seed'`, sql`${votes.userId} <> ${b.authorId}`));
+    for (const v of voters) {
+      if (inHoldout(`finalres:${v.userId}`, e.finalResultsHoldoutPct)) continue;
+      const side = v.side as "A" | "B";
+      await queueVoterItem(v.userId!, `result:${b.id}`, {
+        type: "result",
+        data: { title: publicTitle(b), slug: b.slug, labelA, labelB, picked: side === "A" ? labelA : labelB, ...finalResult(b.votesA, b.votesB, side) },
+      });
+      n++;
+    }
+  }
+  return n;
+}
+
 /** E3: halfway through with few votes. */
 async function needsVotes(now: Date) {
   const e = await getEconomy();
@@ -251,6 +295,7 @@ async function weeklyRoundups(now: Date) {
 export async function runHourlyEmails(now = new Date()) {
   return {
     resultsIn: await resultsIn(now),
+    finalResults: await queueFinalResults(now),
     needsVotes: await needsVotes(now),
     voterUpdates: await flushVoterUpdates(now),
     queued: await flushQueued(now),
