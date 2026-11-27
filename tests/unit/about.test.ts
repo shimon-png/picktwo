@@ -53,7 +53,8 @@ describe("answers + shuffle", () => {
     expect(isValidAboutAnswer("sex", "FEMALE")).toBe(true);
     expect(isValidAboutAnswer("sex", "UNDISCLOSED")).toBe(false);
     expect(isValidAboutAnswer("age", "AGE_25_34")).toBe(true);
-    expect(isValidAboutAnswer("relationship", "TAKEN")).toBe(true);
+    expect(isValidAboutAnswer("relationship", "DATING")).toBe(true);
+    expect(isValidAboutAnswer("relationship", "TAKEN")).toBe(false);
     expect(isValidAboutAnswer("zip", "78704")).toBe(true);
     expect(isValidAboutAnswer("zip", "<script>")).toBe(false);
     expect(isValidAboutAnswer("education", "BACHELORS")).toBe(true);

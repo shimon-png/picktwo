@@ -40,9 +40,8 @@ export type AboutQuestion = {
 
 export const RELATIONSHIP_OPTIONS = [
   { id: "SINGLE", label: "Single" },
-  { id: "DATING", label: "Dating" },
-  { id: "TAKEN", label: "Taken" },
   { id: "MARRIED", label: "Married" },
+  { id: "DATING", label: "Dating" },
 ] as const;
 export const HOUSING_OPTIONS = [
   { id: "RENT", label: "Rent" },

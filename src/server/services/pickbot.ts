@@ -306,7 +306,7 @@ export async function chooseStep(userIn: User | null, id: string, action: "retai
 
 const LABEL: Record<string, Record<string, string>> = {
   sex: { MALE: "man", FEMALE: "woman" },
-  relationship: { SINGLE: "single", DATING: "dating", TAKEN: "in a relationship", MARRIED: "married" },
+  relationship: { SINGLE: "single", MARRIED: "married", DATING: "dating" },
   housing: { RENT: "rents", OWN: "owns their home", FAMILY: "lives with family" },
   work: { STUDENT: "student", WORKING: "working", BOTH: "student and working", NEITHER: "not working or studying" },
 };
