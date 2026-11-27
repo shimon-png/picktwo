@@ -10,6 +10,8 @@ import {
   shouldStartBatch,
   storyRepeat,
   topicPlan,
+  isFocusTopic,
+  planSlots,
   voiceFromLabels,
   watchedRank,
   type SeedDraft,
@@ -55,12 +57,23 @@ describe("batch mix", () => {
     expect(photoCount(100, 33)).toBe(33);
     expect(photoCount(10, 0)).toBe(0);
   });
-  it("plans exactly n topics, heaviest on couples", () => {
+  it("plans exactly n topics, half on money, jobs, politics and the economy (Alex, Nov 27)", () => {
     const t = topicPlan(100);
     expect(t).toHaveLength(100);
     const n = (k: string) => t.filter((x) => x === k).length;
-    expect(n("couples")).toBeGreaterThan(n("life"));
+    expect(t.filter(isFocusTopic)).toHaveLength(50);
+    expect(n("money")).toBeGreaterThan(n("cheating"));
     expect(topicPlan(7)).toHaveLength(7);
+  });
+  it("puts about 30% photos in each half", () => {
+    const slots = planSlots(topicPlan(100), 30, mulberry32(3));
+    expect(slots).toHaveLength(100);
+    const photos = (focus: boolean) => slots.filter((s) => s.kind === "photo" && isFocusTopic(s.topic) === focus).length;
+    expect(photos(true)).toBe(15);
+    expect(photos(false)).toBe(15);
+    const small = planSlots(topicPlan(10), 3, mulberry32(1));
+    expect(small.filter((s) => s.kind === "photo")).toHaveLength(3);
+    expect(planSlots(["money"], 5)).toEqual([{ kind: "photo", topic: "money" }]);
   });
 });
 
@@ -75,6 +88,8 @@ describe("draft checks", () => {
   });
   it("catches AI phrasing, emoji, long labels and profanity", () => {
     expect(draftProblems({ ...text, story: "Not a fight, not a breakup." }, clean)).toContain("sounds like AI");
+    expect(draftProblems({ ...text, title: "My dad loves Trump and I can't stand it. Skip Christmas?" }, clean)).toContain("names a politician");
+    expect(draftProblems({ ...text, title: "My dad is a Republican and I'm a Democrat. Invite him for Christmas?" }, clean)).toEqual([]);
     expect(draftProblems({ ...text, story: "ugh 😩" }, clean)).toContain("emoji");
     expect(draftProblems({ ...text, a: "x".repeat(61) }, clean)).toContain("option label over 60");
     expect(draftProblems(text, () => true)).toContain("profanity filter");

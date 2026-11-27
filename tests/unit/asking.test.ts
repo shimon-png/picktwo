@@ -23,8 +23,8 @@ describe("People like you are asking: the bank", () => {
       for (const m of p.months ?? []) expect(m >= 1 && m <= 12).toBe(true);
     }
   });
-  it("has a battle for every preset in migration 0043 (re-run scripts/gen-asking-presets.ts after editing the bank)", () => {
-    const sql = readFileSync("drizzle/0043_asking_presets.sql", "utf8");
+  it("has a battle for every preset in migration 0043 or 0045 (re-run scripts/gen-asking-presets.ts --hot after editing the bank)", () => {
+    const sql = readFileSync("drizzle/0043_asking_presets.sql", "utf8") + readFileSync("drizzle/0045_asking_presets_worries.sql", "utf8");
     for (const p of ASKING_PRESETS) {
       expect(sql, p.id).toContain(`'${presetBattleId(p.id)}'`);
       expect(sql, p.id).toContain(p.q.replace(/'/g, "''"));
@@ -53,10 +53,13 @@ describe("People like you are asking: picking", () => {
     expect(presetScore(p({ months: [1] }), { month: 1 })).toBeGreaterThan(presetScore(plain, { month: 1 }));
   });
 
-  it("returns five questions on five different topics, never an excluded (retired or voted) one", () => {
+  it("returns five questions, one per topic (two for hot worries), never an excluded (retired or voted) one", () => {
     const out = pickAsking({ ...base, exclude: new Set(["w_party", "g_santa"]) });
     expect(out).toHaveLength(5);
-    expect(new Set(out.map((x) => x.topic)).size).toBe(5);
+    for (const t of ASKING_TOPICS) {
+      const here = out.filter((x) => x.topic === t);
+      expect(here.length).toBeLessThanOrEqual(here.every((x) => x.hot) ? 2 : 1);
+    }
     expect(out.map((x) => x.id)).not.toContain("w_party");
     expect(out.map((x) => x.id)).not.toContain("g_santa");
   });
@@ -84,6 +87,18 @@ describe("People like you are asking: picking", () => {
       for (const x of out) expect(x.sex === "MALE").toBe(false);
     }
     expect(dating).toBeGreaterThan(450);
+  });
+
+  it("leans on money, jobs, the economy and family politics (Alex, Nov 27)", () => {
+    let hot = 0;
+    let politics = 0;
+    for (let i = 0; i < 1000; i++) {
+      const out = pickAsking({ ...base, seed: `h${i}` });
+      hot += out.filter((x) => x.hot).length;
+      if (out.some((x) => x.keys?.includes("politics"))) politics++;
+    }
+    expect(hot / 1000).toBeGreaterThanOrEqual(3);
+    expect(politics).toBeGreaterThan(400);
   });
 
   it("follows the What's on your mind topic with more than one question", () => {

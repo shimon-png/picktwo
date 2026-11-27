@@ -278,7 +278,7 @@ export const ECONOMY_DEFAULTS = {
   /** …write this many new seed battles… */
   autoSeedCount: 100,
   /** …this percent of them with photos (the rest text cards)… */
-  autoSeedPhotoPct: 33,
+  autoSeedPhotoPct: 30,
   /** …then wait at least this many hours before the next batch. */
   autoSeedCooldownHours: 12,
   /** Brain "Clean" view counts real activity from this New York day on (YYYYMMDD). The "All data" view ignores it. */

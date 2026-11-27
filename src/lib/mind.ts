@@ -33,9 +33,9 @@ const THEMES: Record<MindTopic, readonly BrainTags["theme"][]> = {
 
 /** Words in the question or story that count too (for gifts, which has no AI theme, and to catch untagged battles). */
 const WORDS: Record<MindTopic, RegExp> = {
-  money: /\b(money|budget|salary|raise|debt|loan|savings?|invest\w*|splurge|afford|pay(ing)? for|bills?)\b/i,
+  money: /\b(money|budget|salary|raise|debt|loan|savings?|invest\w*|splurge|afford\w*|pay(ing)? for|bills?|groceries|recession|inflation|paycheck|credit card)\b/i,
   dating: /\b(date|dating|tinder|hinge|bumble|boyfriend|girlfriend|crush|first date|situationship)\b/i,
-  work: /\b(job|work|boss|coworker|career|offer|interview|promotion|quit|office|salary)\b/i,
+  work: /\b(job|jobs|work|boss|coworker|career|offer|interview|promotion|quit|office|salary|laid off|layoffs?|unemployed|hiring)\b/i,
   family: /\b(mom|dad|parents?|kids?|baby|sister|brother|in-laws?|mother-in-law|family|toddler)\b/i,
   gifts: /\b(gifts?|presents?|birthday|anniversary|christmas|holiday shopping|stocking|secret santa|valentine'?s?)\b/i,
   home: /\b(apartment|rent|lease|move|moving|neighbou?rhood|house|condo|roommates?|city|suburbs?|mortgage)\b/i,
