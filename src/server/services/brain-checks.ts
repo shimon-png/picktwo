@@ -18,6 +18,9 @@ export type BrainNumbers = {
   rawSources: { sessions: number; visitors: number; voters: number }[];
   /** Sign-ups by source total, only when it covers the same window as the tiles. */
   signupSourcesTotal?: number;
+  /** Skips tile and the theme-engagement totals (sums of the theme rows). */
+  skips?: number;
+  themes?: { votes: number; skipped: number; seen: number; voted: number; signupVoters: number; voters: number }[];
 };
 
 export type CheckResult = { rule: string; ok: boolean; detail: string };
@@ -48,5 +51,16 @@ export function brainChecks(n: BrainNumbers): CheckResult[] {
   le("Raw source tags: visits ≤ Visits tile", sum(n.rawSources, (r) => r.sessions), n.visits);
   for (const r of n.rawSources) le("Raw source tags: people who voted ≤ visitors", r.voters, r.visitors);
   if (n.signupSourcesTotal !== undefined) eq("Sign-ups by source total = Sign-ups tile", n.signupSourcesTotal, n.signups);
+  if (n.themes) {
+    eq("By theme: votes add up to the Votes tile", sum(n.themes, (t) => t.votes), n.votes);
+    if (n.skips !== undefined) eq("By theme: skips add up to the Skips tile", sum(n.themes, (t) => t.skipped), n.skips);
+    eq("By theme: cards seen = Text vs photo cards seen", sum(n.themes, (t) => t.seen), sum(n.byKind, (k) => k.seen));
+    // Text vs photo only counts deck votes; the theme table also counts a seen card voted on its battle page.
+    le("Text vs photo seen → voted ≤ By theme seen → voted", sum(n.byKind, (k) => k.voted), sum(n.themes, (t) => t.voted));
+    for (const t of n.themes) {
+      le("By theme: voters ≤ People who voted", t.voters, n.voters);
+      le("By theme: sign-ups who voted ≤ Sign-ups", t.signupVoters, n.signups);
+    }
+  }
   return out;
 }

@@ -106,7 +106,8 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       (SELECT count(DISTINCT ${WHO_V})::int FROM ${V_FROM} WHERE v.created_at > ${since} AND ${voteOK} AND NOT v.flagged) AS voters,
       (SELECT count(*)::int FROM vote v WHERE v.source = 'seed') AS seed_votes_all,
       (SELECT count(*)::int FROM skip s WHERE s.created_at > ${since} AND ${skipOK}) AS skips,
-      (SELECT count(*)::int FROM analytics_event e WHERE e.name = 'signup_gate_shown' AND e.created_at > ${since} AND ${notBot}) AS gates,
+      -- People, not times shown: the B group's closable dialog shows again every few votes (audit, Nov 25 2026).
+      (SELECT count(DISTINCT ${WHO_E})::int FROM ${EV_FROM} WHERE e.name = 'signup_gate_shown' AND e.created_at > ${since} AND ${notBot}) AS gates,
       (SELECT count(*)::int FROM "user" u WHERE u.onboarded_at > ${since} AND ${signupOK}) AS signups,
       (SELECT count(*)::int FROM analytics_event e WHERE e.name = 'vote_changed' AND e.created_at > ${since} AND ${notBot}) AS changed,
       (SELECT count(*)::int FROM battle b WHERE b.created_at > ${since} AND ${battleOK}) AS real_battles,
@@ -166,17 +167,21 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       count(DISTINCT who) FILTER (WHERE who IN (SELECT who FROM vv))::int AS voters
     FROM s GROUP BY 1 ORDER BY 2 DESC LIMIT 15`);
 
-  // Next-day return: of people first seen on a day, how many visited again the next day.
+  // Next-day return: of people first seen on a day, how many visited again the next day. "First seen" looks back to
+  // the clean start (All view: all time), so someone who first came before the window isn't counted as new in it
+  // (audit, Nov 25 2026: with the 24h window everyone looked new).
+  const firstFrom = scope.cleanFrom ?? "1970-01-01T00:00:00.000Z";
   const retention = await db.execute<{ day: string; new_visitors: number; back_d1: number }>(sql`
     WITH a AS (
       SELECT ${WHO_E} AS who, (e.created_at AT TIME ZONE 'America/New_York')::date AS d
-      FROM ${EV_FROM} WHERE e.name IN ('session_start', 'page_view') AND e.created_at > ${since} AND ${notBot}
+      FROM ${EV_FROM} WHERE e.name IN ('session_start', 'page_view') AND e.created_at >= ${firstFrom} AND ${notBot}
         AND ${WHO_E} IS NOT NULL
       GROUP BY 1, 2
     ), f AS (SELECT who, min(d) AS first FROM a GROUP BY 1)
     SELECT to_char(f.first, 'MM-DD') AS day, count(*)::int AS new_visitors,
       count(*) FILTER (WHERE EXISTS (SELECT 1 FROM a WHERE a.who = f.who AND a.d = f.first + 1))::int AS back_d1
-    FROM f GROUP BY f.first ORDER BY f.first`);
+    FROM f WHERE f.first >= (${since}::timestamptz AT TIME ZONE 'America/New_York')::date
+    GROUP BY f.first ORDER BY f.first`);
 
   const topEngaging = await db.execute<{ slug: string; title: string; score: number; voters: number; returns: number; votes_a: number; votes_b: number; seed: boolean; kind: string }>(sql`
     SELECT b.slug, b.title, b.engagement_score AS score, b.engagement_voters AS voters, b.engagement_returns AS returns,
@@ -198,8 +203,9 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       ORDER BY gap ${sql.raw(dir)}, count(*) DESC LIMIT 8`);
   const [closest, lopsided] = await Promise.all([splits("ASC"), splits("DESC")]);
 
-  // By AI tag: how each theme / stakes level performs (votes and views in the window).
-  const byTag = (key: "theme" | "stakes") =>
+  // By AI stakes tag: votes and views in the window. Seed battles count too (most of the deck); the theme view moved
+  // to `themeEngagementData()` (brain-themes.ts), which also covers battles the AI hasn't tagged.
+  const byTag = (key: "stakes") =>
     db.execute<{ tag: string; battles: number; real_votes: number; views: number; voted_views: number; score: number | null }>(sql`
       SELECT b.tags->'brain'->>${key} AS tag, count(DISTINCT b.id)::int AS battles,
         COALESCE(sum(rv.n), 0)::int AS real_votes,
@@ -209,19 +215,19 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       LEFT JOIN LATERAL (SELECT count(*) AS n FROM vote v WHERE v.battle_id = b.id AND v.created_at > ${since} AND ${voteOK} AND NOT v.flagged) rv ON true
       LEFT JOIN LATERAL (
         SELECT count(*) AS views, count(*) FILTER (WHERE EXISTS (
-          SELECT 1 FROM vote v WHERE v.battle_id = b.id
+          SELECT 1 FROM vote v WHERE v.battle_id = b.id AND v.created_at > ${since} AND NOT v.flagged AND ${voteOK}
             AND ((e.user_id IS NOT NULL AND v.user_id = e.user_id) OR (e.device_id IS NOT NULL AND v.device_id = e.device_id))
         )) AS voted
         FROM analytics_event e
         WHERE e.name = 'card_shown' AND e.props->>'battleId' = b.id AND e.created_at > ${since} AND ${notBot}
       ) cv ON true
-      WHERE b.tags ? 'brain' AND b.status <> 'DELETED' AND ${battleOK}
-      GROUP BY 1 ORDER BY 3 DESC`);
-  const [byTheme, byStakes, untagged, tagging] = await Promise.all([byTag("theme"), byTag("stakes"), untaggedCount(), taggingStatus()]);
+      WHERE b.tags ? 'brain' AND b.status <> 'DELETED'
+      GROUP BY 1 HAVING COALESCE(sum(rv.n), 0) > 0 OR COALESCE(sum(cv.views), 0) > 0 ORDER BY 3 DESC`);
+  const [byStakes, untagged, tagging] = await Promise.all([byTag("stakes"), untaggedCount(), taggingStatus()]);
 
   const [daily, visitSources] = await Promise.all([dailyNumbers(scope), visitsBySource(scope)]);
 
-  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byTheme, byStakes, untagged, tagging, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
+  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byStakes, untagged, tagging, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
 }
 
 type Scope = Awaited<ReturnType<typeof brainScope>>;

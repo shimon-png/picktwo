@@ -116,7 +116,7 @@ export async function untaggedCount(): Promise<number> {
  * Tag up to `limit` untagged battles, a few at a time. Open battles (the ones the deck can show) first, then most-voted, then newest: taste profiles and the Brain
  * read tags off the battles people actually voted on, so those go before fresh seeds nobody has seen yet.
  */
-export async function tagUntagged(limit = 25): Promise<{ tagged: number; failed: number; remaining: number; enabled: boolean; error?: string | null }> {
+export async function tagUntagged(limit = 25, parallel = 5): Promise<{ tagged: number; failed: number; remaining: number; enabled: boolean; error?: string | null }> {
   if (!taggingEnabled()) return { tagged: 0, failed: 0, remaining: await untaggedCount(), enabled: false };
   lastError = null;
   const rows = await db
@@ -127,8 +127,8 @@ export async function tagUntagged(limit = 25): Promise<{ tagged: number; failed:
     .limit(limit);
   let tagged = 0;
   let failed = 0;
-  for (let i = 0; i < rows.length; i += 5) {
-    const out = await Promise.all(rows.slice(i, i + 5).map((r) => tagBattle(r.id)));
+  for (let i = 0; i < rows.length; i += parallel) {
+    const out = await Promise.all(rows.slice(i, i + parallel).map((r) => tagBattle(r.id)));
     out.forEach((t) => (t ? tagged++ : failed++));
   }
   const out = { tagged, failed, remaining: await untaggedCount(), enabled: true, error: lastError };

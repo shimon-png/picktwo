@@ -8,6 +8,9 @@ import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
 import { brainChecks } from "@/server/services/brain-checks";
+import { themeEngagementData } from "@/server/services/brain-themes";
+import { themeHighlights } from "@/server/services/theme-engagement-rules";
+import { themeLabel } from "@/lib/theme-guess";
 import { signupJourneys } from "@/server/services/signup-journeys";
 import { gateTestResults } from "@/server/services/gate-test";
 import { ARM_LABELS, type GateCell } from "@/server/services/gate-test-rules";
@@ -85,6 +88,7 @@ function ueFixedLine(ue: UeStats): string {
 const spanLabel = (days: number) =>
   days >= 1 ? `${Math.round(days * 10) / 10} day${Math.round(days * 10) / 10 === 1 ? "" : "s"}` : days * 24 >= 1 ? `${Math.round(days * 24)} h` : `${Math.round(days * 1440)} min`;
 const pctN = (x: number) => `${(100 * x).toFixed(1)}%`;
+const pctOf = (x: number | null) => (x == null ? "—" : `${Math.round(100 * x)}%`);
 const gateRow = (day: React.ReactNode, group: string, c: GateCell): React.ReactNode[] => [
   day,
   group,
@@ -300,7 +304,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb, pk, md] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb, pk, md, te] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
@@ -316,7 +320,9 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     profileBarStats(view, days),
     pickbotStats(view, days),
     mindStats(view, days),
+    themeEngagementData(days, view),
   ]);
+  const themeHeadlines = themeHighlights(te, themeLabel);
   const t = s.tiles;
   const n = (k: string) => Number(t[k] ?? 0);
   const viewedTotal = s.byKind.reduce((a, k) => a + k.seen, 0);
@@ -339,6 +345,8 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     votePlaces: s.votePlaces,
     rawSources: s.sources,
     signupSourcesTotal: acq.days === days ? acq.total.signups : undefined,
+    skips: n("skips"),
+    themes: te.themes,
   });
   const failed = checks.filter((c) => !c.ok);
   // Third item = the list behind the number (/admin/brain/list/[kind]); everything with one is clickable.
@@ -362,7 +370,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
     ["Skips", n("skips"), listHref("skips")],
     // Of deck cards people decided on (voted or skipped), the share they skipped.
     ["Deck skip rate", pct(sk.total.skipped, sk.total.voted + sk.total.skipped), listHref("cards", undefined, { outcome: "skipped" })],
-    ["Hit sign-up wall", n("gates"), listHref("gates")],
+    ["People who hit the sign-up wall", n("gates"), listHref("gates")],
     ["Sign-ups", n("signups"), listHref("signups")],
     ["Vote changes", n("changed"), listHref("changes")],
     [view === "clean" ? "Battles posted by real people" : "Battles posted", n("real_battles"), listHref("battles")],
@@ -848,6 +856,136 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
       </div>
 
       <Section
+        title="Which themes work"
+        note={`Every battle real people saw, voted on or skipped in this window, grouped by theme (${te.totals.aiTagged} of ${te.totals.battles} battles have an AI tag; the rest, mostly seed battles, are matched by their words). Seen = a Vote deck card, once per person. Vote rate = seen cards the person voted on; Skip rate = Skip button presses ÷ seen; Left on it = seen, no vote, no skip (they closed the app on it). All votes = every counted vote from any screen (adds up to the Votes tile). % of voters = share of all ${te.totals.voters} people who voted that voted on this theme at least once; % of sign-ups = the same for the ${te.totals.signups} people who signed up in this window. Last card before bouncing = visitors with no account who never came back on another day, by the theme of the last battle they saw.`}
+      >
+        {themeHeadlines.length > 0 && (
+          <ul className="list-disc space-y-0.5 pl-5 text-sm">
+            {themeHeadlines.map((h) => (
+              <li key={h}>{h}</li>
+            ))}
+          </ul>
+        )}
+        <Rows
+          head={["Theme", "Battles", "People who saw", "Seen", "Voted", "Vote rate", "Skipped", "Skip rate", "Left on it", "All votes", "Voters (% of voters)", "Sign-ups who voted (% of sign-ups)", "Last card before bouncing"]}
+          rows={[
+            ...te.themes.map((r) => [
+              themeLabel(r.theme),
+              r.battles,
+              r.seenPeople,
+              r.seen,
+              r.voted,
+              pctOf(r.voteRate),
+              r.skipped,
+              pctOf(r.skipRate),
+              r.left,
+              r.votes,
+              `${r.voters} (${pctOf(r.pctVoters)})`,
+              `${r.signupVoters} (${pctOf(r.pctSignups)})`,
+              r.bounceLast ? `${r.bounceLast} (${pctOf(r.pctBounced)})` : "—",
+            ]),
+            [<b key="t">Total</b>, te.totals.battles, "", te.totals.seen, te.totals.voted, pct(te.totals.voted, te.totals.seen), te.totals.skipped, pct(te.totals.skipped, te.totals.seen), te.totals.left, te.totals.votes, `${te.totals.voters} people`, `${te.totals.signupVoters} of ${te.totals.signups}`, te.totals.bounced - te.totals.bouncedNoBattle],
+          ]}
+        />
+        <details>
+          <summary className="cursor-pointer text-sm text-accent">Theme × text / photo</summary>
+          <Rows
+            head={["Theme", "Type", "Battles", "Seen", "Vote rate", "Skip rate", "Left on it", "All votes", "% of voters", "% of sign-ups"]}
+            rows={te.themeKinds.map((r) => [themeLabel(r.theme), r.kind, r.battles, r.seen, pctOf(r.voteRate), pctOf(r.skipRate), r.left, r.votes, pctOf(r.pctVoters), pctOf(r.pctSignups)])}
+          />
+        </details>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          <TagBattles remaining={s.untagged} /> AI-tag the rest so seed battles use the AI theme instead of the word match.
+          {s.tagging && (
+            <span className={s.tagging.failed ? "text-b" : undefined}>
+              Last run {nyTime(s.tagging.at)}: {s.tagging.tagged} tagged
+              {s.tagging.failed ? `, ${s.tagging.failed} failed${s.tagging.error ? ` (${s.tagging.error})` : ""}` : ""}
+            </span>
+          )}
+        </div>
+      </Section>
+
+      <Section
+        title="Where bounced visitors left"
+        note="Bounced = a visitor with no account who was active on one New York day only, and that day is over (seen 24h+ ago). Their last battle = the newest battle they saw, voted on or skipped. Compare a theme's share of last cards with its share of everything seen: a theme people leave on much more often than they see it (index above 1.0) is a bounce theme."
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(
+            [
+              ["Bounced visitors", te.totals.bounced],
+              ["Left before seeing a battle", te.totals.bouncedNoBattle],
+              ["Left after seeing a battle", te.totals.bounced - te.totals.bouncedNoBattle],
+              ["Avg votes before leaving", te.bounce.avgVotesBeforeLeaving == null ? "—" : te.bounce.avgVotesBeforeLeaving.toFixed(1)],
+            ] as const
+          ).map(([k, v]) => (
+            <div key={k} className="rounded-lg bg-surface p-2.5">
+              <div className="text-xs text-zinc-500">{k}</div>
+              <div className="text-xl font-medium">{v}</div>
+            </div>
+          ))}
+        </div>
+        <Rows
+          head={["Theme of last battle", "Bounced people", "Share of bounces", "Share of all cards seen", "Index", "In their last 3 battles"]}
+          rows={te.themes
+            .filter((r) => r.bounceLast > 0)
+            .sort((a, b) => b.bounceLast - a.bounceLast)
+            .map((r) => [
+              themeLabel(r.theme),
+              r.bounceLast,
+              pctOf(r.pctBounced),
+              pctOf(r.pctSeen),
+              r.pctBounced != null && r.pctSeen ? (r.pctBounced / r.pctSeen).toFixed(1) : "—",
+              te.bounce.lastThree.find((x) => x.theme === r.theme)?.n ?? 0,
+            ])}
+        />
+        <Rows
+          head={["Last battle before leaving", "Theme", "Type", "People", "Voted on it", "Skipped it", "Left on it"]}
+          rows={te.bounce.lastBattles.slice(0, 20).map((b) => [b.slug ? battleLink(b.slug, b.title) : b.title, themeLabel(b.theme), b.kind, b.people, b.voted, b.skipped, b.left])}
+        />
+      </Section>
+
+      <Section
+        title={`Real voters, one by one (${te.voters.length})`}
+        note="Everyone who cast a counted vote in this window, most votes first (same people as the People who voted tile). Seen = Vote deck cards; Left = seen with no vote or skip. Tap a row for the battles they skipped and their full journey."
+      >
+        <div className="divide-y divide-ink/10">
+          {te.voters.slice(0, 200).map((v) => (
+            <details key={v.who} className="py-2">
+              <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+                <span className="font-medium">{v.handle ? `@${v.handle}` : `Guest ·${v.who.slice(-4)}`}</span>
+                {v.signedUp && <span className="chip chip-on !py-0.5 text-[11px]">signed up</span>}
+                <span className="text-xs text-zinc-500">{v.themes.slice(0, 3).map((t) => `${themeLabel(t.theme)} ${t.n}`).join(" · ")}</span>
+                <span className="ml-auto text-xs tabular-nums">
+                  <b>{v.votes} votes</b> · seen {v.seen} · skipped {v.skips} · left {v.left}
+                </span>
+              </summary>
+              <div className="mt-2 space-y-1 pl-1 text-xs">
+                <p className="text-zinc-500">
+                  All themes: {v.themes.map((t) => `${themeLabel(t.theme)} ${t.n}`).join(", ")} · last vote {nyTime(v.lastAt)} ·{" "}
+                  <Link href={`/admin/journey/person/${encodeURIComponent(v.who)}`} className="text-accent underline-offset-2 hover:underline">
+                    Full journey ›
+                  </Link>
+                </p>
+                {v.skipped.length === 0 ? (
+                  <p className="text-zinc-500">Skipped nothing.</p>
+                ) : (
+                  <ul className="space-y-0.5">
+                    {v.skipped.map((b, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="w-28 shrink-0 text-zinc-500">Skipped · {themeLabel(b.theme)}</span>
+                        <span className="min-w-0 flex-1">{b.slug ? battleLink(b.slug, b.title) : b.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </details>
+          ))}
+        </div>
+        {te.voters.length > 200 && <p className="text-xs text-zinc-500">Showing the top 200 of {te.voters.length}.</p>}
+      </Section>
+
+      <Section
         title="New sign-ups, one by one"
         note="Real accounts since the clean start date, newest first (admins left out, no emails, ZIP cut to 3 digits). Source is their first visit. Tap a row to see every vote, before and after signing up. Back days = later New York days they visited again."
       >
@@ -951,25 +1089,6 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
       </Section>
 
       <Section
-        title="By theme (AI tags)"
-        note="Each battle is tagged by AI: theme, stakes, what picking each side suggests about the voter, and which taste traits it tests (these build everyone's taste wheel). Tagging runs every hour, most-voted battles first. Votes and views are for the selected window."
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          <TagBattles remaining={s.untagged} />
-          {s.tagging && (
-            <span className={`text-xs ${s.tagging.failed ? "text-b" : "text-zinc-600"}`}>
-              Last run {new Date(s.tagging.at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}: {s.tagging.tagged} tagged
-              {s.tagging.failed ? `, ${s.tagging.failed} failed${s.tagging.error ? ` (${s.tagging.error})` : ""}` : ""}
-            </span>
-          )}
-        </div>
-        <Rows
-          head={["Theme", "Battles", "Votes", "Vote rate", "Avg score"]}
-          rows={s.byTheme.map((r) => [r.tag.replace(/_/g, " "), r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
-        />
-      </Section>
-
-      <Section
         title="What groups lean toward (taste profiles)"
         note={`From picks on AI-tagged battles by ${taste.people} signed-in people with data consent on (${taste.picks} picks). Groups only, shown once they have ${taste.minGroup}+ people. "1.6×" = this trait shows up 1.6 times as often in the group's picks as in everyone's.`}
       >
@@ -983,7 +1102,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         />
       </Section>
 
-      <Section title="By stakes" note="Small (snack, nail colour), medium (event outfit, gadget), big (house, job, proposal).">
+      <Section title="By stakes" note="AI-tagged battles only (seed battles too, once tagged). Small (snack, nail colour), medium (event outfit, gadget), big (house, job, proposal).">
         <Rows
           head={["Stakes", "Battles", "Votes", "Vote rate", "Avg score"]}
           rows={s.byStakes.map((r) => [r.tag, r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}
