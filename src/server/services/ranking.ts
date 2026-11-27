@@ -54,11 +54,13 @@ export function diversify<T extends { categoryId: string; authorId: string }>(so
 
 /**
  * Deck order in tiers (Alex + Shimon, Nov 26 2026: "always prioritize the battles that humans have created"):
- * featured battles first, then battles real people posted, then seed content. Score order and `diversify()`
- * apply within each tier, so a seed battle never jumps ahead of a real person's.
+ * featured battles first, then battles real people posted, then seed content. Within seed content, battles that test a
+ * taste trait the viewer is still missing (`fill`) come first (Alex, Nov 27 2026: 30 votes must fill the whole taste
+ * chart). Score order and `diversify()` apply within each tier, so a seed battle never jumps ahead of a real person's.
  */
-export function tieredPick<T extends { categoryId: string; authorId: string; featured: boolean; human: boolean }>(sorted: T[], limit: number): T[] {
-  const tiers = [sorted.filter((x) => x.featured), sorted.filter((x) => !x.featured && x.human), sorted.filter((x) => !x.featured && !x.human)];
+export function tieredPick<T extends { categoryId: string; authorId: string; featured: boolean; human: boolean; fill?: boolean }>(sorted: T[], limit: number): T[] {
+  const seed = sorted.filter((x) => !x.featured && !x.human);
+  const tiers = [sorted.filter((x) => x.featured), sorted.filter((x) => !x.featured && x.human), seed.filter((x) => x.fill), seed.filter((x) => !x.fill)];
   const out: T[] = [];
   for (const t of tiers) if (out.length < limit) out.push(...diversify(t, limit - out.length));
   return out;

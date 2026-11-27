@@ -59,12 +59,22 @@ export function scoreAxes(picks: TastePick[]): AxisScore[] {
 export function visibleAxes(axes: AxisScore[], votes: number, firstAt: number, fullAt: number, min = 3): AxisScore[] {
   const stage = tasteStage(axes, votes, firstAt, fullAt, min);
   if (stage === 0) return [];
-  return stage === 2 ? axes : axes.filter((a) => a.n >= min);
+  const m = effectiveMin(votes, fullAt, min);
+  return stage === 2 ? axes : axes.filter((a) => a.n >= m);
+}
+
+/**
+ * The promise is "30 battles fill in your chart" (Alex, Nov 27 2026). The deck sends trait-testing battles first so
+ * each trait normally has `min` battles by then; from `fullAt` votes one battle is enough, so the chart is never held
+ * back past 30 by a trait the deck couldn't find battles for.
+ */
+export function effectiveMin(votes: number, fullAt: number, min = 3): number {
+  return votes >= fullAt ? Math.min(min, 1) : min;
 }
 
 /** 0 = nothing to show yet, 1 = some traits measured, 2 = full profile (all six measured, `fullAt` votes). */
 export function tasteStage(axes: AxisScore[], votes: number, firstAt: number, fullAt: number, min = 3): 0 | 1 | 2 {
-  const measured = axes.filter((a) => a.n >= min).length;
+  const measured = axes.filter((a) => a.n >= effectiveMin(votes, fullAt, min)).length;
   if (votes >= fullAt && measured >= axes.length) return 2;
   return votes >= firstAt && measured >= 2 ? 1 : 0;
 }

@@ -8,7 +8,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import type { User } from "../db/schema";
 import { getEconomy } from "./config";
-import { scoreAxes, typeName, visibleAxes, axisWhy, tasteStage, missingAxes, pickFromTags, TASTE_AXES, type AxisScore } from "@/lib/taste-profile";
+import { scoreAxes, typeName, visibleAxes, axisWhy, tasteStage, missingAxes, effectiveMin, pickFromTags, TASTE_AXES, type AxisScore } from "@/lib/taste-profile";
 import { likeYouLabel } from "@/lib/like-you";
 
 type Viewer = { user: User | null; deviceId: string | null };
@@ -126,7 +126,7 @@ export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean; wit
     stage,
     prevStage,
     /** Traits that still need battles (fewer than tasteAxisMin tested them), as their left-pole names. */
-    missing: missingAxes(axes, min).map((id) => TASTE_AXES.find((a) => a.id === id)!.left),
+    missing: missingAxes(axes, effectiveMin(votes, e.tasteFullAt, min)).map((id) => TASTE_AXES.find((a) => a.id === id)!.left),
     axisMin: min,
     axes: shown.map((a) => ({ ...a, crowd: crowdById.get(a.id) ?? 0, why: axisWhy(a), examples: (examples as Record<string, unknown[]>)[a.id] ?? [] })),
     against,

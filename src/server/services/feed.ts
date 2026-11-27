@@ -132,11 +132,12 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     // "What's on your mind this week?" (lib/mind.ts): battles on the topic they picked rise.
     const onMind = mindFactor(mind?.topic ?? null, { theme: r.b.tags?.brain?.theme, title: r.b.title, context: r.b.context }, economy.mindBoost, mind?.text);
     const brain = r.b.tags?.brain as { a?: string[]; b?: string[]; axes?: Record<string, string> } | undefined;
-    const fill = gapFactor(battleAxes(brain?.a, brain?.b, brain?.axes), missing, economy.tasteGapBoost);
+    const tests = battleAxes(brain?.a, brain?.b, brain?.axes);
+    const fill = gapFactor(tests, missing, economy.tasteGapBoost);
     const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind * hotFactor(hot.get(r.b.id) ?? 0, economy.hotBoost) * fill;
     const featured = !!r.b.tags?.featured;
     const human = isHumanBattle({ id: r.b.id, authorHasEmail: !!r.authorHasEmail, pickbot: r.b.tags?.pickbot });
-    return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, featured, human, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
+    return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, featured, human, fill: fill > 1, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
   // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet; then every battle a
   // real person posted, above all seed content (Alex + Shimon, Nov 26 2026). Same for the holdout.
