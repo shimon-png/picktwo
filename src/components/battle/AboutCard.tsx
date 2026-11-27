@@ -121,7 +121,7 @@ export function AboutCard({ card, onDone }: { card: AboutCardPayload; onDone: (a
 
       <p className="flex items-center gap-2 rounded-[12px] bg-surface px-3 py-2 text-[12px] text-zinc-600">
         <Lock className="size-3.5 shrink-0 text-green" aria-hidden />
-        Never shown on your profile. Only used in group results.
+        Never shown on your public profile. Only used in group results.
       </p>
     </article>
   );

@@ -585,24 +585,23 @@ test("Pickbot: every profile card first → answer → ask the crowd → better 
   await answer.getByRole("button", { name: "Helpful", exact: true }).click();
   await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute("aria-pressed", "true");
   await snap(page, "pickbot-04-answer");
-  // No "better answer" offer until the crowd question is settled.
-  await expect(page.getByTestId("pickbot-better")).toHaveCount(0);
+  // "Get answers from the crowd" was ticked when asking, so it's already posted as "Asked via Pickbot".
+  const crowdBox = page.getByTestId("pickbot-crowd");
+  await expect(crowdBox.getByRole("checkbox", { name: "Let the crowd decide too" })).toBeChecked();
+  await expect(crowdBox.getByText(/Posted anonymously as “Asked via Pickbot”/)).toBeVisible();
+  await snap(page, "pickbot-05-crowd");
+  // Unticking takes it down (private); ticking again sends it.
+  await crowdBox.getByRole("checkbox").uncheck();
+  await expect(crowdBox.getByText("Private. Only you can see this question.")).toBeVisible();
+  await crowdBox.getByRole("checkbox").check();
+  await expect(crowdBox.getByText(/Posted anonymously as “Asked via Pickbot”/)).toBeVisible();
 
-  // Ask the crowd: draft → review → post as "Asked via Pickbot".
-  await page.getByRole("button", { name: "Yes, ask the crowd" }).click();
-  const draft = page.getByTestId("pickbot-draft");
-  await expect(draft.getByText("Anonymous · preview")).toBeVisible();
-  await snap(page, "pickbot-05-draft");
-  await draft.getByRole("button", { name: "Post anonymously" }).click();
-  await expect(page.getByText("Posted anonymously.", { exact: false })).toBeVisible();
-  await expect(page.getByText("With the crowd")).toBeVisible();
-
-  // Then: "Want a better answer?" with the 30-battle bar (all votes so far count).
+  // Then: "Want more precise answers?" with the 30-battle bar (all votes so far count) and one "Keep voting" button.
   const better = page.getByTestId("pickbot-better");
-  await expect(better.getByText(/Want a better answer, tailored to your personality\? Answer \d+ more battles?/)).toBeVisible();
+  await expect(better.getByText(/Want more precise answers, fully tailored to/)).toBeVisible();
   await expect(better.getByText(/\d+ \/ 30 battles/)).toBeVisible();
   await snap(page, "pickbot-06-better");
-  await better.getByRole("button", { name: "Yes, let’s go" }).click();
+  await better.getByRole("button", { name: "Keep voting" }).click();
   const battles = page.getByTestId("pickbot-battles");
   const bar = battles.getByTestId("pickbot-taste-bar");
   const before = Number((await bar.getByText(/\/ 30 battles/).textContent())!.split("/")[0].trim());

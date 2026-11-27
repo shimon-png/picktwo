@@ -46,7 +46,7 @@ export function KnowYourTaste() {
         voted on every battle, and a taste profile that fills in as you play.
       </p>
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <Step n={1} title="Tell us a little, one tap at a time" line="A quick question between battles. Skip any of them. Never shown on your profile.">
+        <Step n={1} title="Tell us a little, one tap at a time" line="A quick question between battles. Skip any of them. Never shown on your public profile.">
           <div className="flex w-full max-w-[230px] flex-col gap-1.5" aria-hidden>
             <span className="self-start rounded-full bg-a-soft px-2 py-0.5 font-display text-[9px] font-semibold uppercase tracking-[.1em] text-a">About you · 1 tap</span>
             <span className="display text-[20px] leading-tight">I&apos;m…</span>

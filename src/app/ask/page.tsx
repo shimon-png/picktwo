@@ -52,7 +52,7 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
       <Intro />
       {preset ? <AskComposer initialText={preset.q} preset={preset.id} /> : <AskComposer examples />}
       <p className="flex items-center gap-1.5 text-[12px] text-ink/50">
-        <Lock className="size-3.5" /> Your questions stay private unless you choose to ask the crowd.
+        <Lock className="size-3.5" /> Your questions will be anonymized and get the crowd’s answer as well! You can always opt-out.
         {left != null && !isPlus(user) && (
           <span className="ml-auto">
             {left} of {e.pickbotFreePerDay} free answers left today

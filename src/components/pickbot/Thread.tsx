@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Lock, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { api, toast } from "@/lib/client";
 import { cn, pct } from "@/lib/utils";
@@ -13,7 +13,6 @@ import { PREFER_NOT, cardOrder } from "@/lib/about";
 
 type Msg = ThreadView["messages"][number];
 type Similar = { slug: string; title: string; a: string; b: string; votesA: number; votesB: number; likeA: number | null; likeB: number | null };
-type Draft = { title: string; context: string; a: string; b: string; pickSide: "A" | "B" | null; removed: string[] };
 
 const WHY: Record<string, string> = {
   sex: "People of different backgrounds choose very differently.",
@@ -40,12 +39,15 @@ const GATE_WHY = [
 
 const END = "\u0000";
 
+/** Cards and buttons under a bot bubble line up with the bubble, not the avatar (size-7 avatar + gap-2). */
+const UNDER_BOT = "ml-9";
+
 /** A Pickbot thread: the conversation so far, then whatever comes next (a profile question, the choice, quick battles, the answer, the crowd). */
 export function PickbotThread({ initial }: { initial: ThreadView }) {
   const [v, setV] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [stream, setStream] = useState<{ raw: string; kind: AnswerKind } | null>(null);
-  const [declined, setDeclined] = useState(false);
+  const [nextPicked, setNextPicked] = useState(false);
   const started = useRef(false);
   const bottom = useRef<HTMLDivElement>(null);
 
@@ -118,12 +120,14 @@ export function PickbotThread({ initial }: { initial: ThreadView }) {
   }, [v.messages.length, v.step.type, streaming]);
 
   const lastAnswerIdx = v.messages.findLastIndex((m) => m.kind === "answer");
-  const hasDraft = v.messages.some((m) => m.kind === "draft");
   const lastAnswer = lastAnswerIdx >= 0 ? v.messages[lastAnswerIdx] : null;
   // "Not now" to the better-answer offer after the latest answer (kept in the thread, so it holds after a reload).
-  const saidNotNow = v.messages.slice(lastAnswerIdx + 1).some((m) => m.role === "USER" && m.kind === "note" && m.text === "Not now");
-  const draftMsg = v.messages.findLast((m) => m.kind === "draft");
+  const notNowIdx = v.messages.findLastIndex((m, i) => i > lastAnswerIdx && m.role === "USER" && m.kind === "note" && m.text === "Not now");
+  const saidNotNow = lastAnswerIdx >= 0 && notNowIdx > lastAnswerIdx;
   const done = v.step.type === "done";
+  const hasResults = v.messages.some((m) => m.kind === "results");
+  // The crowd question is settled once it's posted, the box is unticked, or it can't go to the crowd.
+  const crowdSettled = !v.crowdAllowed || !!v.crowd || v.thread.state.crowd !== true;
 
   return (
     <div className="space-y-3 pb-4">
@@ -156,18 +160,21 @@ export function PickbotThread({ initial }: { initial: ThreadView }) {
       </div>
 
       {v.messages.map((m, i) => (
-        <MessageView
-          key={m.id}
-          m={m}
-          threadId={v.thread.id}
-          latest={i === lastAnswerIdx}
-          left={v.progress.left}
-          onRetailor={() => post("step", { action: "retailor" })}
-          crowd={v.crowd}
-          onOutcome={(c) => post("outcome", { chosen: c })}
-          busy={busy}
-          canTailor={false}
-        />
+        <Fragment key={m.id}>
+          <MessageView
+            m={m}
+            threadId={v.thread.id}
+            latest={i === lastAnswerIdx}
+            left={v.progress.left}
+            onRetailor={() => post("step", { action: "retailor" })}
+            crowd={v.crowd}
+            onOutcome={(c) => post("outcome", { chosen: c })}
+            busy={busy}
+            canTailor={false}
+          />
+          {/* The crowd box sits right under the latest answer. */}
+          {i === lastAnswerIdx && done && !hasResults && v.thread.scope !== "off_topic" && <CrowdBox v={v} busy={busy} onToggle={(on) => post("crowd", { on })} />}
+        </Fragment>
       ))}
 
       {v.step.type === "gate" && v.gate && <Gate v={v} busy={busy} onAnswer={(answer, label) => post("gate", { question: v.gate!.q, answer, label })} />}
@@ -182,52 +189,53 @@ export function PickbotThread({ initial }: { initial: ThreadView }) {
         </Link>
       )}
 
-      {done && v.crowdAllowed && !v.crowd && !hasDraft && !declined && lastAnswerIdx >= 0 && (
-        <div className="space-y-2">
-          <Bot>Want real people to weigh in too? I’ll post it anonymously, and you check every word first.</Bot>
-          <div className="flex gap-2">
-            <button type="button" className="btn-primary" disabled={busy} onClick={() => post("draft")}>
-              {busy ? <Loader2 className="size-4 animate-spin" /> : "Yes, ask the crowd"}
-            </button>
-            <button type="button" className="btn-outline" onClick={() => setDeclined(true)}>
-              No thanks
-            </button>
-          </div>
+      {v.crowd && !hasResults && (
+        <div className={UNDER_BOT}>
+          <PushButton />
         </div>
       )}
 
-      {done && !v.crowd && draftMsg && <DraftReview key={draftMsg.id} m={draftMsg} threadId={v.thread.id} onPosted={refresh} />}
-
-      {done && lastAnswer?.answer?.kind === "general" && v.progress.left > 0 && !saidNotNow && (v.crowd || declined || !v.crowdAllowed) && (
+      {done && lastAnswer?.answer?.kind === "general" && v.progress.left > 0 && !saidNotNow && crowdSettled && (
         <div className="space-y-2" data-testid="pickbot-better">
           <Bot>
-            Want a better answer, tailored to your personality? Answer {v.progress.left} more battle{v.progress.left === 1 ? "" : "s"}. I need {v.progress.target} answered for the full
-            personality test to give good results.
+            Want more precise answers, fully tailored to <b>YOU</b>? It’s easy and fun! Answer {v.progress.left} more battle{v.progress.left === 1 ? "" : "s"}. I need {v.progress.target}{" "}
+            answers to show you my magic.
           </Bot>
-          <TasteBar votes={v.progress.votes} target={v.progress.target} />
-          <div className="flex gap-2">
-            <button type="button" className="btn-primary" disabled={busy} onClick={() => post("step", { action: "retailor" })}>
-              Yes, let’s go
+          <div className={cn(UNDER_BOT, "space-y-2")}>
+            <TasteBar votes={v.progress.votes} target={v.progress.target} />
+            <button type="button" className="btn-primary w-full !py-3 text-[16px]" disabled={busy} onClick={() => post("step", { action: "retailor" })}>
+              Keep voting
             </button>
-            <button type="button" className="btn-outline" disabled={busy} onClick={() => post("step", { action: "stop" })}>
+            <button type="button" className="block w-full py-1.5 text-center text-[14px] text-ink/60" disabled={busy} onClick={() => post("step", { action: "stop" })}>
               Not now
             </button>
           </div>
         </div>
       )}
 
-      {v.crowd && !v.messages.some((m) => m.kind === "results") && (
-        <div className="card flex items-center justify-between gap-3 px-4 py-3 text-[13px]">
-          <span>
-            <b className="block text-[14px]">With the crowd</b>
-            {v.crowd.votesA + v.crowd.votesB} votes so far · {v.crowd.status === "OPEN" ? `closes ${new Date(v.crowd.deadline).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "closed"}
-          </span>
-          <Link href={`/b/${v.crowd.slug}`} className="text-accent">
-            See it →
-          </Link>
+      {done && saidNotNow && notNowIdx === v.messages.length - 1 && !nextPicked && (
+        <div className="space-y-2" data-testid="pickbot-next">
+          <Bot>No problem! What would you like to do next?</Bot>
+          <div className={cn(UNDER_BOT, "grid gap-2")}>
+            <Link href="/you" className="btn-outline w-full justify-center">
+              See my profile
+            </Link>
+            <Link href="/vote" className="btn-outline w-full justify-center">
+              Vote on battles
+            </Link>
+            <button
+              type="button"
+              className="btn-outline w-full justify-center"
+              onClick={() => {
+                setNextPicked(true);
+                setTimeout(() => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Ask a follow-up"]')?.focus(), 50);
+              }}
+            >
+              Ask Pickbot more
+            </button>
+          </div>
         </div>
       )}
-      {v.crowd && !v.messages.some((m) => m.kind === "results") && <PushButton />}
 
       {(done || v.step.type === "off_topic") && v.thread.scope !== "off_topic" && (
         <div className="pt-2">
@@ -517,11 +525,11 @@ function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (
             ))}
           </ul>
           <p className="mt-2 flex items-center gap-1.5 text-[13px] text-ink/60">
-            <Lock className="size-3.5 shrink-0" aria-hidden /> Ranges only, never shown on your profile.
+            <Lock className="size-3.5 shrink-0" aria-hidden /> Ranges only. Never shown on your public profile.
           </p>
         </Bot>
       ) : null}
-      <div className="card space-y-3 px-4 py-4">
+      <div className={cn(UNDER_BOT, "card space-y-3 px-4 py-4")}>
         <div className="flex items-center justify-between">
           <p className="display text-[22px] text-ink">{g.title}</p>
           <span className="text-[12px] text-ink/50">
@@ -561,7 +569,7 @@ function Gate({ v, busy, onAnswer }: { v: ThreadView; busy: boolean; onAnswer: (
           <span>{WHY[g.q]}</span>
         </p>
         <p className="flex items-center gap-1 text-[12px] text-ink/45">
-          <Lock className="size-3" /> Never shown on your profile
+          <Lock className="size-3" /> Never shown on your public profile
         </p>
       </div>
     </div>
@@ -600,7 +608,7 @@ function QuickBattles({ v, onDone, onStop }: { v: ThreadView; onDone: () => void
     }
   };
   return (
-    <div className="space-y-2" data-testid="pickbot-battles">
+    <div className={cn(UNDER_BOT, "space-y-2")} data-testid="pickbot-battles">
       <TasteBar votes={votes} target={v.progress.target} />
       <div className="card space-y-3 px-4 py-4">
         <p className="text-[16px] font-medium leading-snug text-ink">{b.title}</p>
@@ -638,91 +646,57 @@ function QuickBattles({ v, onDone, onStop }: { v: ThreadView; onDone: () => void
   );
 }
 
-function DraftReview({ m, threadId, onPosted }: { m: Msg; threadId: string; onPosted: () => void }) {
-  const d = m.data as { draft: Draft; photos: string[]; hours: number; target: { sexes?: string[]; ageRanges?: string[] } };
-  const [title, setTitle] = useState(d.draft.title);
-  const [context, setContext] = useState(d.draft.context);
-  const [a, setA] = useState(d.draft.a);
-  const [b, setB] = useState(d.draft.b);
-  const [withPhotos, setWithPhotos] = useState(d.photos.length === 2);
-  const [likeMe, setLikeMe] = useState(true);
-  const [hours, setHours] = useState(d.hours);
-  const [busy, setBusy] = useState(false);
-  const [posted, setPosted] = useState(false);
-  const who = [d.target.sexes?.[0] === "FEMALE" ? "women" : d.target.sexes?.[0] === "MALE" ? "men" : "people", d.target.ageRanges?.length ? ageSpan(d.target.ageRanges) : ""]
-    .filter(Boolean)
-    .join(" ");
-  const post = async () => {
-    setBusy(true);
-    try {
-      await api(`/api/pickbot/${threadId}/post`, { body: { title, context, a, b, withPhotos, hours, targetLikeMe: likeMe } });
-      setPosted(true);
-      onPosted();
-    } catch (e) {
-      toast((e as Error).message, "error");
-    }
-    setBusy(false);
-  };
-  if (posted) return null;
+/**
+ * "Get answers from the crowd" after the answer (Alex, Nov 27 2026): ticked by default, so the question is already
+ * posted anonymously; untick to take it down and keep it private, tick to send it.
+ */
+function CrowdBox({ v, busy, onToggle }: { v: ThreadView; busy: boolean; onToggle: (on: boolean) => Promise<void> }) {
+  // The tick shows at once; the thread catches up when the server answers.
+  const [tapped, setTapped] = useState<boolean | null>(null);
+  if (!v.crowdAllowed)
+    return (
+      <p className={cn(UNDER_BOT, "flex items-center gap-1.5 text-[13px] text-ink/60")}>
+        <Lock className="size-3.5 shrink-0" aria-hidden /> This one stays private, so it doesn’t go to the crowd.
+      </p>
+    );
+  const on = tapped ?? (!!v.crowd || v.thread.state.crowd === true);
+  const c = tapped === false ? null : v.crowd;
   return (
-    <div className="space-y-2" data-testid="pickbot-draft">
-      <Bot>Here’s the anonymous version. Check it first, and change anything you like.</Bot>
-      <div className="card space-y-3 px-4 py-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink/50">Anonymous · preview</p>
-        <label className="block space-y-1">
-          <span className="text-[12px] text-ink/60">Question</span>
-          <textarea value={title} onChange={(e) => setTitle(e.target.value.slice(0, 160))} rows={2} className="input w-full resize-none text-[15px]" />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-[12px] text-ink/60">Background (optional)</span>
-          <input value={context} onChange={(e) => setContext(e.target.value.slice(0, 280))} className="input w-full text-[14px]" />
-        </label>
-        <div className="grid grid-cols-2 gap-2">
-          <label className="space-y-1">
-            <span className="text-[12px] text-a">Option A</span>
-            <input value={a} onChange={(e) => setA(e.target.value.slice(0, 60))} className="input w-full text-[14px]" />
-          </label>
-          <label className="space-y-1">
-            <span className="text-[12px] text-b">Option B</span>
-            <input value={b} onChange={(e) => setB(e.target.value.slice(0, 60))} className="input w-full text-[14px]" />
-          </label>
-        </div>
-        {d.photos.length === 2 && (
-          <label className="flex items-center gap-2 text-[13px]">
-            <input type="checkbox" checked={withPhotos} onChange={(e) => setWithPhotos(e.target.checked)} /> Use my two photos as the options
-          </label>
-        )}
-        <label className="flex items-center gap-2 text-[13px]">
-          <input type="checkbox" checked={likeMe} onChange={(e) => setLikeMe(e.target.checked)} /> Show it to people like me{who.trim() && ` (${who})`}
-        </label>
-        <label className="flex items-center gap-2 text-[13px]">
-          Closes in
-          <select value={hours} onChange={(e) => setHours(Number(e.target.value))} className="input !py-1 text-[13px]">
-            {[6, 12, 24, 48, 72, 120].map((h) => (
-              <option key={h} value={h}>
-                {h < 48 ? `${h} hours` : `${h / 24} days`}
-              </option>
-            ))}
-          </select>
-        </label>
-        {d.draft.removed.length > 0 && <p className="text-[12px] text-ink/55">To keep you anonymous I left out: {d.draft.removed.join(", ")}.</p>}
-        <p className="flex items-center gap-1 text-[12px] text-ink/50">
-          <Lock className="size-3" /> Posted as “Asked via Pickbot”. No name, username or location.
+    <div className={cn(UNDER_BOT, "card space-y-2 px-4 py-3")} data-testid="pickbot-crowd">
+      <label className="flex cursor-pointer items-center gap-2.5 text-[15px] font-semibold text-ink">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={busy}
+          onChange={async (e) => {
+            setTapped(e.target.checked);
+            await onToggle(e.target.checked);
+            setTapped(null);
+          }}
+          className="size-5 shrink-0 accent-green"
+          aria-label="Let the crowd decide too"
+        />
+        Let the crowd decide too
+        {busy && <Loader2 className="size-4 animate-spin text-ink/40" aria-hidden />}
+      </label>
+      {c ? (
+        <p className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[13px] text-ink/70">
+          <span>
+            Posted anonymously as “Asked via Pickbot” · {c.votesA + c.votesB} vote{c.votesA + c.votesB === 1 ? "" : "s"} so far ·{" "}
+            {c.status === "OPEN" ? `closes ${new Date(c.deadline).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "closed"}
+          </span>
+          <Link href={`/b/${c.slug}`} className="font-semibold text-accent">
+            See it →
+          </Link>
         </p>
-        <button type="button" className="btn-primary w-full" disabled={busy || title.trim().length < 3 || !a.trim() || !b.trim()} onClick={post}>
-          {busy ? <Loader2 className="mx-auto size-4 animate-spin" /> : "Post anonymously"}
-        </button>
-      </div>
+      ) : (
+        <p className="flex items-center gap-1.5 text-[13px] text-ink/60">
+          <Lock className="size-3.5 shrink-0" aria-hidden />
+          {on ? "Sending it to the crowd anonymously…" : "Private. Only you can see this question."}
+        </p>
+      )}
     </div>
   );
-}
-
-function ageSpan(ids: string[]): string {
-  const nums = ids.flatMap((id) => id.replace("AGE_", "").replace("_PLUS", "").split("_").map(Number)).filter((n) => Number.isFinite(n));
-  if (!nums.length) return "";
-  const lo = Math.min(...nums);
-  const hi = Math.max(...nums);
-  return ids.some((i) => i.endsWith("PLUS")) ? `${lo}+` : `${lo}–${hi}`;
 }
 
 /** Battles answered toward the full personality test (all votes ever, not just this chat). */
