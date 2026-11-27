@@ -17,6 +17,7 @@ export function AskComposer({
   placeholder = "Ask anything…",
   initialText = "",
   preset,
+  focus = false,
 }: {
   threadId?: string;
   onSent?: () => void;
@@ -25,6 +26,8 @@ export function AskComposer({
   /** Filled in from a "People like you are asking" card (lib/asking.ts); `preset` goes with the question. */
   initialText?: string;
   preset?: string;
+  /** Open the keyboard right away (the deck card's "ask in your own words" slot). */
+  focus?: boolean;
 }) {
   const router = useRouter();
   const [text, setText] = useState(initialText);
@@ -112,7 +115,7 @@ export function AskComposer({
               }
             }}
             rows={threadId ? 1 : initialText ? 3 : 2}
-            autoFocus={!!initialText}
+            autoFocus={!!initialText || focus}
             placeholder={placeholder}
             className="min-h-11 flex-1 resize-none bg-transparent px-2 py-2.5 text-[16px] text-ink outline-none placeholder:text-ink/40"
           />

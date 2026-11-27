@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, PenLine } from "lucide-react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { currentSessionId, logEvent } from "@/lib/events";
 import type { LikeYou } from "@/lib/like-you";
@@ -50,9 +50,11 @@ export function AskingCard({
   const [signup, setSignup] = useState(false);
   const [shownAt, setShownAt] = useState(() => Date.now());
   const log = { round, picks, mode };
+  // Room for one open slot: at most four suggestions.
+  const shownItems = items.slice(0, 4);
 
   useEffect(() => {
-    logEvent("asking_shown", { ...log, ids: items.map((i) => i.id).join(",") });
+    logEvent("asking_shown", { ...log, ids: shownItems.map((i) => i.id).join(",") });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -105,6 +107,16 @@ export function AskingCard({
     setSignup(true);
   }
 
+  // The open slot (Alex, Nov 27: "leave one or two open"): their own question, in their own words.
+  function own() {
+    logEvent("asking_tap", { ...log, id: "own", slot: shownItems.length });
+    if (mode === "pickbot") {
+      router.push("/ask?mine=1");
+      return;
+    }
+    setSignup(true);
+  }
+
   function close() {
     logEvent("asking_dismissed", {
       ...log,
@@ -116,7 +128,7 @@ export function AskingCard({
 
   return (
     <>
-      {signup && open && <SignupGate soft next={pickbotUrl(open.id)} place="asking" log={{ preset: open.id }} onClose={() => setSignup(false)} />}
+      {signup && <SignupGate soft next={open ? pickbotUrl(open.id) : "/ask?mine=1"} place="asking" log={{ preset: open?.id ?? "own" }} onClose={() => setSignup(false)} />}
       <article
         aria-label="People similar to you are worried about"
         className="deck-card animate-pop absolute inset-0 z-40 flex flex-col gap-3 overflow-y-auto rounded-[20px] bg-white p-5 shadow-card"
@@ -143,7 +155,7 @@ export function AskingCard({
               </p>
             </div>
             <div className="flex flex-1 flex-col justify-center gap-1.5">
-              {items.map((it, i) => (
+              {shownItems.map((it, i) => (
                 <button
                   key={it.id}
                   type="button"
@@ -155,6 +167,16 @@ export function AskingCard({
                   <ChevronRight className="size-5 shrink-0 text-ink/40" aria-hidden />
                 </button>
               ))}
+              <button
+                type="button"
+                data-testid="asking-own"
+                onClick={own}
+                className="flex items-center gap-2 rounded-[14px] border-2 border-dashed border-a bg-surface px-3.5 py-2 text-left transition active:scale-[.98]"
+              >
+                <PenLine className="size-5 shrink-0 text-a" aria-hidden />
+                <span className="flex-1 text-[14.5px] font-medium leading-snug text-ink">Something else on your mind? Ask in your own words</span>
+                <ChevronRight className="size-5 shrink-0 text-ink/40" aria-hidden />
+              </button>
             </div>
             <button type="button" data-testid="asking-keep-voting" className="w-full shrink-0 rounded-full py-3 text-[16px] font-semibold text-ink ring-2 ring-ink/40 transition active:scale-[.98]" onClick={close}>
               Keep voting

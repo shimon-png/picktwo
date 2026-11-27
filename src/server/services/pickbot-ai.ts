@@ -312,6 +312,7 @@ Each question:
 - Weigh heavily toward what people are most worried about this year: money and affordability (rent, groceries, debt, saving), the economy, job security, layoffs and AI taking jobs, and political differences in families (e.g. a parent who votes the other way, whether to invite them, how to keep the peace). Mix in a little everyday life (dating, friends, family) so it doesn't feel heavy.
 - Never repeats or rewords anything in "Already asked or shown". Change the subject away from what they already asked Pickbot.
 - Vary the topics: no two questions about the same thing.
+- Make them feel written for this one person: follow how they vote (their picks show what they lean toward: careful or bold, saver or spender, family-first or me-first) and echo their situation. Vary the wording and sentence shapes so no two people get the same lines; avoid stock openings like "Should I".
 - Nothing about self-harm, medical diagnoses, or anything sexual.`;
 
 /** Fresh questions for one person (Haiku). Ranges only: never a name, email, username or exact ZIP. */
@@ -351,7 +352,7 @@ export async function writeAskingQuestions(input: {
     `Write ${input.count} questions.`,
     `Month: ${input.month}`,
     profile ? `About them (ranges only):\n${profile}` : "About them: not much yet.",
-    input.recentVotes.length ? `Battles they voted on lately:\n- ${input.recentVotes.join("\n- ")}` : "",
+    input.recentVotes.length ? `Battles they voted on lately (and what they picked):\n- ${input.recentVotes.join("\n- ")}` : "",
     input.pickbotTopics.length ? `What they already asked Pickbot about (change the subject):\n- ${input.pickbotTopics.join("\n- ")}` : "",
     input.already.length ? `Already asked or shown (never repeat):\n- ${input.already.join("\n- ")}` : "",
   ]

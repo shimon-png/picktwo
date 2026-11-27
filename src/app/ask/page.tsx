@@ -15,7 +15,7 @@ export const metadata = { title: "Ask Pickbot" };
 export const dynamic = "force-dynamic";
 
 /** Ask (Pickbot PRD S1): the profile bar, the question box with examples, and your past questions. */
-export default async function AskPage({ searchParams }: { searchParams: Promise<{ preset?: string; q?: string }> }) {
+export default async function AskPage({ searchParams }: { searchParams: Promise<{ preset?: string; q?: string; mine?: string }> }) {
   // "People like you are asking" (lib/asking.ts): the tapped question comes filled in, through sign-up and onboarding.
   const sp = await searchParams;
   const preset = presetById(sp.preset);
@@ -53,7 +53,7 @@ export default async function AskPage({ searchParams }: { searchParams: Promise<
     <div className="space-y-5 pt-2">
       {progress && !progress.complete && <ProfileBar p={progress} place="ask" />}
       <Intro />
-      {preset ? <AskComposer initialText={preset.q} preset={preset.id} /> : typed ? <AskComposer initialText={typed} /> : <AskComposer examples />}
+      {preset ? <AskComposer initialText={preset.q} preset={preset.id} /> : typed ? <AskComposer initialText={typed} /> : <AskComposer examples focus={sp.mine === "1"} />}
       <p className="flex items-center gap-1.5 text-[12px] text-ink/50">
         <Lock className="size-3.5" /> Your questions will be anonymized and get the crowd’s answer as well! You can always opt-out.
         {left != null && !isPlus(user) && (
