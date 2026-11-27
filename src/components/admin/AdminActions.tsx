@@ -110,8 +110,8 @@ export function TagBattles({ remaining }: { remaining: number }) {
   async function run() {
     setBusy(true);
     try {
-      const r = await api<{ tagged: number; failed: number; remaining: number; enabled: boolean }>("/api/admin/brain/tag", { method: "POST" });
-      toast(r.enabled ? `Tagged ${r.tagged}${r.failed ? `, ${r.failed} failed` : ""}. ${r.remaining} left.` : "Tagging is off: OPENAI_API_KEY isn't set in Vercel yet.", r.enabled ? "ok" : "error");
+      const r = await api<{ tagged: number; failed: number; remaining: number; enabled: boolean; error?: string | null }>("/api/admin/brain/tag", { method: "POST" });
+      toast(r.enabled ? `Tagged ${r.tagged}${r.failed ? `, ${r.failed} failed${r.error ? ` (${r.error})` : ""}` : ""}. ${r.remaining} left.` : "Tagging is off: neither OPENAI_API_KEY nor ANTHROPIC_API_KEY is set in Vercel.", r.enabled ? "ok" : "error");
       router.refresh();
     } catch (e) {
       toast((e as Error).message, "error");

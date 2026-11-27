@@ -8,6 +8,7 @@ export type TasteMilestone = {
   full: boolean;
   signedIn: boolean;
   name: string | null;
+  missing?: string[];
   axes: { id: string; left: string; right: string; score: number; crowd: number; why: string }[];
 };
 
@@ -41,7 +42,7 @@ export function TasteReveal({ t, onDone }: { t: TasteMilestone; onDone: () => vo
         {t.full
           ? "Built from your picks. See what each trait means and share it."
           : t.signedIn
-            ? "Keep voting: all six traits unlock as you go."
+            ? `Keep voting: we're still learning ${(t.missing ?? []).slice(0, 3).join(", ").toLowerCase() || "the rest"}.`
             : "Sign up when your free votes run out to save it and unlock all six."}
       </p>
       <div className="flex w-full flex-col gap-2">

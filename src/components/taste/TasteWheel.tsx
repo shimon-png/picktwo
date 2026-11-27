@@ -9,10 +9,10 @@ type Axis = { id: string; score: number; crowd?: number };
 export function TasteWheel({ axes, size = 220, showCrowd = true }: { axes: Axis[]; size?: number; showCrowd?: boolean }) {
   const byId = new Map(axes.map((a) => [a.id, a]));
   const order = TASTE_AXES.map((a) => byId.get(a.id));
-  const ring = (k: number) => radarPoints(TASTE_AXES.map(() => k * 2 - 1)).map((p) => p.join(",")).join(" ");
+  const ring = (k: number) => radarPoints(TASTE_AXES.map(() => k * 2 - 1), 100, 100, 80, false).map((p) => p.join(",")).join(" ");
   const me = radarPoints(order.map((a) => a?.score ?? 0));
   const crowd = radarPoints(order.map((a) => a?.crowd ?? 0));
-  const labels = radarPoints(TASTE_AXES.map(() => 1), 100, 100, 92);
+  const labels = radarPoints(TASTE_AXES.map(() => 1), 100, 100, 92, false);
   return (
     <svg viewBox="-46 -12 292 224" width={size} height={size} style={{ maxWidth: "100%", height: "auto" }} role="img" aria-label={`Taste wheel: ${TASTE_AXES.map((a, i) => `${a.left} ${Math.round(((order[i]?.score ?? 0) + 1) * 50)}%`).join(", ")}`}>
       <g fill="none" stroke="currentColor" strokeOpacity={0.18}>

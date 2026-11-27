@@ -240,21 +240,23 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
   // About-you card next in the Vote deck (only the deck shows them; never together with the sign-up prompt).
   // Deck extras after a new vote: a taste-profile moment wins over an about-you card (which simply waits a vote).
   const inDeck = res.isNew && input.source === "feed" && !res.gatePrompt;
-  const [taste, likeYou] = await Promise.all([inDeck ? tasteMilestone(viewer, economy) : null, likeYouFor(b.id, viewer)]);
+  const [taste, likeYou] = await Promise.all([inDeck ? tasteMilestone(viewer, b.id) : null, likeYouFor(b.id, viewer)]);
   // Then "What's on your mind this week?" or its sign-up nudge (lib/mind.ts); an about-you card waits a vote for it.
   const mind = inDeck && !taste ? await mindAfterVote(viewer, await voteTotal(viewer)) : null;
   const about = inDeck && !taste && !mind ? await aboutAfterVote(viewer) : null;
   return { ...res, about, likeYou, taste, mind };
 }
 
-/** Taste profile moments in the deck: the first traits at tasteFirstAt votes, the full wheel at tasteFullAt. */
-async function tasteMilestone(viewer: VoteViewer, economy: Awaited<ReturnType<typeof getEconomy>>) {
+/**
+ * Taste profile moments in the deck: the first traits the moment two are really measured (economy tasteAxisMin battles
+ * each, from tasteFirstAt votes), the full wheel once all six are and they have tasteFullAt votes (Alex, Nov 27 2026:
+ * never show a wheel that says nothing).
+ */
+async function tasteMilestone(viewer: VoteViewer, battleId: string) {
   try {
-    const n = await voteTotal(viewer);
-    if (n !== economy.tasteFirstAt && n !== economy.tasteFullAt) return null;
-    const t = await tasteProfileFor(viewer);
-    if (!t || !t.axes.length) return null;
-    return { milestone: n, full: n >= economy.tasteFullAt, signedIn: !!viewer.user, name: t.name, axes: t.axes.map(({ id, left, right, score, crowd, why }) => ({ id, left, right, score, crowd, why })) };
+    const t = await tasteProfileFor(viewer, { withoutBattle: battleId });
+    if (!t || !t.axes.length || t.prevStage == null || t.stage <= t.prevStage) return null;
+    return { milestone: t.votes, full: t.stage === 2, signedIn: !!viewer.user, name: t.name, missing: t.missing, axes: t.axes.map(({ id, left, right, score, crowd, why }) => ({ id, left, right, score, crowd, why })) };
   } catch (e) {
     console.error("[taste] milestone", e);
     return null;

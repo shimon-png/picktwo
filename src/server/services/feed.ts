@@ -4,7 +4,9 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, type ViewerProfile } from "./ranking";
+import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, hotFactor, gapFactor, type ViewerProfile } from "./ranking";
+import { missingAxesFor } from "./taste-profile";
+import { battleAxes } from "@/lib/taste-profile";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 import { matchesTarget } from "./targeting";
 import { isHumanBattle } from "@/lib/auto-seed";
@@ -104,7 +106,13 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   const sWeight = arm === "engine" ? economy.skipWeight : 0;
   const decisions = sWeight ? await deckDecisions(rows.map((r) => r.b.id)) : new Map<string, { votes: number; skips: number }>();
   const avgPick = averagePickRate([...decisions.values()]);
-  const [loops, mind] = await Promise.all([openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy), activeMindTopic(viewer)]);
+  const [loops, mind, hot, missing] = await Promise.all([
+    openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy),
+    activeMindTopic(viewer),
+    // Alex, Nov 27 2026: after real people's battles, the hottest battles and the ones that fill out the taste profile.
+    economy.hotBoost > 1 ? recentRealVotes(rows.map((r) => r.b.id)) : new Map<string, number>(),
+    economy.tasteGapBoost > 1 ? missingAxesFor(viewer).catch(() => [] as string[]) : ([] as string[]),
+  ]);
   const scored = rows.map((r) => {
     const boostActive = !!r.b.boostUntil && r.b.boostUntil > now && r.b.boostVotesLeft > 0;
     const pf = priorityFactor({ ppBalance: r.authorPP, openLoops: loops.get(r.b.authorId) ?? 0, boostActive, cap: economy.priorityCap });
@@ -123,7 +131,9 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     const d = decisions.get(r.b.id);
     // "What's on your mind this week?" (lib/mind.ts): battles on the topic they picked rise.
     const onMind = mindFactor(mind?.topic ?? null, { theme: r.b.tags?.brain?.theme, title: r.b.title, context: r.b.context }, economy.mindBoost, mind?.text);
-    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind;
+    const brain = r.b.tags?.brain as { a?: string[]; b?: string[]; axes?: Record<string, string> } | undefined;
+    const fill = gapFactor(battleAxes(brain?.a, brain?.b, brain?.axes), missing, economy.tasteGapBoost);
+    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind * hotFactor(hot.get(r.b.id) ?? 0, economy.hotBoost) * fill;
     const featured = !!r.b.tags?.featured;
     const human = isHumanBattle({ id: r.b.id, authorHasEmail: !!r.authorHasEmail, pickbot: r.b.tags?.pickbot });
     return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, featured, human, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
@@ -140,6 +150,20 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     ...(picked[i].row.b.tags?.featured ? { featured: true } : {}),
     ...(opts.debug ? { debug: { priorityFactor: picked[i].pf, openLoops: picked[i].openLoops } } : {}),
   })) as FeedItem[];
+}
+
+/** Per battle: real (non-seed) votes in the last 24 hours, for the hot boost. */
+async function recentRealVotes(ids: string[]) {
+  const out = new Map<string, number>();
+  if (!ids.length) return out;
+  const since = new Date(Date.now() - 86400_000).toISOString();
+  const list = sql.join(ids.map((i) => sql`${i}`), sql`, `);
+  const rows = await db.execute<{ id: string; n: number }>(sql`
+    SELECT battle_id AS id, count(*)::int AS n FROM vote
+    WHERE battle_id IN (${list}) AND created_at > ${since} AND NOT flagged AND COALESCE(source, '') <> 'seed'
+    GROUP BY 1`);
+  for (const r of rows) out.set(r.id, Number(r.n));
+  return out;
 }
 
 /** Per battle: votes made in the Vote deck and skips (all time, real people only: seed votes have source 'seed'). */

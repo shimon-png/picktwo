@@ -161,6 +161,14 @@ export const ECONOMY_DEFAULTS = {
   /** Taste profile (lib/taste-profile.ts): first two traits show at this many votes, all six (and the type name) at the second. */
   tasteFirstAt: 10,
   tasteFullAt: 30,
+  /** A trait only counts as measured (shown on the wheel) after this many battles tested it (Alex, Nov 27 2026). */
+  tasteAxisMin: 3,
+  /**
+   * Deck: while someone's taste profile isn't complete, seed battles that test a trait they still lack get this
+   * multiplier (1 = off). Hot seed battles (real votes in the last 24h) get up to `hotBoost` (1 = off).
+   */
+  tasteGapBoost: 3,
+  hotBoost: 2,
   /** Votes between two about-you cards (2 = never two in a row, two battles between). */
   aboutMinGap: 2,
   /** A skipped question comes back once, this many votes later. */

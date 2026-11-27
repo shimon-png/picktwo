@@ -52,14 +52,53 @@ export function scoreAxes(picks: TastePick[]): AxisScore[] {
 }
 
 /**
- * How many axes to show: none before `firstAt` votes, the two with the most evidence from `firstAt`, all six from
- * `fullAt` (economy tasteFirstAt / tasteFullAt). Returns the visible axes in wheel order.
+ * Which axes to show (Alex, Nov 27 2026: never show a meaningless wheel). An axis is "measured" once `min` battles
+ * tested it (economy tasteAxisMin). Nothing before `firstAt` votes or before two axes are measured; then the measured
+ * ones; all six only from `fullAt` votes once every axis is measured. Returns the visible axes in wheel order.
  */
-export function visibleAxes(axes: AxisScore[], votes: number, firstAt: number, fullAt: number): AxisScore[] {
-  if (votes < firstAt) return [];
-  if (votes >= fullAt) return axes;
-  const top = [...axes].sort((a, b) => b.n - a.n || Math.abs(b.score) - Math.abs(a.score)).slice(0, 2).map((a) => a.id);
-  return axes.filter((a) => top.includes(a.id));
+export function visibleAxes(axes: AxisScore[], votes: number, firstAt: number, fullAt: number, min = 3): AxisScore[] {
+  const stage = tasteStage(axes, votes, firstAt, fullAt, min);
+  if (stage === 0) return [];
+  return stage === 2 ? axes : axes.filter((a) => a.n >= min);
+}
+
+/** 0 = nothing to show yet, 1 = some traits measured, 2 = full profile (all six measured, `fullAt` votes). */
+export function tasteStage(axes: AxisScore[], votes: number, firstAt: number, fullAt: number, min = 3): 0 | 1 | 2 {
+  const measured = axes.filter((a) => a.n >= min).length;
+  if (votes >= fullAt && measured >= axes.length) return 2;
+  return votes >= firstAt && measured >= 2 ? 1 : 0;
+}
+
+/** Axes not measured yet (fewer than `min` battles tested them), for "still learning" copy and the deck's gap boost. */
+export function missingAxes(axes: AxisScore[], min = 3): TasteAxisId[] {
+  return axes.filter((a) => a.n < min).map((a) => a.id);
+}
+
+/**
+ * One pick from a battle's AI tags. `axes` (tags v2) says per axis which option leans to the left pole; it's turned
+ * into that axis's pole traits so it scores like the trait lists. Older tags only have the trait lists.
+ */
+export function pickFromTags(side: "A" | "B", ta: string[] | null, tb: string[] | null, axes?: Record<string, string> | null): TastePick {
+  const a = [...(ta ?? [])];
+  const b = [...(tb ?? [])];
+  for (const ax of TASTE_AXES) {
+    const v = axes?.[ax.id];
+    if (v === "a") {
+      a.push(ax.pos[0]);
+      b.push(ax.neg[0]);
+    } else if (v === "b") {
+      b.push(ax.pos[0]);
+      a.push(ax.neg[0]);
+    }
+  }
+  const dedupe = (x: string[]) => [...new Set(x)];
+  return side === "A" ? { chosen: dedupe(a), other: dedupe(b) } : { chosen: dedupe(b), other: dedupe(a) };
+}
+
+/** Axes a battle tests (from its tags), for the deck's gap boost. */
+export function battleAxes(ta: string[] | null | undefined, tb: string[] | null | undefined, axes?: Record<string, string> | null): TasteAxisId[] {
+  const all = [...(ta ?? []), ...(tb ?? [])];
+  return TASTE_AXES.filter((ax) => axes?.[ax.id] === "a" || axes?.[ax.id] === "b" || all.some((t) => (ax.pos as readonly string[]).includes(t) || (ax.neg as readonly string[]).includes(t))).map((ax) => ax.id);
 }
 
 /** Hand-written words for each pole: adjective when it's the strongest lean, noun when it's the second. */
@@ -104,11 +143,13 @@ export function axisWhy(a: AxisScore): string {
   return `You leaned ${pole.toLowerCase()} on ${k} of ${a.n} battle${a.n === 1 ? "" : "s"} that tested this${leftShare > 0.8 || leftShare < 0.2 ? ", more than most people" : ""}.`;
 }
 
-/** Radar points (SVG coords) for scores on a wheel of radius r centred at (cx, cy); 0 → mid ring. */
-export function radarPoints(scores: number[], cx = 100, cy = 100, r = 80): [number, number][] {
+/** Radar points (SVG coords) for scores on a wheel of radius r centred at (cx, cy); 0 → mid ring. `curve` off = linear (grid rings). */
+export function radarPoints(scores: number[], cx = 100, cy = 100, r = 80, curve = true): [number, number][] {
   return scores.map((s, i) => {
     const angle = -Math.PI / 2 + (i * 2 * Math.PI) / scores.length;
-    const d = r * (0.5 + 0.5 * Math.max(-1, Math.min(1, s)));
+    // Square-root curve so real but modest leans (±0.2–0.4) visibly move off the middle ring.
+    const c = Math.max(-1, Math.min(1, s));
+    const d = r * (0.5 + 0.5 * (curve ? Math.sign(c) * Math.sqrt(Math.abs(c)) : c));
     return [Math.round((cx + d * Math.cos(angle)) * 10) / 10, Math.round((cy + d * Math.sin(angle)) * 10) / 10];
   });
 }

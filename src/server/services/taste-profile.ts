@@ -8,11 +8,11 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import type { User } from "../db/schema";
 import { getEconomy } from "./config";
-import { scoreAxes, typeName, visibleAxes, axisWhy, TASTE_AXES, type AxisScore, type TastePick } from "@/lib/taste-profile";
+import { scoreAxes, typeName, visibleAxes, axisWhy, tasteStage, missingAxes, pickFromTags, TASTE_AXES, type AxisScore } from "@/lib/taste-profile";
 import { likeYouLabel } from "@/lib/like-you";
 
 type Viewer = { user: User | null; deviceId: string | null };
-type PickRow = { battle_id: string; slug: string; title: string; side: "A" | "B"; ta: string[] | null; tb: string[] | null; votes_a: number; votes_b: number };
+type PickRow = { battle_id: string; slug: string; title: string; side: "A" | "B"; ta: string[] | null; tb: string[] | null; ax: Record<string, string> | null; votes_a: number; votes_b: number };
 
 const owner = (v: Viewer) =>
   v.user
@@ -25,19 +25,29 @@ let crowdCache: { at: number; axes: AxisScore[] } | null = null;
 async function crowdAxes(): Promise<AxisScore[]> {
   if (crowdCache && Date.now() - crowdCache.at < 3600_000) return crowdCache.axes;
   const since = new Date(Date.now() - 180 * 86400_000).toISOString();
-  const rows = await db.execute<{ side: "A" | "B"; ta: string[] | null; tb: string[] | null }>(sql`
+  const rows = await db.execute<{ side: "A" | "B"; ta: string[] | null; tb: string[] | null; ax: Record<string, string> | null }>(sql`
     SELECT v.side, ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'a')) AS ta,
-      ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'b')) AS tb
+      ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'b')) AS tb, b.tags->'brain'->'axes' AS ax
     FROM vote v JOIN battle b ON b.id = v.battle_id
     WHERE v.created_at > ${since} AND NOT v.flagged AND COALESCE(v.source, '') <> 'seed' AND b.tags ? 'brain'
     LIMIT 50000`);
-  const axes = scoreAxes([...rows].map((r) => toPick(r.side, r.ta, r.tb)));
+  const axes = scoreAxes([...rows].map((r) => pickFromTags(r.side, r.ta, r.tb, r.ax)));
   crowdCache = { at: Date.now(), axes };
   return axes;
 }
 
-const toPick = (side: "A" | "B", ta: string[] | null, tb: string[] | null): TastePick =>
-  side === "A" ? { chosen: ta ?? [], other: tb ?? [] } : { chosen: tb ?? [], other: ta ?? [] };
+/** Traits this person still lacks (fewer than tasteAxisMin of their battles tested them), for the deck's gap boost. */
+export async function missingAxesFor(v: Viewer): Promise<string[]> {
+  if (!v.user && !v.deviceId) return TASTE_AXES.map((a) => a.id);
+  const e = await getEconomy();
+  const rows = await db.execute<{ side: "A" | "B"; ta: string[] | null; tb: string[] | null; ax: Record<string, string> | null }>(sql`
+    SELECT v.side, ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'a')) AS ta,
+      ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'b')) AS tb, b.tags->'brain'->'axes' AS ax
+    FROM vote v JOIN battle b ON b.id = v.battle_id
+    WHERE ${owner(v)} AND NOT v.flagged AND b.tags ? 'brain'
+    ORDER BY v.created_at DESC LIMIT 2000`);
+  return missingAxes(scoreAxes([...rows].map((r) => pickFromTags(r.side, r.ta, r.tb, r.ax))), e.tasteAxisMin);
+}
 
 export async function voteTotal(v: Viewer): Promise<number> {
   if (!v.user && !v.deviceId) return 0;
@@ -45,7 +55,11 @@ export async function voteTotal(v: Viewer): Promise<number> {
   return Number(r?.n ?? 0);
 }
 
-export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = {}) {
+/**
+ * `withoutBattle`: also report the stage this person was at before their vote on that battle (`prevStage`), so the
+ * deck can show the reveal the moment the profile becomes meaningful instead of at a fixed vote count.
+ */
+export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean; withoutBattle?: string } = {}) {
   const e = await getEconomy();
   if (!v.user && !v.deviceId) return null;
   const [votes, rows, crowd, crowdRows] = await Promise.all([
@@ -53,7 +67,7 @@ export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = 
     db.execute<PickRow>(sql`
       SELECT v.battle_id, b.slug, b.title, v.side, b.votes_a, b.votes_b,
         ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'a')) AS ta,
-        ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'b')) AS tb
+        ARRAY(SELECT jsonb_array_elements_text(b.tags->'brain'->'b')) AS tb, b.tags->'brain'->'axes' AS ax
       FROM vote v JOIN battle b ON b.id = v.battle_id
       WHERE ${owner(v)} AND NOT v.flagged AND b.tags ? 'brain'
       ORDER BY v.created_at DESC LIMIT 2000`),
@@ -66,8 +80,15 @@ export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = 
       WHERE ${owner(v)} AND NOT v.flagged AND b.votes_a + b.votes_b >= 10`),
   ]);
   const picks = [...rows];
-  const axes = scoreAxes(picks.map((r) => toPick(r.side, r.ta, r.tb)));
-  const shown = visibleAxes(axes, votes, e.tasteFirstAt, e.tasteFullAt);
+  const axes = scoreAxes(picks.map((r) => pickFromTags(r.side, r.ta, r.tb, r.ax)));
+  const min = e.tasteAxisMin;
+  const shown = visibleAxes(axes, votes, e.tasteFirstAt, e.tasteFullAt, min);
+  const stage = tasteStage(axes, votes, e.tasteFirstAt, e.tasteFullAt, min);
+  let prevStage: 0 | 1 | 2 | null = null;
+  if (opts.withoutBattle) {
+    const before = scoreAxes(picks.filter((p) => p.battle_id !== opts.withoutBattle).map((r) => pickFromTags(r.side, r.ta, r.tb, r.ax)));
+    prevStage = tasteStage(before, votes - 1, e.tasteFirstAt, e.tasteFullAt, min);
+  }
   // Against the crowd: picks on the side that is currently the minority (battles with 10+ votes).
   const settled = Number(crowdRows[0]?.settled ?? 0);
   const against = Number(crowdRows[0]?.against ?? 0);
@@ -83,12 +104,12 @@ export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = 
           ax.id,
           picks
             .filter((p) => {
-              const pk = toPick(p.side, p.ta, p.tb);
+              const pk = pickFromTags(p.side, p.ta, p.tb, p.ax);
               return [...pk.chosen, ...pk.other].some((t) => (ax.pos as readonly string[]).includes(t) || (ax.neg as readonly string[]).includes(t));
             })
             .slice(0, 4)
             .map((p) => {
-              const pk = toPick(p.side, p.ta, p.tb);
+              const pk = pickFromTags(p.side, p.ta, p.tb, p.ax);
               const left = pk.chosen.some((t) => (ax.pos as readonly string[]).includes(t)) || pk.other.some((t) => (ax.neg as readonly string[]).includes(t));
               return { slug: p.slug, title: p.title, pole: left ? ax.left : ax.right };
             }),
@@ -101,7 +122,12 @@ export async function tasteProfileFor(v: Viewer, opts: { examples?: boolean } = 
     tagged: picks.length,
     firstAt: e.tasteFirstAt,
     fullAt: e.tasteFullAt,
-    name: shown.length >= 6 ? typeName(axes) : null,
+    name: stage === 2 ? typeName(axes) : null,
+    stage,
+    prevStage,
+    /** Traits that still need battles (fewer than tasteAxisMin tested them), as their left-pole names. */
+    missing: missingAxes(axes, min).map((id) => TASTE_AXES.find((a) => a.id === id)!.left),
+    axisMin: min,
     axes: shown.map((a) => ({ ...a, crowd: crowdById.get(a.id) ?? 0, why: axisWhy(a), examples: (examples as Record<string, unknown[]>)[a.id] ?? [] })),
     against,
     settled,

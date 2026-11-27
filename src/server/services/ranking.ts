@@ -138,3 +138,21 @@ export function skipFactor(votes: number, skips: number, avgRate: number, weight
   const rate = pickRate(votes, skips, avgRate);
   return Math.min(2, Math.max(0.5, Math.pow(rate / avgRate, weight)));
 }
+
+/**
+ * Hot battles (Alex, Nov 27 2026): real (non-seed) votes in the last 24 hours lift a battle, up to `boost` at
+ * `full` votes. boost 1 = off.
+ */
+export function hotFactor(recentVotes: number, boost: number, full = 5): number {
+  if (!(boost > 1)) return 1;
+  return 1 + (boost - 1) * Math.min(1, Math.max(0, recentVotes) / full);
+}
+
+/**
+ * Taste gaps (Alex, Nov 27 2026): while someone's taste profile is missing traits, battles that test one of them
+ * rise by `boost`, so the profile fills in fast. boost 1 = off; no missing traits = no change.
+ */
+export function gapFactor(tests: readonly string[], missing: readonly string[], boost: number): number {
+  if (!(boost > 1) || !missing.length) return 1;
+  return tests.some((t) => missing.includes(t)) ? boost : 1;
+}
