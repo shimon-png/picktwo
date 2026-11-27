@@ -281,7 +281,7 @@ export const ECONOMY_DEFAULTS = {
   winbackCooldownDays: 14,
   /** Most win-back emails sent in one daily run. */
   winbackDailyMax: 200,
-  /** Auto-seeding (Alex + Shimon, Nov 26 2026; services/auto-seed.ts): 1 = on, 0 = off. Needs ANTHROPIC_API_KEY (writing) and PEXELS_API_KEY (photos). */
+  /** Auto-seeding (Alex + Shimon, Nov 26 2026; services/auto-seed.ts): 1 = on, 0 = off. Needs ANTHROPIC_API_KEY (writing) and PIXABAY_API_KEY (photos; or an existing PEXELS_API_KEY). */
   autoSeed: 1,
   /** Watch the person ranked this high by real votes in the last 7 days (the 10th top voter)… */
   autoSeedRank: 10,

@@ -59,7 +59,7 @@ export type BattleTags = {
   /** Posted from a Pickbot thread ("Asked via Pickbot"). The asker is only in pickbot_thread, never shown. */
   pickbot?: boolean;
   /** Written by auto-seeding (services/auto-seed.ts): batch, poster voice, topic, planned split, photo credits. Never sent to the browser. */
-  seed?: { auto: string; voice: "F" | "M" | "N"; topic: string; kind: "text" | "photo"; pctA: number; photos?: { id: number; by: string; page: string }[] };
+  seed?: { auto: string; voice: "F" | "M" | "N"; topic: string; kind: "text" | "photo"; pctA: number; photos?: { id: number | string; by: string; page: string }[] };
 };
 
 // ---------- Users & auth (Auth.js drizzle adapter compatible) ----------
