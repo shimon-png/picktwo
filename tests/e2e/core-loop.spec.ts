@@ -619,7 +619,9 @@ test("Pickbot: every profile card first → answer → ask the crowd → better 
   await snap(page, "pickbot-08-tailored");
 
   // The crowd battle never shows who asked; follow-ups work; history lists the question.
+  // (The crowd box on the thread also says "Asked via Pickbot", so wait for the battle page itself.)
   await page.getByRole("link", { name: "See it →" }).click();
+  await page.waitForURL(/\/b\/[^/]+$/);
   await expect(page.getByText(/askedviapickbot|Asked via Pickbot/).first()).toBeVisible();
   await expect(page.getByText(/asker\d_/)).toHaveCount(0);
   await page.goBack();
