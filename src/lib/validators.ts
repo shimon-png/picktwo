@@ -132,7 +132,7 @@ export const profileInput = z.object({
   bio: z.string().trim().max(160).optional().default(""),
   isAdultConfirmed: z.literal(true, { errorMap: () => ({ message: "You must be 18 or older" }) }),
   kidsStatus: z.enum(KIDS_STATUS_IDS).nullable().optional(),
-  relationship: z.enum(["SINGLE", "DATING", "TAKEN", "MARRIED"]).nullable().optional(),
+  relationship: z.enum(["SINGLE", "MARRIED", "DATING"]).nullable().optional(),
   housing: z.enum(["RENT", "OWN", "FAMILY"]).nullable().optional(),
   workStatus: z.enum(["STUDENT", "WORKING", "BOTH", "NEITHER"]).nullable().optional(),
   kidAges: z.array(z.enum(KID_AGE_IDS)).default([]),

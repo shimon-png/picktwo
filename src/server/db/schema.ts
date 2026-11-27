@@ -85,7 +85,7 @@ export const users = pgTable("user", {
   /** Answer to "Do you have kids?": YES / NO / UNDISCLOSED (null = not answered). */
   kidsStatus: text("kids_status"),
   kidAges: text("kid_ages").array().$type<KidAge[]>().notNull().default([]),
-  /** About-you cards (lib/about.ts): SINGLE / DATING / TAKEN / MARRIED; RENT / OWN / FAMILY; STUDENT / WORKING / BOTH / NEITHER. */
+  /** About-you cards (lib/about.ts): SINGLE / MARRIED / DATING (TAKEN folded into DATING, migration 0044); RENT / OWN / FAMILY; STUDENT / WORKING / BOTH / NEITHER. */
   relationship: text("relationship"),
   housing: text("housing"),
   workStatus: text("work_status"),
