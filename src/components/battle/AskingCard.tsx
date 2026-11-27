@@ -56,7 +56,11 @@ export function AskingCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const pickbotUrl = (id: string) => `/ask?preset=${encodeURIComponent(id)}`;
+  // AI-written questions (ids "ai_…") have no preset: the question itself goes into Pickbot's box.
+  const pickbotUrl = (id: string) => {
+    const ai = id.startsWith("ai_") ? items.find((i) => i.id === id) : null;
+    return ai ? `/ask?q=${encodeURIComponent(ai.q)}` : `/ask?preset=${encodeURIComponent(id)}`;
+  };
 
   function tap(item: AskingItem, slot: number) {
     logEvent("asking_tap", { ...log, id: item.id, slot });
@@ -122,8 +126,8 @@ export function AskingCard({
           <>
             <div className="space-y-2">
               <h1 className="leading-tight">
-                <span className="block text-[25px] text-green">You’re not alone.</span>
-                <span className="mt-1 block text-[17px] text-ink">People similar to you are worried about real day-to-day issues. Are any of these on your mind?</span>
+                <span className="block text-[23px] text-green">You’re not alone.</span>
+                <span className="mt-1 block text-[16px] text-ink">People similar to you are worried about real day-to-day issues. Are any of these on your mind?</span>
               </h1>
               <p className="flex items-center gap-2.5 text-[16px] font-medium leading-snug text-ink/85">
                 {mode === "pickbot" ? (
