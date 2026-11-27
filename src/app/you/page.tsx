@@ -103,7 +103,9 @@ export default async function YouPage() {
   const blocked = !canPostBattle(unreported, e.maxUnreportedBattles);
   const t = pointsTier(user.ppBalance, e.tierHighAt, e.tierTopAt);
   const awaiting = mine.filter((b) => b.status !== "OPEN" && !b.outcome);
-  const others = mine.filter((b) => !(b.status !== "OPEN" && !b.outcome));
+  // Two groups, newest first: Active (still voting, by when posted) and Closed (by when voting ended).
+  const live = mine.filter((b) => b.status === "OPEN");
+  const closed = mine.filter((b) => b.status !== "OPEN").sort((x, y) => y.deadline.localeCompare(x.deadline));
   const earn: [Tone, React.ComponentType<{ className?: string }>, string, number][] = [
     ["pink", ThumbsUp, "Vote on a battle", e.votePoints],
     ["teal", MessageSquareText, "Add a reason", e.voteReasonBonus],
@@ -217,8 +219,10 @@ export default async function YouPage() {
           <ExpandList
             searchPlaceholder="Search your battles"
             className="!space-y-0 divide-y divide-ink/8"
-            items={[...awaiting, ...others].map((b) => ({
+            sections={["Active", "Closed"]}
+            items={[...live, ...closed].map((b) => ({
               key: b.id,
+              section: b.status === "OPEN" ? "Active" : "Closed",
               text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB}`,
               node: <BattleRow b={b} reasons={reasonCounts.get(b.id) ?? 0} awaiting={awaiting.includes(b)} loopPoints={e.loopClosedPoints} />,
             }))}
