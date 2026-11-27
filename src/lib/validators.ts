@@ -74,7 +74,7 @@ export const voteInput = z.object({
   side: z.enum(["A", "B"]),
   reason: z.string().trim().max(140).optional(),
   dwellMs: z.number().int().min(0).max(3_600_000).optional(),
-  source: z.enum(["link", "feed", "profile", "home", "discover", "search"]).optional(),
+  source: z.enum(["link", "feed", "profile", "home", "discover", "search", "pickbot", "asking"]).optional(),
   /** Data-brain context (docs/brain/data-dictionary.md): how the pick was made and where in the deck. */
   meta: z
     .object({
@@ -86,7 +86,7 @@ export const voteInput = z.object({
 });
 
 /** Event names the browser may log through POST /api/events. Keep docs/brain/data-dictionary.md in sync. */
-export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "engaged", "home_click"] as const;
+export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "device_hints", "about_card_shown", "taste_shared", "engaged", "home_click", "profile_bar_tap", "pickbot_promo_shown", "pickbot_promo_tap", "pickbot_promo_dismissed", "mind_card_shown", "mind_nudge_shown", "mind_nudge_tap", "mind_nudge_dismissed", "asking_shown", "asking_tap", "asking_voted", "asking_signup_tap", "asking_dismissed"] as const;
 export type ClientEventName = (typeof CLIENT_EVENTS)[number];
 const safeId = z.string().regex(/^[A-Za-z0-9_-]{6,40}$/);
 export const clientEventsInput = z.object({
@@ -119,6 +119,9 @@ export const outcomeInput = z
 /** US ZIP (12345 / 12345-6789) or a general postal code (3–10 letters, digits, spaces, dashes). */
 export const ZIP_RE = /^(\d{5}(-\d{4})?|[A-Z0-9][A-Z0-9 -]{1,8}[A-Z0-9])$/;
 
+/** A real-looking ZIP / postal code (existence is checked by lookupZip on the server). */
+export const zipField = z.string().trim().toUpperCase().regex(ZIP_RE, "Enter a valid ZIP / postal code");
+
 export const profileInput = z.object({
   name: z.string().trim().min(1).max(50),
   handle: z
@@ -129,14 +132,14 @@ export const profileInput = z.object({
   bio: z.string().trim().max(160).optional().default(""),
   isAdultConfirmed: z.literal(true, { errorMap: () => ({ message: "You must be 18 or older" }) }),
   kidsStatus: z.enum(KIDS_STATUS_IDS).nullable().optional(),
+  relationship: z.enum(["SINGLE", "MARRIED", "DATING"]).nullable().optional(),
+  housing: z.enum(["RENT", "OWN", "FAMILY"]).nullable().optional(),
+  workStatus: z.enum(["STUDENT", "WORKING", "BOTH", "NEITHER"]).nullable().optional(),
   kidAges: z.array(z.enum(KID_AGE_IDS)).default([]),
-  zipCode: z
-    .string()
-    .trim()
-    .toUpperCase()
-    .regex(ZIP_RE, "Enter a valid ZIP / postal code"),
-  sex: z.enum(SEX_IDS, { errorMap: () => ({ message: "Choose an option for sex" }) }),
-  ageRange: z.enum(AGE_RANGE_IDS, { errorMap: () => ({ message: "Choose your age range" }) }),
+  // Optional since the one-tap sign-up (Nov 25 2026): blank = not answered (or cleared in Settings).
+  zipCode: zipField.or(z.literal("")).optional(),
+  sex: z.enum(SEX_IDS, { errorMap: () => ({ message: "Choose an option for sex" }) }).or(z.literal("")).optional(),
+  ageRange: z.enum(AGE_RANGE_IDS, { errorMap: () => ({ message: "Choose your age range" }) }).or(z.literal("")).optional(),
   country: z.string().trim().max(60).optional().default(""),
   region: z.string().trim().max(80).optional().default(""),
   city: z.string().trim().max(80).optional().default(""),

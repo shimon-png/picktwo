@@ -6,6 +6,8 @@ import { ArrowLeft, ChevronUp, ExternalLink, Lock, Pencil, StopCircle, ThumbsDow
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { markDone } from "@/lib/seen";
 import { SignupGate } from "@/components/auth/SignupGate";
+import { ResultBars } from "./ResultBars";
+import { AboutCard, type AboutCardPayload } from "./AboutCard";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
 import { Scores } from "./Scores";
 import { cn, formatPrice, timeAgo, timeLeft } from "@/lib/utils";
@@ -28,6 +30,8 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
   const [gate, setGate] = useState(false);
   // Sign-up gate test, group B: the server lets the vote through and asks us to show the closable dialog.
   const [softGate, setSoftGate] = useState(false);
+  // "People like you" locked row → reopen that about-you card here.
+  const [aboutCard, setAboutCard] = useState<AboutCardPayload | null>(null);
   const mountedAt = useRef(Date.now());
   const router = useRouter();
 
@@ -253,9 +257,32 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
             <Scores everyone={res} experts={v.expertResults} labelA={A.label} labelB={B.label} />
           </div>
         )}
+        {v.likeYou && v.myVote && v.myVote.id !== "pending" && (
+          <div className="mt-2 rounded-[14px] bg-surface px-3 py-2">
+            <ResultBars side={v.myVote.side} everyone={null} likeYou={v.likeYou} onUnlock={(q) => setAboutCard({ id: q })} onPhoto={false} />
+          </div>
+        )}
+        {aboutCard && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-3 md:items-center" onClick={() => setAboutCard(null)}>
+            <div className="relative h-[min(560px,85dvh)] w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <AboutCard
+                card={aboutCard}
+                onDone={() => {
+                  setAboutCard(null);
+                  refresh();
+                }}
+              />
+            </div>
+          </div>
+        )}
         {signedIn && v.myVote && v.myVote.id !== "pending" && !v.isOwner && (
           <Link href={`/b/${v.slug}/like-you`} className="mt-3 inline-flex items-center gap-1 text-sm text-accent">
             See who voted like you →
+          </Link>
+        )}
+        {v.myVote && v.myVote.id !== "pending" && (
+          <Link href="/ask" className="ml-4 mt-3 inline-flex items-center gap-1 text-sm text-accent" data-track="pickbot_from_battle">
+            Stuck on your own choice? Ask Pickbot →
           </Link>
         )}
       </div>

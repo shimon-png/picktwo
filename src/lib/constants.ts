@@ -60,9 +60,10 @@ export const AGE_RANGE_IDS = ["AGE_18_24", "AGE_25_34", "AGE_35_44", "AGE_45_54"
 export const KIDS_STATUS_OPTIONS = [
   { id: "YES", label: "Yes" },
   { id: "NO", label: "No" },
+  { id: "EXPECTING", label: "Expecting" },
   { id: "UNDISCLOSED", label: "Prefer not to say" },
 ] as const;
-export const KIDS_STATUS_IDS = ["YES", "NO", "UNDISCLOSED"] as const;
+export const KIDS_STATUS_IDS = ["YES", "NO", "EXPECTING", "UNDISCLOSED"] as const;
 export const kidAgeLabel = (id: string) => KID_AGES.find((k) => k.id === id)?.label ?? id;
 
 export const RECIPIENTS = ["Child", "Partner", "Parent", "Friend", "Myself", "Other"] as const;
@@ -120,6 +121,104 @@ export const ECONOMY_DEFAULTS = {
    * Assignments are saved, so changing this only affects browsers seen after the change.
    */
   gateTestPct: 50,
+  /**
+   * About-you cards in the Vote deck (lib/about.ts): the vote number each question is first asked after (0 = off).
+   * No account needed: sex, age, relationship, kids, education, home, race/ethnicity, party (Alex, Nov 25: ZIP is
+   * no longer asked; it comes from the IP). With an account: work. The ZIP card stays off (0).
+   */
+  aboutSexAt: 2,
+  aboutAgeAt: 4,
+  aboutRelationshipAt: 7,
+  aboutZipAt: 0,
+  aboutKidsAt: 9,
+  aboutEducationAt: 11,
+  aboutHousingAt: 13,
+  aboutRaceAt: 16,
+  aboutPartyAt: 19,
+  aboutWorkAt: 35,
+  /** "People like you" result bar: smallest group (sex × age, else sex) shown, and how long the deck shows a result with it (ms). */
+  likeYouMinVotes: 20,
+  likeYouResultMs: 2200,
+  /**
+   * Brain "Before vs after": when a product change went live, New York time, as YYYYMMDDHHmm (that day is split
+   * into a Before and an After row) or YYYYMMDD (that day counts as neither side). Default: the about-you go-live.
+   */
+  beforeAfterFrom: 202611251123,
+  /**
+   * Brain "Unit economics" assumptions (unit-economics-rules.ts), in US dollars. Ad CPM = $ per 1,000 ad views,
+   * one ad every ueVotesPerAd votes; sponsored battles = ueSponsoredSharePct % of cards at ueSponsoredCpm $ per
+   * 1,000 votes; ueSignupValue = $ a signed-up user brings in a year; ueLifetimeVisits 0 = use the measured visits
+   * per visitor.
+   */
+  /** Unit economics counts everything from this New York day (YYYYMMDD) on, whatever window the Brain page shows. */
+  ueFrom: 20261123,
+  ueAdCpm: 4,
+  ueVotesPerAd: 5,
+  ueSponsoredSharePct: 10,
+  ueSponsoredCpm: 20,
+  ueSignupValue: 1.5,
+  ueLifetimeVisits: 0,
+  /** Taste profile (lib/taste-profile.ts): first two traits show at this many votes, all six (and the type name) at the second. */
+  tasteFirstAt: 10,
+  tasteFullAt: 30,
+  /** A trait only counts as measured (shown on the wheel) after this many battles tested it (Alex, Nov 27 2026). */
+  tasteAxisMin: 3,
+  /**
+   * Deck: while someone's taste profile isn't complete, seed battles that test a trait they still lack get this
+   * multiplier (1 = off). Hot seed battles (real votes in the last 24h) get up to `hotBoost` (1 = off).
+   */
+  tasteGapBoost: 3,
+  hotBoost: 2,
+  /** Votes between two about-you cards (2 = never two in a row, two battles between). */
+  aboutMinGap: 2,
+  /** A skipped question comes back once, this many votes later. */
+  aboutSkipRetry: 10,
+  /** Share of people (stable per account/browser) who never see about-you cards, to measure their cost in votes. */
+  aboutHoldoutPct: 10,
+  /**
+   * "What's on your mind this week?" deck card (lib/mind.ts, Nov 26 2026): first asked after this many votes (0 = off),
+   * again after mindDays. The topic picked multiplies matching battles' feed score by mindBoost (1 = off) for mindDays.
+   */
+  mindAt: 3,
+  mindDays: 7,
+  mindBoost: 5,
+  /** Signed-out: "We're starting to really understand you" sign-up card after this many votes since the pick (0 = off). */
+  mindNudgeAfter: 8,
+  /** Share of people (stable per account/browser) who never see the card, to measure what it adds. */
+  mindHoldoutPct: 10,
+  /** Profile bar (Pickbot Phase 0): share of people (stable per account/browser) who never see it, to measure what it adds. */
+  profileBarHoldoutPct: 10,
+  /** Pickbot (docs/plans/pickbot-prd.html). 1 = every signed-in person (not the holdout); 0 = admins only (alpha). */
+  pickbotOpen: 1,
+  /** Answer model: 0 = Claude Sonnet 5.5 (launch choice), 1 = Claude Opus 5.5. */
+  pickbotModelOpus: 0,
+  /** Free Pickbot answers per person per New York day (Plus = unlimited). */
+  pickbotFreePerDay: 3,
+  /** Crowd battles a person can post from Pickbot per day (Plus = pickbotPlusCrowdPerDay). */
+  pickbotCrowdPerDay: 1,
+  pickbotPlusCrowdPerDay: 5,
+  /** Similar battles (by theme) sent to Claude as crowd signals, and the votes one needs to count. */
+  pickbotSimilarBattles: 10,
+  pickbotMinCrowdVotes: 20,
+  /** A crowd battle's results go back to the asker at this many votes, or when it closes. */
+  pickbotResultsAt: 50,
+  /** Default length of a Pickbot crowd battle, in hours. */
+  pickbotCrowdHours: 24,
+  /** "Ask Pickbot" card in the Vote deck, once per person at a tested position (lib/pickbot-promo.ts). 0 = off. */
+  pickbotPromo: 1,
+  /**
+   * "People like you are asking" card in the Vote deck (lib/asking.ts): 1 = on. Shows after askingAt picks in a deck
+   * visit (after the sex and age cards), then again every askingEvery picks with three new questions, at most
+   * askingRounds times a visit.
+   */
+  askingCard: 1,
+  askingAt: 6,
+  askingEvery: 12,
+  askingRounds: 3,
+  /** Questions on the card (Alex, Nov 26: 5). */
+  askingCount: 5,
+  /** Share of people (stable per account) who don't get Pickbot, to measure what it adds. */
+  pickbotHoldoutPct: 10,
   /** Group B: the closable sign-up dialog shows again every this many votes after the free ones. */
   softGateEvery: 5,
   /** Close the loop (docs/rules/close-the-loop-and-experts.md): longest a battle can run, in hours (5 days). */
@@ -156,6 +255,8 @@ export const ECONOMY_DEFAULTS = {
   engagementWeight: 2,
   /** Percent of people (by account/device) who keep the old deck order, to measure the engine's lift. */
   engagementHoldoutPct: 10,
+  /** How much the deck's vote-vs-skip rate moves the order (Shimon, Nov 25 2026): battles people vote on rise, ones they skip sink. 0 = off. Same holdout as engagementWeight. */
+  skipWeight: 1.5,
   /** Data brain Phase 4: win-back emails to people drifting away. 0 = off (default), 1 = on. */
   winbackEmails: 0,
   /** Percent of lapsing people who get no email (stable per account), to measure whether the emails bring people back. */
@@ -168,6 +269,18 @@ export const ECONOMY_DEFAULTS = {
   winbackCooldownDays: 14,
   /** Most win-back emails sent in one daily run. */
   winbackDailyMax: 200,
+  /** Auto-seeding (Alex + Shimon, Nov 26 2026; services/auto-seed.ts): 1 = on, 0 = off. Needs ANTHROPIC_API_KEY (writing) and PEXELS_API_KEY (photos). */
+  autoSeed: 1,
+  /** Watch the person ranked this high by real votes in the last 7 days (the 10th top voter)… */
+  autoSeedRank: 10,
+  /** …and when they have this many battles or fewer left in their deck… */
+  autoSeedAt: 50,
+  /** …write this many new seed battles… */
+  autoSeedCount: 100,
+  /** …this percent of them with photos (the rest text cards)… */
+  autoSeedPhotoPct: 30,
+  /** …then wait at least this many hours before the next batch. */
+  autoSeedCooldownHours: 12,
   /** Brain "Clean" view counts real activity from this New York day on (YYYYMMDD). The "All data" view ignores it. */
   brainCleanFrom: 20261123,
   /** Admin "Sign-ups by source": engaged = voted on this many different days (or posted a battle)… */

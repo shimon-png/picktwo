@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { PICKBOT_HANDLE, PICKBOT_NAME } from "@/lib/pickbot";
 import { tagBattle } from "./tagging";
 import { and, desc, eq, inArray, isNotNull, lt, sql, notInArray, or } from "drizzle-orm";
 import { db, type DbOrTx } from "../db";
@@ -31,13 +32,14 @@ import { pct } from "@/lib/utils";
 import { isAdmin } from "../viewer";
 import { cleanTarget } from "./targeting";
 import { checkZipTarget } from "./zip";
+import { likeYouFor } from "./about";
 
 // ---------------- Create ----------------
 /**
  * Admin "post as": resolve the username to a user, creating a profile for it if it doesn't exist.
  * Created profiles have no email, so nobody can sign in as them.
  */
-async function resolvePostAs(handle: string): Promise<User> {
+async function resolvePostAs(handle: string, name = handle): Promise<User> {
   const [existing] = await db.select().from(users).where(eq(users.handle, handle));
   if (existing) {
     if (existing.bannedAt) throw new AppError("FORBIDDEN", `@${handle} is banned`);
@@ -45,7 +47,7 @@ async function resolvePostAs(handle: string): Promise<User> {
   }
   const [created] = await db
     .insert(users)
-    .values({ handle, name: handle, isAdultConfirmed: true, onboardedAt: new Date() })
+    .values({ handle, name, isAdultConfirmed: true, onboardedAt: new Date() })
     .onConflictDoNothing({ target: users.handle })
     .returning();
   if (created) return created;
@@ -59,13 +61,21 @@ function cleanTags(tags: CreateBattleInput["tags"]): BattleTags {
   return t ? { ...rest, target: t } : rest;
 }
 
-export async function createBattle(actor: User, input: CreateBattleInput, opts: { asAdmin?: boolean } = {}) {
+/**
+ * `opts.pickbot` (Pickbot crowd battles): posted under the shared @askedviapickbot account, never the asker's handle.
+ * The asker still owns the screening (a blocked or hash-matched photo is on them) and reports the outcome in Pickbot.
+ */
+export async function createBattle(actor: User, input: CreateBattleInput, opts: { asAdmin?: boolean; pickbot?: boolean } = {}) {
   if (!actor.isAdultConfirmed || !actor.handle) throw new AppError("FORBIDDEN", "Finish setting up your profile first");
   if (input.postAs && !opts.asAdmin) throw new AppError("FORBIDDEN", "Only admins can post as another user");
   assertCleanText(input.title, input.context, input.options[0].label, input.options[1].label, input.postAs);
   const badZips = (input.tags.target?.zips ?? []).filter((z) => z.trim() && !checkZipTarget(z));
   if (badZips.length) throw new AppError("VALIDATION", `Not a real ZIP code or prefix: ${badZips.join(", ")}`);
-  const user = input.postAs && input.postAs !== actor.handle ? await resolvePostAs(input.postAs) : actor;
+  const user = opts.pickbot
+    ? await resolvePostAs(PICKBOT_HANDLE, PICKBOT_NAME)
+    : input.postAs && input.postAs !== actor.handle
+      ? await resolvePostAs(input.postAs)
+      : actor;
   const economy = await getEconomy();
   // Close-the-loop gate. Admin "post as" profiles can't sign in to report back, so they're exempt.
   if (user.id === actor.id) {
@@ -73,7 +83,7 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
     if (!canPostBattle(unreported, economy.maxUnreportedBattles))
       throw new AppError("LOOPS_OPEN", `Tell the crowd what you picked on your ${unreported} finished battles first. Each one you close frees up a post.`);
   }
-  const screen = await screenPhotos(user, input.options);
+  const screen = await screenPhotos(opts.pickbot ? actor : user, input.options);
   const hours = clampBattleHours(input.deadlineHours, economy.maxBattleHours);
   const deadline = new Date(Date.now() + hours * 3600_000);
 
@@ -92,7 +102,7 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
         title: input.title,
         context: input.context || null,
         categoryId: DEFAULT_CATEGORY_ID,
-        tags: cleanTags(input.tags),
+        tags: opts.pickbot ? { ...cleanTags(input.tags), pickbot: true } : cleanTags(input.tags),
         visibility: input.visibility,
         status: screen.verdict === "review" ? "HIDDEN" : "OPEN",
         deadline,
@@ -157,6 +167,11 @@ export async function createBattle(actor: User, input: CreateBattleInput, opts: 
  */
 async function screenPhotos(user: User, opts: CreateBattleInput["options"]) {
   const urls = opts.flatMap((o) => [o.imageUrl, o.urlImage]).filter((u): u is string => !!u && (u.startsWith("https://") || u.startsWith("data:image/")));
+  return screenPhotoUrls(user, urls);
+}
+
+/** The same screening for any list of photo URLs (battles, Pickbot questions). Throws on a block or a hash match. */
+export async function screenPhotoUrls(user: User, urls: string[]) {
   if (!urls.length) return { verdict: "allow" as const, reasons: [] as string[] };
   const hashes = await Promise.all(urls.map((u) => hashMatchImage(u)));
   const matched = urls.filter((_, i) => hashes[i].match);
@@ -171,7 +186,7 @@ async function screenPhotos(user: User, opts: CreateBattleInput["options"]) {
   if (hashError && decision.verdict === "allow") return { verdict: "review" as const, reasons: [`hash check unavailable: ${hashError}`] };
   if (decision.verdict === "block") {
     track("upload_blocked", { reasons: decision.reasons }, { userId: user.id });
-    const own = opts.map((o) => o.imageUrl).filter((u): u is string => !!u && u.includes(".blob.vercel-storage.com/"));
+    const own = urls.filter((u) => u.includes(".blob.vercel-storage.com/"));
     if (own.length && process.env.BLOB_READ_WRITE_TOKEN) await del(own).catch(() => {});
     throw new AppError("VALIDATION", "One of your photos looks explicit or graphic, so it can't be posted. Please choose another.");
   }
@@ -305,6 +320,8 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
   const totalVotes = b.votesA + b.votesB;
   const now = new Date();
   const expertResults = showResults ? ((await expertScores([b.id], economy.expertAt)).get(b.id) ?? null) : null;
+  // "People like you" bar for people who voted (not the poster).
+  const likeYou = myVote && !isOwner ? await likeYouFor(b.id, viewer) : null;
 
   // Voter relevance (owner view): how many votes came from parents of same-age kids.
   let relevantVotes: { count: number; ageLabel: string } | null = null;
@@ -323,9 +340,9 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     slug: b.slug,
     title: b.title,
     context: b.context,
-    // Brain tags are internal analysis data, never sent to the browser.
+    // Brain tags and auto-seed notes are internal data, never sent to the browser.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    tags: (({ brain: _brain, ...pub }) => pub)(b.tags ?? {}),
+    tags: (({ brain: _brain, seed: _seed, ...pub }) => pub)(b.tags ?? {}),
     visibility: b.visibility,
     status: b.status,
     isOpen,
@@ -336,6 +353,7 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     results,
     /** "Expert score": votes from Expert and Super expert voters only (status when they voted). */
     expertResults,
+    likeYou,
     totalVotes: showResults ? totalVotes : null,
     /** Vote count only (no split); Discover shows it to everyone. */
     voteCount: totalVotes,

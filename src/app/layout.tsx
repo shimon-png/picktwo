@@ -16,6 +16,8 @@ import { unreadMessageCount } from "@/server/services/messages";
 import { MessagesButton } from "@/components/messages/MessagesButton";
 import { countOpenLoops } from "@/server/services/points";
 import { getEconomy } from "@/server/services/config";
+import { showAskTab } from "@/server/services/pickbot";
+import { ServiceWorker } from "@/components/app/ServiceWorker";
 import { Nav, ChromeOnly, ContentShell, HeaderLogo, YouButton } from "@/components/layout/Nav";
 import { PriorityPill } from "@/components/priority/PriorityPill";
 import { Toaster } from "@/components/ui/Toaster";
@@ -29,7 +31,7 @@ export const metadata: Metadata = {
   title: { default: "crowdpick.ai — can't decide? Ask people like you.", template: "%s · crowdpick.ai" },
   description: "Can't decide? Post two options, get fast votes from friends and people like you, and tell everyone how it went.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "crowdpick", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "crowdpick", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = {
@@ -45,6 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   let unreadDms = 0;
   let openLoops = 0;
   const economy = await getEconomy();
+  const ask = await showAskTab(user).catch(() => false);
   if (user) {
     if (deviceId) await linkDevice(user.id, deviceId).catch((e) => console.error("[linkDevice]", e));
     [unread, openLoops, unreadDms] = await Promise.all([unreadCount(user.id), countOpenLoops(user.id, economy), unreadMessageCount(user.id)]);
@@ -57,6 +60,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="min-h-dvh font-sans">
         <ThemePreview />
         <Telemetry />
+        <ServiceWorker />
         <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2">
           Skip to content
         </a>
@@ -88,7 +92,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {children}
           </main>
         </ContentShell>
-        <Nav />
+        <Nav ask={ask} />
         <Toaster />
         <XPixel />
         <Analytics />

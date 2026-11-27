@@ -4,6 +4,7 @@ import { getViewer } from "@/server/viewer";
 import { rateLimit } from "@/server/ratelimit";
 import { clientEventsInput } from "@/lib/validators";
 import { logClientEvents } from "@/server/analytics";
+import { geoFromHeaders } from "@/server/services/passive-rules";
 
 /**
  * Data-brain client events (lib/events.ts). The browser says what it showed; the server stamps who,
@@ -18,7 +19,10 @@ export const POST = handler(async (req) => {
     raw = JSON.parse(await req.text());
   } catch {}
   const input = clientEventsInput.parse(raw);
-  const ua = (await headers()).get("user-agent") ?? "";
-  await logClientEvents(input.events, { userId: viewer.user?.id ?? null, deviceId: viewer.deviceId, userAgent: ua });
+  const h = await headers();
+  const ua = h.get("user-agent") ?? "";
+  // Vercel's IP geolocation (country, state, city, ZIP): metro-level guesses, stored on session_start + the device.
+  const geo = geoFromHeaders((n) => h.get(n));
+  await logClientEvents(input.events, { userId: viewer.user?.id ?? null, deviceId: viewer.deviceId, userAgent: ua, geo });
   return { ok: true };
 });

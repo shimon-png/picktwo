@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Zap, MessageCircle, ThumbsUp } from "lucide-react";
 import { api, toast } from "@/lib/client";
 import { AGE_RANGES, INTERESTS, KID_AGES, KIDS_STATUS_OPTIONS, SEX_OPTIONS } from "@/lib/constants";
+import { HOUSING_OPTIONS, RELATIONSHIP_OPTIONS, WORK_OPTIONS } from "@/lib/about";
 import { useZipCheck } from "@/lib/use-zip";
 import { ZipHint } from "@/components/ui/ZipHint";
 import { ChipGroup } from "@/components/compose/ComposeForm";
@@ -15,6 +16,9 @@ type Init = {
   bio: string;
   kidAges: string[];
   kidsStatus: string;
+  relationship?: string;
+  housing?: string;
+  workStatus?: string;
   country: string;
   region: string;
   city: string;
@@ -49,7 +53,8 @@ export function ProfileForm({
     if (zipCheck.state !== "ok") return;
     setF((x) => (x.country ? x : { ...x, country: zipCheck.country, region: zipCheck.region ?? "", city: zipCheck.city ?? "" }));
   }, [zipCheck]);
-  const requiredDone = zipValid && !!f.sex && !!f.ageRange;
+  // ZIP, sex and age are optional; a ZIP that is filled in must be real.
+  const requiredDone = !f.zipCode.trim() || zipValid;
   const hasKids = f.kidsStatus === "YES";
   const set = <K extends keyof Init>(k: K, v: Init[K]) => setF((x) => ({ ...x, [k]: v }));
 
@@ -57,7 +62,7 @@ export function ProfileForm({
     setBusy(true);
     try {
       await api("/api/me/profile", {
-        body: { ...f, kidsStatus: f.kidsStatus || null, kidAges: hasKids ? f.kidAges : [], isAdultConfirmed: f.isAdultConfirmed || undefined },
+        body: { ...f, kidsStatus: f.kidsStatus || null, relationship: f.relationship || null, housing: f.housing || null, workStatus: f.workStatus || null, kidAges: hasKids ? f.kidAges : [], isAdultConfirmed: f.isAdultConfirmed || undefined },
       });
       if (mode === "onboarding" && !returning) setStep("intro");
       else if (mode === "onboarding") {
@@ -134,7 +139,7 @@ export function ProfileForm({
       )}
       <div>
         <label className="label" htmlFor="zip">
-          ZIP code <span className="text-b">*</span>
+          ZIP code (optional)
         </label>
         <input
           id="zip"
@@ -142,7 +147,6 @@ export function ProfileForm({
           inputMode="numeric"
           autoComplete="postal-code"
           maxLength={10}
-          required
           aria-invalid={zipCheck.state === "bad"}
           value={f.zipCode}
           onChange={(e) => set("zipCode", e.target.value)}
@@ -151,14 +155,14 @@ export function ProfileForm({
         <ZipHint check={zipCheck} />
       </div>
       <ChipGroup
-        label={<>Sex <span className="text-b">*</span></>}
+        label="Sex (optional)"
         options={SEX_OPTIONS.map((o) => ({ id: o.id, label: o.label }))}
         value={f.sex ? [f.sex] : []}
         onChange={(v) => set("sex", v[0] ?? "")}
         single
       />
       <ChipGroup
-        label={<>Your age <span className="text-b">*</span></>}
+        label="Your age (optional)"
         options={AGE_RANGES.map((o) => ({ id: o.id, label: o.label }))}
         value={f.ageRange ? [f.ageRange] : []}
         onChange={(v) => set("ageRange", v[0] ?? "")}
@@ -185,6 +189,23 @@ export function ProfileForm({
           </>
         )}
       </fieldset>
+      {/* About-you answers (lib/about.ts), optional; also asked one at a time in the Vote deck. */}
+      {(
+        [
+          ["relationship", "Right now I'm… (optional)", RELATIONSHIP_OPTIONS],
+          ["housing", "Home (optional)", HOUSING_OPTIONS],
+          ["workStatus", "Work (optional)", WORK_OPTIONS],
+        ] as const
+      ).map(([key, label, opts]) => (
+        <ChipGroup
+          key={key}
+          label={label}
+          options={opts.map((o) => ({ id: o.id, label: o.label }))}
+          value={f[key] ? [f[key] as string] : []}
+          onChange={(v) => set(key, v[0] ?? "")}
+          single
+        />
+      ))}
       <LocationFields value={{ country: f.country, region: f.region, city: f.city }} onChange={(v) => setF((x) => ({ ...x, ...v }))} />
       <ChipGroup label="Interests (optional)" options={INTERESTS.map((i) => ({ id: i, label: i }))} value={f.interests} onChange={(v) => set("interests", v)} />
       <label className="flex items-start gap-3 text-sm">
@@ -199,7 +220,6 @@ export function ProfileForm({
           <span>I’m 18 or older and agree to the <a href="/legal/terms" className="underline" target="_blank">Terms</a> and <a href="/legal/guidelines" className="underline" target="_blank">Community guidelines</a>.</span>
         </label>
       )}
-      {!requiredDone && <p className="text-xs text-zinc-500"><span className="text-b">*</span> ZIP code, sex and age are required.</p>}
       <button className="btn-primary w-full py-3" disabled={busy || !f.name || f.handle.length < 3 || !f.isAdultConfirmed || !requiredDone} onClick={save}>
         {busy ? "Saving…" : mode === "onboarding" ? "Continue" : "Save profile"}
       </button>

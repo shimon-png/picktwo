@@ -70,8 +70,22 @@ const STEP_TEST: Record<string, { label: string; test: (v: Visitor) => boolean }
   guestback: { label: "Guest came back", test: (v) => v.votes > 0 && !v.signedUp && v.days >= 2 },
   guestgone: { label: "Guest gone", test: (v) => v.votes > 0 && !v.signedUp && v.days < 2 },
 };
+/** Extra groups that aren't Sankey nodes but sit behind a tile or table number (Alex, Nov 26: drill down from anywhere). */
+const EXTRA_STEPS: Record<string, { label: string; test: (v: Visitor) => boolean }> = {
+  all: { label: "All visitors", test: () => true },
+  returned: { label: "Came back another day", test: (v) => v.days >= 2 },
+  posted: { label: "Posted a battle", test: (v) => !!v.posted },
+};
 function stepOf(id: string | undefined): { label: string; test: (v: Visitor) => boolean } | null {
   if (!id) return null;
+  if (EXTRA_STEPS[id]) return EXTRA_STEPS[id];
+  // votes:3-5 = cast 3 to 5 votes in the window; votesback:3-5 = of those, came back another day.
+  const vm = id.match(/^votes(back)?:(\d+)-(\d+)$/);
+  if (vm) {
+    const [lo, hi, back] = [Number(vm[2]), Number(vm[3]), !!vm[1]];
+    const span = hi >= 9999 ? `${lo}+` : `${lo}–${hi}`;
+    return { label: back ? `Cast ${span} votes and came back` : `Cast ${span} votes`, test: (v) => v.votes >= lo && v.votes <= hi && (!back || v.days >= 2) };
+  }
   if (id.startsWith("s:")) {
     const src = id.slice(2) as Source;
     return SHORT[src] ? { label: `From ${SHORT[src]}`, test: (v) => v.source === src } : null;
@@ -231,16 +245,26 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
   const sources = [...new Set(vs.map((v) => v.source))];
 
   const bounced = vs.length - f.engaged.length;
-  const tiles: [string, string | number][] = [
-    ["Visitors", vs.length],
-    ["Engaged (tapped or scrolled)", `${f.engaged.length} (${pct(f.engaged.length, vs.length)})`],
-    ["Opened a battle", `${f.opened.length} (${pct(f.opened.length, vs.length)})`],
-    ["Voted", `${f.voted.length} (${pct(f.voted.length, vs.length)})`],
-    ["Signed up (of voters)", `${f.signed.length} (${pct(f.signed.length, f.voted.length)})`],
-    ["Came back another day", `${returners.length} (${pct(returners.length, vs.length)})`],
-    ["Posted a battle", posted],
-    ["Median votes: back vs one-time", `${median(returners.map((v) => v.votes))} vs ${median(oneTime.map((v) => v.votes))}`],
+  // Each tile opens its people below (third item = step id).
+  const tiles: [string, string | number, string][] = [
+    ["Visitors", vs.length, "all"],
+    ["Engaged (tapped or scrolled)", `${f.engaged.length} (${pct(f.engaged.length, vs.length)})`, "engaged"],
+    ["Opened a battle", `${f.opened.length} (${pct(f.opened.length, vs.length)})`, "opened"],
+    ["Voted", `${f.voted.length} (${pct(f.voted.length, vs.length)})`, "voted"],
+    ["Signed up (of voters)", `${f.signed.length} (${pct(f.signed.length, f.voted.length)})`, "signed"],
+    ["Came back another day", `${returners.length} (${pct(returners.length, vs.length)})`, "returned"],
+    ["Posted a battle", posted, "posted"],
+    ["Median votes: back vs one-time", `${median(returners.map((v) => v.votes))} vs ${median(oneTime.map((v) => v.votes))}`, "returned"],
   ];
+  /** A number that opens a group of people in the panel below; `src` narrows it to one source. */
+  const go = (st: string, label: React.ReactNode, src?: Source) => (
+    <Link
+      href={`${href({ step: st, ...(src ? { by: "source", val: SHORT[src] } : {}) })}#people`}
+      className="underline decoration-ink/20 underline-offset-2 hover:decoration-accent"
+    >
+      {label}
+    </Link>
+  );
 
   return (
     <div className="space-y-5">
@@ -266,7 +290,7 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
       <div className="card flex flex-wrap items-end gap-x-6 gap-y-1 p-4">
         <div>
           <div className="text-xs text-zinc-500">Bounce rate (never tapped or scrolled)</div>
-          <div className="text-4xl font-medium tabular-nums">{pct(bounced, vs.length)}</div>
+          <div className="text-4xl font-medium tabular-nums">{go("bounced", pct(bounced, vs.length))}</div>
         </div>
         <div className="pb-1 text-sm text-zinc-500">
           {bounced} of {vs.length} visitors · typical for a landing page ≈ 80%
@@ -278,11 +302,11 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {tiles.map(([k, v]) => (
-          <div key={k} className="card p-3">
-            <div className="text-xs text-zinc-500">{k}</div>
+        {tiles.map(([k, v, st]) => (
+          <Link key={k} href={`${href({ step: st })}#people`} className={`card block p-3 transition hover:ring-1 hover:ring-accent ${step === st ? "ring-1 ring-accent" : ""}`}>
+            <div className="text-xs text-zinc-500">{k} ›</div>
             <div className="text-xl font-medium">{v}</div>
-          </div>
+          </Link>
         ))}
       </div>
 
@@ -311,13 +335,13 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
             const g = vs.filter((v) => v.source === s);
             const gv = g.filter((v) => v.votes > 0);
             return [
-              SHORT[s],
-              g.length,
-              pct(g.filter((v) => !v.engaged).length, g.length),
-              pct(g.filter((v) => v.engaged && v.opened).length, g.length),
-              pct(gv.length, g.length),
-              pct(gv.filter((v) => v.signedUp).length, gv.length),
-              pct(g.filter((v) => v.days >= 2).length, g.length),
+              go(`s:${s}`, SHORT[s]),
+              go(`s:${s}`, g.length),
+              go("bounced", pct(g.filter((v) => !v.engaged).length, g.length), s),
+              go("opened", pct(g.filter((v) => v.engaged && v.opened).length, g.length), s),
+              go("voted", pct(gv.length, g.length), s),
+              go("signed", pct(gv.filter((v) => v.signedUp).length, gv.length), s),
+              go("returned", pct(g.filter((v) => v.days >= 2).length, g.length), s),
               g.length ? (g.reduce((a, v) => a + v.votes, 0) / g.length).toFixed(1) : "—",
             ];
           })}
@@ -327,15 +351,17 @@ export default async function JourneyPage({ searchParams }: { searchParams: Prom
       <Section title="How many votes before they're hooked" note="Of people who voted, how many came back another day, by how many votes they cast in the window.">
         <Rows
           head={["Votes", "People", "Came back", "Rate"]}
-          rows={[
-            ["1–2", (v: Visitor) => v.votes >= 1 && v.votes <= 2],
-            ["3–5", (v: Visitor) => v.votes >= 3 && v.votes <= 5],
-            ["6–10", (v: Visitor) => v.votes >= 6 && v.votes <= 10],
-            ["11+", (v: Visitor) => v.votes > 10],
-          ].map(([label, test]) => {
-            const g = vs.filter(test as (v: Visitor) => boolean);
+          rows={(
+            [
+              ["1–2", 1, 2],
+              ["3–5", 3, 5],
+              ["6–10", 6, 10],
+              ["11+", 11, 99999],
+            ] as const
+          ).map(([label, lo, hi]) => {
+            const g = vs.filter((v) => v.votes >= lo && v.votes <= hi);
             const b = g.filter((v) => v.days >= 2).length;
-            return [label as string, g.length, b, pct(b, g.length)];
+            return [label, go(`votes:${lo}-${hi}`, g.length), go(`votesback:${lo}-${hi}`, b), pct(b, g.length)];
           })}
         />
       </Section>

@@ -1,8 +1,11 @@
 import { refreshEngagement } from "@/server/services/engagement";
 import { tagUntagged } from "@/server/services/tagging";
 import { sendWinbacks } from "@/server/services/winback";
+import { ensureZipIncome } from "@/server/services/passive";
 import { closeDueBattles, sendReminders, decayPoints, dailyRollup } from "@/server/services/jobs";
 import { runDailyEmails, runHourlyEmails } from "@/server/services/lifecycle";
+import { deliverPickbotResults, purgeOldThreads } from "@/server/services/pickbot";
+import { runAutoSeed } from "@/server/services/auto-seed";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -19,7 +22,13 @@ const JOBS: Record<string, () => Promise<unknown>> = {
   hourly: async () => ({
     closed: await closeDueBattles(),
     emails: await runHourlyEmails(),
+    pickbotResults: await deliverPickbotResults(),
+    // Hourly so new battles (incl. auto-seeded ones) get AI tags before people's taste profiles need them.
+    tagging: await tagUntagged(100),
   }),
+  "pickbot-results": () => deliverPickbotResults(),
+  // Hourly, on its own so a slow batch never delays the emails: more seed battles when the 10th top voter runs low.
+  "auto-seed": () => runAutoSeed(),
   // Once a day.
   daily: async () => ({
     closed: await closeDueBattles(),
@@ -30,6 +39,8 @@ const JOBS: Record<string, () => Promise<unknown>> = {
     tagging: await tagUntagged(40),
     winback: await sendWinbacks(),
     emails: await runDailyEmails(),
+    zipIncome: await ensureZipIncome(),
+    pickbotPurged: await purgeOldThreads(),
   }),
 };
 

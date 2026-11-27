@@ -22,31 +22,35 @@ export async function suggestHandle(email: string | null): Promise<string> {
 /**
  * Saves the sign-up fields (username, sex, age range, ZIP) and finishes onboarding in one go. Age ranges start at 18, so picking one confirms the user is an adult.
  */
-export async function saveQuickProfile(u: User, p: { handle: string; zipCode: string; sex: string; ageRange: string }) {
-  assertCleanText(p.handle);
+export async function saveQuickProfile(u: User, p: { handle?: string; zipCode?: string; sex?: string; ageRange?: string }) {
+  const handle = p.handle || u.handle || (await suggestHandle(u.email));
+  assertCleanText(handle);
   const [taken] = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.handle, p.handle), ne(users.id, u.id)));
+    .where(and(eq(users.handle, handle), ne(users.id, u.id)));
   if (taken) throw new AppError("CONFLICT", "That username is taken — try another");
-  const zip = lookupZip(p.zipCode, u.country);
-  if (!zip.ok) throw new AppError("VALIDATION", zip.message);
-  // Fill in the location from the ZIP unless the user already picked one.
-  const place = u.country ? {} : { country: zip.country, region: zip.region, city: zip.city };
+  // ZIP, sex and age are optional since the one-tap sign-up; whatever is given is saved.
+  let place: { zipCode?: string; country?: string | null; region?: string | null; city?: string | null } = {};
+  if (p.zipCode) {
+    const zip = lookupZip(p.zipCode, u.country);
+    if (!zip.ok) throw new AppError("VALIDATION", zip.message);
+    // Fill in the location from the ZIP unless the user already picked one.
+    place = u.country ? { zipCode: zip.code } : { zipCode: zip.code, country: zip.country, region: zip.region, city: zip.city };
+  }
+  const demo = { ...place, ...(p.sex ? { sex: p.sex } : {}), ...(p.ageRange ? { ageRange: p.ageRange } : {}) };
   const first = !u.onboardedAt;
   await db
     .update(users)
     .set({
-      zipCode: zip.code,
-      ...place,
-      sex: p.sex,
-      ageRange: p.ageRange,
+      ...demo,
+      // Age ranges start at 18 and sign-up asks people to confirm they're adults.
       isAdultConfirmed: true,
-      handle: p.handle,
+      handle,
       onboardedAt: u.onboardedAt ?? new Date(),
     })
     .where(eq(users.id, u.id));
-  trackProfileChanges(u.id, u, { zipCode: zip.code, ...place, sex: p.sex, ageRange: p.ageRange }, "quick_profile");
+  trackProfileChanges(u.id, u, demo, "quick_profile");
   if (first) {
     await db.insert(consentEvents).values({ userId: u.id, type: "terms", value: true, version: POLICY_VERSION });
     track("onboarding_completed", { quick: true }, { userId: u.id });

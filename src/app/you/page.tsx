@@ -1,5 +1,11 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
+import { tasteProfileFor } from "@/server/services/taste-profile";
+import { TasteSection } from "@/components/taste/TasteSection";
+import { ProfileBar } from "@/components/taste/ProfileBar";
+import { PickbotHistory } from "@/components/pickbot/History";
+import { answersLeftFor, listThreads, pickbotAccess } from "@/server/services/pickbot";
+import { profileProgressFor } from "@/server/services/profile-progress";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
@@ -52,7 +58,7 @@ export default async function YouPage() {
   const e = await getEconomy();
   const admin = isAdmin(user);
   // Everything below is independent, so it all runs at once (one round of DB trips instead of ~7 in a row).
-  const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms, newMessages, flagged, reasonRows] = await Promise.all([
+  const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms, newMessages, flagged, reasonRows, taste, progress, pickbot] = await Promise.all([
     battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 100),
     countOpenLoops(user.id, e),
     countUnreported(user.id),
@@ -83,6 +89,13 @@ export default async function YouPage() {
       .innerJoin(battles, eq(battles.id, votes.battleId))
       .where(and(eq(battles.authorId, user.id), isNotNull(votes.reason)))
       .groupBy(votes.battleId),
+    tasteProfileFor({ user, deviceId: null }),
+    profileProgressFor({ user, deviceId: null }),
+    (async () => {
+      if (!(await pickbotAccess(user)).ok) return null;
+      const [left, threads, e] = await Promise.all([answersLeftFor(user), listThreads(user, 5), getEconomy()]);
+      return { left, threads, free: e.pickbotFreePerDay };
+    })().catch(() => null),
   ]);
   const reasonCounts = new Map(reasonRows.map((r) => [r.id, r.n]));
   const tier = expertTier(user.correctPicks, e);
@@ -90,7 +103,9 @@ export default async function YouPage() {
   const blocked = !canPostBattle(unreported, e.maxUnreportedBattles);
   const t = pointsTier(user.ppBalance, e.tierHighAt, e.tierTopAt);
   const awaiting = mine.filter((b) => b.status !== "OPEN" && !b.outcome);
-  const others = mine.filter((b) => !(b.status !== "OPEN" && !b.outcome));
+  // Two groups, newest first: Active (still voting, by when posted) and Closed (by when voting ended).
+  const live = mine.filter((b) => b.status === "OPEN");
+  const closed = mine.filter((b) => b.status !== "OPEN").sort((x, y) => y.deadline.localeCompare(x.deadline));
   const earn: [Tone, React.ComponentType<{ className?: string }>, string, number][] = [
     ["pink", ThumbsUp, "Vote on a battle", e.votePoints],
     ["teal", MessageSquareText, "Add a reason", e.voteReasonBonus],
@@ -147,6 +162,21 @@ export default async function YouPage() {
         )}
       </section>
 
+      {progress && !progress.complete && <ProfileBar p={progress} place="you" />}
+      {pickbot && (
+        <section className="space-y-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-[22px]">Pickbot</h2>
+            <Link href="/ask" className="text-[13px] text-accent">
+              Ask a question →
+            </Link>
+          </div>
+          {pickbot.left != null && <p className="text-[13px] text-ink/60">Today: {pickbot.left} of {pickbot.free} free answers left</p>}
+          {pickbot.threads.length ? <PickbotHistory rows={pickbot.threads.slice(0, 5)} title="" /> : <p className="text-[13px] text-ink/60">Stuck on a choice? Pickbot answers for you, using your taste profile.</p>}
+        </section>
+      )}
+      {taste && <TasteSection t={taste} />}
+
       <section>
         <h2 className="mb-2.5 text-[22px]">Earn ⚡</h2>
         <ul className="space-y-1.5">
@@ -189,8 +219,10 @@ export default async function YouPage() {
           <ExpandList
             searchPlaceholder="Search your battles"
             className="!space-y-0 divide-y divide-ink/8"
-            items={[...awaiting, ...others].map((b) => ({
+            sections={["Active", "Closed"]}
+            items={[...live, ...closed].map((b) => ({
               key: b.id,
+              section: b.status === "OPEN" ? "Active" : "Closed",
               text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB}`,
               node: <BattleRow b={b} reasons={reasonCounts.get(b.id) ?? 0} awaiting={awaiting.includes(b)} loopPoints={e.loopClosedPoints} />,
             }))}

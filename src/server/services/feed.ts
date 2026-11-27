@@ -4,9 +4,14 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, diversify, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, type ViewerProfile } from "./ranking";
+import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, hotFactor, gapFactor, type ViewerProfile } from "./ranking";
+import { missingAxesFor } from "./taste-profile";
+import { battleAxes } from "@/lib/taste-profile";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
 import { matchesTarget } from "./targeting";
+import { isHumanBattle } from "@/lib/auto-seed";
+import { activeMindTopic } from "./mind";
+import { mindFactor } from "@/lib/mind";
 
 export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; featured?: boolean; debug?: Record<string, number> };
 
@@ -47,6 +52,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       authorCountry: users.country,
       authorKidAges: users.kidAges,
       authorPP: users.ppBalance,
+      authorHasEmail: sql<boolean>`${users.email} IS NOT NULL`,
       oChosen: outcomes.chosen,
       oThumb: outcomes.thumb,
       oNote: outcomes.note,
@@ -63,10 +69,16 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
         user ? sql`${battles.authorId} <> ${user.id}` : sql`true`,
         blocked.length ? notInArray(battles.authorId, blocked) : sql`true`,
         sql`${users.bannedAt} IS NULL`,
+        // "People like you are asking" preset battles (lib/asking.ts) only show through their card.
+        sql`(${battles.tags}->>'askingPreset') IS NULL`,
         seenCond,
       ),
     )
-    .orderBy(desc(battles.createdAt))
+    // Real people's battles first, so the 500 cap never cuts one off when there's lots of seed content.
+    .orderBy(
+      sql`CASE WHEN ${battles.id} NOT LIKE 'seed\_%' AND (${users.email} IS NOT NULL OR COALESCE((${battles.tags}->>'pickbot')::boolean, false)) THEN 0 ELSE 1 END`,
+      desc(battles.createdAt),
+    )
     .limit(500);
   // "Target a specific group": only viewers whose profile matches see a targeted battle in the deck.
   const rows = allRows.filter((r) => matchesTarget(r.b.tags?.target, user));
@@ -90,7 +102,17 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
   // Data brain Phase 3: rank by engagement too, except for a stable holdout group (the comparison for lift).
   const arm: "engine" | "holdout" = inHoldout(viewerKey, economy.engagementHoldoutPct) ? "holdout" : "engine";
   const eWeight = arm === "engine" ? economy.engagementWeight : 0;
-  const loops = await openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy);
+  // Vote deck decisions per battle (votes made in the deck vs skips), for the skip signal.
+  const sWeight = arm === "engine" ? economy.skipWeight : 0;
+  const decisions = sWeight ? await deckDecisions(rows.map((r) => r.b.id)) : new Map<string, { votes: number; skips: number }>();
+  const avgPick = averagePickRate([...decisions.values()]);
+  const [loops, mind, hot, missing] = await Promise.all([
+    openLoopCountsFor([...new Set(rows.map((r) => r.b.authorId))], economy),
+    activeMindTopic(viewer),
+    // Alex, Nov 27 2026: after real people's battles, the hottest battles and the ones that fill out the taste profile.
+    economy.hotBoost > 1 ? recentRealVotes(rows.map((r) => r.b.id)) : new Map<string, number>(),
+    economy.tasteGapBoost > 1 ? missingAxesFor(viewer).catch(() => [] as string[]) : ([] as string[]),
+  ]);
   const scored = rows.map((r) => {
     const boostActive = !!r.b.boostUntil && r.b.boostUntil > now && r.b.boostVotesLeft > 0;
     const pf = priorityFactor({ ppBalance: r.authorPP, openLoops: loops.get(r.b.authorId) ?? 0, boostActive, cap: economy.priorityCap });
@@ -105,13 +127,22 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       hoursSincePublish: (now.getTime() - r.b.createdAt.getTime()) / 3600_000,
       priorityFactor: pf,
     });
-    const score = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
-    return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
+    const engaged = base * shuffleFactor(seed, r.b.id) * engagementFactor(r.b.engagementScore, eWeight);
+    const d = decisions.get(r.b.id);
+    // "What's on your mind this week?" (lib/mind.ts): battles on the topic they picked rise.
+    const onMind = mindFactor(mind?.topic ?? null, { theme: r.b.tags?.brain?.theme, title: r.b.title, context: r.b.context }, economy.mindBoost, mind?.text);
+    const brain = r.b.tags?.brain as { a?: string[]; b?: string[]; axes?: Record<string, string> } | undefined;
+    const tests = battleAxes(brain?.a, brain?.b, brain?.axes);
+    const fill = gapFactor(tests, missing, economy.tasteGapBoost);
+    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind * hotFactor(hot.get(r.b.id) ?? 0, economy.hotBoost) * fill;
+    const featured = !!r.b.tags?.featured;
+    const human = isHumanBattle({ id: r.b.id, authorHasEmail: !!r.authorHasEmail, pickbot: r.b.tags?.pickbot });
+    return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, featured, human, fill: fill > 1, pf, openLoops: loops.get(r.b.authorId) ?? 0 };
   });
-  // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet.
-  const feat = (x: (typeof scored)[number]) => (x.row.b.tags?.featured ? 1 : 0);
-  scored.sort((a, b) => feat(b) - feat(a) || b.score - a.score);
-  const picked = diversify(scored, limit);
+  // Featured battles (battle.tags.featured) go first for everyone who hasn't voted on them yet; then every battle a
+  // real person posted, above all seed content (Alex + Shimon, Nov 26 2026). Same for the holdout.
+  scored.sort((a, b) => b.score - a.score);
+  const picked = tieredPick(scored, limit);
   const cards = await hydrateCards(picked.map((p) => p.row));
   return cards.map((c, i) => ({
     ...c,
@@ -120,4 +151,32 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     ...(picked[i].row.b.tags?.featured ? { featured: true } : {}),
     ...(opts.debug ? { debug: { priorityFactor: picked[i].pf, openLoops: picked[i].openLoops } } : {}),
   })) as FeedItem[];
+}
+
+/** Per battle: real (non-seed) votes in the last 24 hours, for the hot boost. */
+async function recentRealVotes(ids: string[]) {
+  const out = new Map<string, number>();
+  if (!ids.length) return out;
+  const since = new Date(Date.now() - 86400_000).toISOString();
+  const list = sql.join(ids.map((i) => sql`${i}`), sql`, `);
+  const rows = await db.execute<{ id: string; n: number }>(sql`
+    SELECT battle_id AS id, count(*)::int AS n FROM vote
+    WHERE battle_id IN (${list}) AND created_at > ${since} AND NOT flagged AND COALESCE(source, '') <> 'seed'
+    GROUP BY 1`);
+  for (const r of rows) out.set(r.id, Number(r.n));
+  return out;
+}
+
+/** Per battle: votes made in the Vote deck and skips (all time, real people only: seed votes have source 'seed'). */
+async function deckDecisions(ids: string[]) {
+  const out = new Map<string, { votes: number; skips: number }>();
+  if (!ids.length) return out;
+  const list = sql.join(ids.map((i) => sql`${i}`), sql`, `);
+  const rows = await db.execute<{ id: string; votes: number; skips: number }>(sql`
+    SELECT x.id,
+      (SELECT count(*)::int FROM vote v WHERE v.battle_id = x.id AND v.source = 'feed' AND NOT v.flagged) AS votes,
+      (SELECT count(*)::int FROM skip s WHERE s.battle_id = x.id) AS skips
+    FROM (SELECT unnest(ARRAY[${list}]::text[]) AS id) x`);
+  for (const r of rows) out.set(r.id, { votes: Number(r.votes), skips: Number(r.skips) });
+  return out;
 }

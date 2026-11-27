@@ -5,6 +5,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, api, setPP, toast } from "@/lib/client";
 import { doneIds, markDone, unmarkDone } from "@/lib/seen";
 import { SignupGate } from "@/components/auth/SignupGate";
+import { AboutCard, type AboutCardPayload } from "./AboutCard";
+import type { LikeYou } from "@/lib/like-you";
+import { TasteReveal, type TasteMilestone } from "@/components/taste/TasteReveal";
+import { ProfileBar } from "@/components/taste/ProfileBar";
+import { PickbotPromoCard } from "./PickbotPromoCard";
+import { MindCard } from "./MindCard";
+import { MindNudgeCard, type MindNudge } from "./MindNudgeCard";
+import { promoDue } from "@/lib/pickbot-promo";
+import { AskingCard } from "./AskingCard";
+import { askingDue, askingMemory } from "@/lib/asking";
+
+const ASKING_KEY = "cp:asking";
+import type { AskingCardData, AskingItem } from "@/server/services/asking";
+import { withAnswer, withVote, type ProfileProgress } from "@/lib/profile-progress";
 import { cn, pct, timeLeft, titleSizeClass } from "@/lib/utils";
 import { AVATAR_TONES, TONE_CLASSES, kidAgeLabel } from "@/lib/constants";
 import { pointsTier } from "@/server/services/priority";
@@ -20,7 +34,7 @@ import { cardKind, contentHash, currentSessionId, logEvent } from "@/lib/events"
 type Side = "A" | "B";
 type PickMethod = "tap" | "swipe" | "key";
 const other = (s: Side): Side => (s === "A" ? "B" : "A");
-type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null; softGate?: boolean; gatePrompt?: boolean };
+type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; guestVotesLeft?: number | null; softGate?: boolean; gatePrompt?: boolean; about?: AboutCardPayload | null; likeYou?: LikeYou | null; taste?: TasteMilestone | null; mind?: ({ kind: "ask" } | ({ kind: "nudge" } & MindNudge)) | null };
 
 /**
  * Two ways to pick (Alex, Nov 21 2026): tap the photo you want, or swipe away the one you don't.
@@ -48,6 +62,10 @@ export function SwipeDeck({
   guestLeft: initialGuestLeft,
   guestLimit,
   softGate: initialSoft = false,
+  likeYouMs = RESULT_MS,
+  progress: initialProgress = null,
+  pickbotPromo = null,
+  asking = null,
 }: {
   initial: BattleCard[];
   signedIn: boolean;
@@ -58,11 +76,30 @@ export function SwipeDeck({
   guestLimit: number;
   /** Sign-up gate test, group B: past the free votes they keep voting and get a closable dialog instead of a wall. */
   softGate?: boolean;
+  /** How long a result shows when it has a "people like you" row (economy likeYouResultMs). */
+  likeYouMs?: number;
+  /** Profile bar (Pickbot Phase 0); null = holdout or unknown viewer, no bar. */
+  progress?: ProfileProgress | null;
+  /** One-time "Ask Pickbot" card: after `at` picks this visit (lib/pickbot-promo.ts); null = not for this person. */
+  pickbotPromo?: { at: number } | null;
+  /** "People like you are asking" card (lib/asking.ts); null = off or nothing to show. */
+  asking?: AskingCardData | null;
 }) {
   const [queue, setQueue] = useState(initial);
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
   const [soft, setSoft] = useState(initialSoft);
   const [prompt, setPrompt] = useState(false);
+  // About-you card (lib/about.ts): the server says after a vote; it shows as the next card once the result is done.
+  const [about, setAbout] = useState<AboutCardPayload | null>(null);
+  const pendingAbout = useRef<AboutCardPayload | null>(null);
+  const [taste, setTaste] = useState<TasteMilestone | null>(null);
+  const pendingTaste = useRef<TasteMilestone | null>(null);
+  // "What's on your mind this week?" card, or its sign-up nudge (lib/mind.ts): the server says after a vote.
+  type MindSlot = { kind: "ask" } | ({ kind: "nudge" } & MindNudge);
+  const [mind, setMind] = useState<MindSlot | null>(null);
+  const pendingMind = useRef<MindSlot | null>(null);
+  const [likeYou, setLikeYou] = useState<LikeYou | null>(null);
+  const likeYouShown = useRef(false);
   const [voted, setVoted] = useState<Side | null>(null);
   const [result, setResult] = useState<{ a: number; b: number; total: number } | null>(null);
   const [fly, setFly] = useState<-1 | 1 | 0>(0);
@@ -70,13 +107,39 @@ export function SwipeDeck({
   const [grab, setGrab] = useState<{ side: Side; dx: number; dy: number } | null>(null);
   const [thrown, setThrown] = useState<{ side: Side; dir: -1 | 1 } | null>(null);
   const [pp, setPp] = useState(initialPP);
+  // Profile bar: moves by one on each new deck vote and drops a core question once its card is answered. On
+  // completion it shows the done state for a few seconds, then goes away.
+  const [progress, setProgress] = useState(initialProgress);
+  const [celebrate, setCelebrate] = useState(false);
+  const bump = useCallback((change: (p: ProfileProgress) => ProfileProgress) => setProgress((p) => p && change(p)), []);
+  const wasComplete = useRef(initialProgress?.complete ?? true);
+  useEffect(() => {
+    if (!progress?.complete || wasComplete.current) return;
+    wasComplete.current = true;
+    setCelebrate(true);
+    const t = setTimeout(() => setCelebrate(false), 4000);
+    return () => clearTimeout(t);
+  }, [progress?.complete]);
+  const showBar = !!progress && (!progress.complete || celebrate);
   const [session, setSession] = useState({ votes: 0, points: 0 });
+  const [promo, setPromo] = useState<{ at: number; picks: number } | null>(null);
+  const promoShown = useRef(false);
+  const [askingNow, setAskingNow] = useState<{ items: AskingItem[]; round: number; picks: number; mode: AskingCardData["mode"] } | null>(null);
+  // How many times the card showed this tab session, and at which pick (kept across deck visits, so it never comes
+  // straight back after a trip to Pickbot).
+  const askingShown = useRef(0);
+  const askingLastAt = useRef<number | null>(null);
+  // The questions are fetched one pick before they're due, so they use the sex / age cards answered so far.
+  const askingNext = useRef<Promise<AskingCardData | null> | null>(null);
   // "You're on a roll" card: picks this tab session (survives switching tabs), and the milestone on screen.
   const rollCount = useRef(0);
   const [roll, setRoll] = useState<number | null>(null);
   useEffect(() => {
     try {
       rollCount.current = Number(sessionStorage.getItem(ROLL_KEY)) || 0;
+      const m = askingMemory(sessionStorage.getItem(ASKING_KEY), rollCount.current);
+      askingShown.current = m.shown;
+      askingLastAt.current = m.lastAt;
     } catch {}
   }, []);
   const shownAt = useRef(Date.now());
@@ -152,6 +215,7 @@ export function SwipeDeck({
       setThrown(null);
       setVoted(null);
       setResult(null);
+      setLikeYou(null);
     }, FLY_MS);
   }, []);
 
@@ -175,10 +239,16 @@ export function SwipeDeck({
       if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
       if (r.softGate != null) setSoft(r.softGate);
       if (r.gatePrompt) setPrompt(true);
+      if (r.about) pendingAbout.current = r.about;
+      if (r.taste) pendingTaste.current = r.taste;
+      if (r.mind) pendingMind.current = r.mind;
+      setLikeYou(r.likeYou ?? null);
+      likeYouShown.current = !!r.likeYou;
       setResult(r.results);
       setPP(r.ppBalance);
       if (r.ppBalance != null) setPp(r.ppBalance);
       setSession((s) => ({ votes: s.votes + (prev ? 0 : 1), points: s.points + r.points }));
+      if (!prev) bump(withVote);
       if (r.points > 0) toast(`+${r.points} for voting`, "pp");
       return true;
     } catch (e) {
@@ -266,8 +336,9 @@ export function SwipeDeck({
   // Every pick (tap, swipe-away, ← / →): the pick fills the card, its scores show for
   // RESULT_MS, then the next battle.
   async function pick(side: Side, method: PickMethod, dir: -1 | 1 = side === "A" ? -1 : 1) {
-    if (!card || voted || fly || roll) return;
+    if (!card || voted || fly || roll || about || taste || promo || mind || askingNow) return;
     const started = Date.now();
+    likeYouShown.current = false;
     const ok = await vote(side, method);
     if (!ok) {
       setThrown(null);
@@ -280,11 +351,55 @@ export function SwipeDeck({
     setTimeout(() => buzz(10), 120);
     setTimeout(() => {
       advance(dir);
+      const special = !!pendingAbout.current || !!pendingTaste.current || !!pendingMind.current;
+      if (pendingMind.current) {
+        const m = pendingMind.current;
+        pendingMind.current = null;
+        setTimeout(() => setMind(m), FLY_MS);
+      }
+      if (pendingAbout.current) {
+        const a = pendingAbout.current;
+        pendingAbout.current = null;
+        setTimeout(() => setAbout(a), FLY_MS);
+      }
+      if (pendingTaste.current) {
+        const t = pendingTaste.current;
+        pendingTaste.current = null;
+        setTimeout(() => setTaste(t), FLY_MS);
+      }
       if (isRollMilestone(n)) {
         setRoll(n);
         buzz(30);
       }
-    }, Math.max(0, RESULT_MS - (Date.now() - started)));
+      // The Ask Pickbot card waits for a pick with no other special card (about-you, taste, roll) coming up.
+      const busy = special || isRollMilestone(n);
+      const promoNow = !!pickbotPromo && promoDue({ picks: n, at: pickbotPromo.at, shown: promoShown.current, busy });
+      if (pickbotPromo && promoNow) {
+        promoShown.current = true;
+        setTimeout(() => setPromo({ at: pickbotPromo.at, picks: n }), FLY_MS);
+      }
+      // "People like you are asking" waits the same way, and never lands on the same pick as the Pickbot card.
+      if (asking) {
+        const due = { at: asking.at, every: asking.every, rounds: asking.rounds.length, shown: askingShown.current, lastAt: askingLastAt.current };
+        if (askingDue({ ...due, picks: n, busy: busy || promoNow })) {
+          const round = askingShown.current++;
+          askingLastAt.current = n;
+          try {
+            sessionStorage.setItem(ASKING_KEY, JSON.stringify({ shown: askingShown.current, lastAt: n }));
+          } catch {}
+          const fresh = askingNext.current ?? Promise.resolve(null);
+          askingNext.current = null;
+          const started = Date.now();
+          fresh.then((c) => {
+            const items = c?.rounds[round] ?? c?.rounds.at(-1) ?? asking.rounds[round];
+            if (!items?.length) return;
+            setTimeout(() => setAskingNow({ items, round: round + 1, picks: n, mode: c?.mode ?? asking.mode }), Math.max(0, FLY_MS - (Date.now() - started)));
+          });
+        } else if (!askingNext.current && askingDue({ ...due, picks: n + 1, busy: false })) {
+          askingNext.current = api<{ card: AskingCardData | null }>("/api/asking").then((r) => r.card, () => null);
+        }
+      }
+    }, Math.max(0, (likeYouShown.current ? likeYouMs : RESULT_MS) - (Date.now() - started)));
   }
 
   // Swipe away: that photo flies off and the other one is the pick.
@@ -297,7 +412,7 @@ export function SwipeDeck({
   }
 
   function skip() {
-    if (!card || voted || fly || thrown || roll) return;
+    if (!card || voted || fly || thrown || roll || about || promo || mind || askingNow) return;
     markDone(card.id);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
     advance(-1);
@@ -325,7 +440,7 @@ export function SwipeDeck({
   const tierLine = tier ? (tier.next ? `${tier.toNext} ⚡ to ${tier.next} priority.` : "Top priority — your battles go first.") : null;
 
   const header = (
-    <div className="sticky top-16 z-20 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
+    <div className="sticky top-16 z-30 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
       <p className="text-xs text-zinc-500" data-tour="status">
         {tierLine ?? (
           <>
@@ -342,6 +457,9 @@ export function SwipeDeck({
           </>
         )}
       </p>
+      {showBar && progress && (
+        <ProfileBar p={progress} place="deck" celebrate={celebrate} className="mt-2" onAsk={about || taste ? undefined : (q) => setAbout({ id: q })} />
+      )}
     </div>
   );
 
@@ -424,8 +542,52 @@ export function SwipeDeck({
       {prompt && (
         <SignupGate soft limit={guestLimit} next="/vote" place="deck" log={{ pos: deckPos.current }} onClose={() => setPrompt(false)} />
       )}
-      <div className="relative h-[calc(100dvh-15.35rem)] min-h-[440px] md:h-[calc(100dvh-10rem)]">
+      <div className={cn("relative min-h-[440px]", showBar ? "h-[calc(100dvh-18.1rem)] md:h-[calc(100dvh-12.75rem)]" : "h-[calc(100dvh-15.35rem)] md:h-[calc(100dvh-10rem)]")}>
         {roll != null && <RollCard count={roll} onDone={() => setRoll(null)} />}
+        {about && (
+          <AboutCard
+            key={about.id}
+            card={about}
+            onDone={(answer) => {
+              if (answer) bump((p) => withAnswer(p, about.id));
+              setAbout(null);
+            }}
+          />
+        )}
+        {taste && <TasteReveal t={taste} onDone={() => setTaste(null)} />}
+        {mind?.kind === "ask" && (
+          <MindCard
+            onDone={(topic, items) => {
+              setMind(null);
+              // The next battles, steered toward the topic, go to the front of the deck.
+              const done = doneIds();
+              const fresh = items.filter((i) => !done.has(i.id));
+              if (topic && fresh.length) {
+                fresh.forEach((i) => seen.current.add(i.id));
+                const ids = new Set(fresh.map((i) => i.id));
+                setQueue((q) => [...fresh, ...q.filter((i) => !ids.has(i.id))]);
+              }
+            }}
+          />
+        )}
+        {mind?.kind === "nudge" && <MindNudgeCard n={mind} onDone={() => setMind(null)} />}
+        {promo && !about && !taste && <PickbotPromoCard at={promo.at} picks={promo.picks} onDone={() => setPromo(null)} />}
+        {askingNow && asking && !about && !taste && !promo && !mind && (
+          <AskingCard
+            key={askingNow.round}
+            items={askingNow.items}
+            mode={askingNow.mode}
+            round={askingNow.round}
+            picks={askingNow.picks}
+            signedIn={signedIn}
+            onVoted={(r) => {
+              if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
+              setSession((s) => ({ ...s, votes: s.votes + 1 }));
+              bump(withVote);
+            }}
+            onDone={() => setAskingNow(null)}
+          />
+        )}
         {peek && <div aria-hidden className="deck-peek absolute inset-0 translate-y-3 scale-95 rounded-[20px] bg-white opacity-70 shadow-soft" />}
         <article
           ref={cardRef}
@@ -501,7 +663,14 @@ export function SwipeDeck({
                   className="absolute inset-0"
                 >
                   {winner === s && result && (
-                    <ResultBars side={s} everyone={result} experts={card.expert} onPhoto={!!(s === "A" ? card.imageA : card.imageB)} />
+                    <ResultBars
+                      side={s}
+                      everyone={result}
+                      experts={card.expert}
+                      likeYou={likeYou}
+                      onUnlock={(q) => setAbout({ id: q })}
+                      onPhoto={!!(s === "A" ? card.imageA : card.imageB)}
+                    />
                   )}
                 </OptionFace>
                 {grab?.side === s && (

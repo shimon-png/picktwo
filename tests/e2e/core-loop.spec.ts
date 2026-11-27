@@ -1,6 +1,8 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
 import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules";
 import { ECONOMY_DEFAULTS } from "../../src/lib/constants";
+import { inHoldout } from "../../src/server/services/ranking";
+import { promoPosition } from "../../src/lib/pickbot-promo";
 
 /** Free votes before the sign-up gate, and group B's dialog repeat (default config). */
 const FREE = ECONOMY_DEFAULTS.guestVoteLimit;
@@ -31,10 +33,22 @@ const stamp = Date.now().toString(36);
  */
 let guests = 0;
 const salt = Math.random().toString(36).slice(2, 8);
-async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm) {
+async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm, opts: { mind?: boolean } = {}) {
   const n = ++guests; // a new browser every call
   let id = "";
-  for (let i = 0; !id || pickArm(id, 50) !== arm; i++) id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
+  // …and outside the about-you cards holdout, so the deck asks its questions.
+  // …and outside the about-you cards and profile bar holdouts, so the deck asks its questions and shows the bar.
+  for (
+    let i = 0;
+    !id ||
+    pickArm(id, 50) !== arm ||
+    inHoldout(`about:${id}`, ECONOMY_DEFAULTS.aboutHoldoutPct) ||
+    inHoldout(`pbar:${id}`, ECONOMY_DEFAULTS.profileBarHoldoutPct) ||
+    // "What's on your mind" card (vote 3): only where a test asks for it; elsewhere a browser in its holdout.
+    inHoldout(`mind:${id}`, ECONOMY_DEFAULTS.mindHoldoutPct) !== !opts.mind;
+    i++
+  )
+    id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "pt_vid", value: id, url: baseURL ?? "http://localhost:3000" }]);
   await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
@@ -89,14 +103,15 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await poster.getByRole("button", { name: "Name for option A" }).click();
   await poster.getByLabel("Name of option A").fill("Lego Art Set");
   await poster.getByLabel("Name of option B").fill("Paint easel");
+  await poster.getByLabel(/The story/).fill("Loves art, budget ~$50");
   await snap(poster, "01-new-battle");
   await poster.getByRole("button", { name: "Continue" }).click();
   const sheet = poster.getByRole("dialog", { name: "Review & publish" });
   await expect(sheet.getByLabel("Question")).toHaveValue("Lego Art Set or Paint easel?");
   await expect(sheet.getByText(/Category/)).toHaveCount(0);
   await expect(sheet.getByLabel(/Post as/)).toHaveCount(0); // admin-only
+  await expect(sheet.getByLabel(/The story/)).toHaveCount(0); // asked on the options step now
   await sheet.getByLabel("Question").fill(`Gift for my 6 y/o ${stamp}`);
-  await sheet.getByLabel(/Context/).fill("Loves art, budget ~$50");
   await expect(sheet.getByText(/Kid’s age/)).toHaveCount(0);
   await expect(sheet.getByRole("checkbox")).toHaveCount(0); // data use lives in Settings now
   await sheet.getByRole("button", { name: /Target a specific group/ }).click();
@@ -260,6 +275,94 @@ test("sign-up gate test, group B: a closable dialog after the free votes and eve
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
+test("profile bar: counts deck votes, explains itself, asks a missing question (Pickbot Phase 0)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control");
+  const p = await ctx.newPage();
+  await p.goto("/vote");
+  const bar = p.getByTestId("profile-bar");
+  await expect(bar.getByText("Profile 0/30")).toBeVisible();
+  await expect(bar.getByText("+4 about you")).toBeVisible();
+  await p.getByRole("button", { name: /^Vote for/ }).first().click();
+  await expect(bar.getByText("Profile 1/30")).toBeVisible();
+  await bar.getByRole("button", { name: /Profile 1\/30/ }).click();
+  await expect(bar.getByText("29 more battles to your full profile")).toBeVisible();
+  await expect(bar.getByText("A complete profile unlocks")).toBeVisible();
+  await snap(p, "profile-bar-open");
+  await bar.getByRole("button", { name: "Answer" }).first().click();
+  const card = p.getByRole("article", { name: /About you: I'm a…/ });
+  await card.getByRole("button", { name: "Woman" }).click();
+  await expect(card).toBeHidden();
+  await expect(bar.getByText("+3 about you")).toBeVisible();
+  await snap(p, "profile-bar");
+  await ctx.close();
+});
+
+test("about-you cards: a question after vote 2, answers stick, skip works (Nov 25)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control");
+  const page = await ctx.newPage();
+  await page.goto("/vote");
+  const pickOne = async () => {
+    const title = (await page.locator("article.deck-card h1").first().innerText()).trim();
+    await expect(async () => {
+      await page.getByRole("button", { name: /^Vote for/ }).first().click();
+      await expect(page.locator("article.deck-card h1").first()).not.toHaveText(title, { timeout: 4000 });
+    }).toPass({ timeout: 20_000 });
+  };
+  await pickOne();
+  await pickOne();
+  const card = page.getByRole("article", { name: /About you/ });
+  await expect(card.getByText("I'm a…")).toBeVisible();
+  await card.getByRole("button", { name: "Woman" }).click();
+  await expect(card).toHaveCount(0);
+  await pickOne();
+  await pickOne();
+  await expect(card.getByRole("button", { name: "25–34" })).toBeVisible(); // six equal slices, shuffled
+  await expect(card.getByRole("button")).toHaveCount(7); // 6 answers + Skip
+  await card.getByRole("button", { name: "Skip" }).click();
+  await expect(card).toHaveCount(0);
+  const me = await page.request.get("/api/signup-prefill").then((r) => r.json());
+  expect(me).toMatchObject({ sex: "FEMALE", ageRange: null });
+});
+
+test("what's on your mind: one tap at vote 3, then the personality map sign-up with only what's missing (Nov 26)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control", { mind: true });
+  const page = await ctx.newPage();
+  await page.goto("/vote");
+  const before = await apiVotes(page, 2);
+  test.skip(before.length < 2, "not enough open battles");
+  await page.reload();
+  await page.getByRole("button", { name: /^Vote for/ }).first().click();
+  const card = page.getByTestId("mind-card");
+  await expect(card.getByText("What’s on your mind this week?")).toBeVisible({ timeout: 8000 });
+  await expect(card.getByRole("button")).toHaveCount(8); // 6 topics + Other + Skip
+  await snap(page, "mind-card");
+  // "Other" opens a text box (Alex, Nov 26); Back returns to the topics.
+  await card.getByRole("button", { name: "Other…" }).click();
+  await card.getByLabel("What’s on your mind").fill("my sister's wedding");
+  await snap(page, "mind-other");
+  await card.getByRole("button", { name: "Show me battles about it" }).click();
+  await expect(card).toHaveCount(0);
+  // A run of votes with it in mind, then the sign-up nudge (mindNudgeAfter = 8 votes since the pick).
+  const run = await apiVotes(page, ECONOMY_DEFAULTS.mindNudgeAfter - 1);
+  test.skip(run.length < ECONOMY_DEFAULTS.mindNudgeAfter - 1, "not enough open battles");
+  await page.reload();
+  await page.getByRole("button", { name: /^Vote for/ }).first().click();
+  const nudge = page.getByTestId("mind-nudge");
+  await expect(nudge.getByText("We’re starting to really understand you.")).toBeVisible({ timeout: 8000 });
+  await snap(page, "mind-nudge");
+  await nudge.getByRole("button", { name: "See my personality map" }).click();
+  const dialog = page.getByRole("dialog", { name: "Sign up, or keep voting" });
+  await expect(dialog.getByText("Your personality map is ready.")).toBeVisible();
+  await expect(dialog.getByLabel("ZIP code")).toHaveCount(0); // ZIP is inferred, never asked
+  await dialog.getByLabel("Your email").fill(`mind-${stamp}@test.dev`);
+  await expect(dialog.getByRole("button", { name: "Email me a code" })).toBeDisabled(); // sex + age missing
+  await dialog.getByRole("button", { name: "Woman" }).click();
+  await dialog.getByRole("button", { name: "25–34" }).click();
+  await expect(dialog.getByRole("button", { name: "Email me a code" })).toBeEnabled();
+  await snap(page, "mind-signup");
+  await ctx.close();
+});
+
 test("non-admin cannot post as another user", async ({ browser }) => {
   const p = await newUser(browser, "notadmin");
   const res = await p.request.post("/api/battles", {
@@ -293,24 +396,24 @@ test("guest gate: free votes, then sign up with an emailed code (needs DEV_LOGIN
   test.skip(votes.length < FREE + 1, "not enough open battles");
   expect(votes.slice(0, FREE).every((v) => v.status === 200)).toBe(true);
   expect(votes[FREE].status).toBe(401); // one past the free votes: the wall
+  // About-you answers given as a guest prefill the one-tap sign-up card and land on the account.
+  for (const [question, answer] of [["sex", "FEMALE"], ["age", "AGE_35_44"]])
+    expect((await page.request.post("/api/me/about", { data: { question, answer } })).ok()).toBe(true);
   await page.reload();
   const gate = page.getByRole("region", { name: "Sign up to keep voting" });
-  await expect(gate.getByText("Step 1 of 4")).toBeVisible();
+  await expect(gate.getByText("You’re all set. Just confirm.")).toBeVisible();
+  await expect(gate.getByText(`Save your ${FREE} picks`)).toBeVisible();
+  await expect(gate.getByText("Woman · 35–44")).toBeVisible();
   await gate.getByLabel("Your email").fill(`gate-${stamp}@test.dev`);
+  await expect(gate.getByText(`@gate`)).toBeVisible(); // username follows the email
   await gate.getByRole("button", { name: "Email me a code" }).click();
   const code = (await gate.getByText(/Dev mode: your code is/).innerText()).match(/\d{6}/)![0];
   await gate.getByLabel("Code").fill(code);
   await gate.getByRole("button", { name: "Verify" }).click();
-  await expect(gate.getByText("Step 3 of 4")).toBeVisible();
-  await gate.getByLabel(/Pick a username/).fill(`gate_${stamp}`.slice(0, 20));
-  await gate.getByRole("button", { name: "Continue" }).click();
-  await expect(gate.getByText("Step 4 of 4")).toBeVisible();
-  await gate.getByRole("button", { name: "Female", exact: true }).click();
-  await gate.getByRole("button", { name: "35–44" }).click();
-  await gate.getByLabel(/ZIP code/).fill("94110");
-  await gate.getByRole("button", { name: "Finish and keep voting" }).click();
   await page.waitForURL(/\/vote/);
   await expect(page.getByText(/to High priority|Top priority/)).toBeVisible();
+  const me = await page.request.get("/api/me/quick-profile").then((r) => r.json());
+  expect(me).toMatchObject({ complete: true, sex: "FEMALE", ageRange: "AGE_35_44" });
   // Guest votes carried over: none of the voted battles come back.
   const after = (await page.request.get("/api/feed").then((r) => r.json())).items as { slug: string }[];
   const votedSlugs = new Set(votes.slice(0, FREE).map((v) => v.slug));
@@ -440,4 +543,190 @@ test("voted like you + taste twins + direct messages (policy, block, opt-out)", 
   await expect(a.getByRole("link", { name: handle("twin_b"), exact: true })).toHaveCount(0);
   await b.goto("/people-like-you");
   await expect(b.getByText(/You’re hidden from “Voted like you”/)).toBeVisible();
+});
+
+test("Pickbot: every profile card first → answer → ask the crowd → better answer after 30 battles (fake AI)", async ({ browser }) => {
+  test.setTimeout(180_000);
+  // 10% of accounts are in the Pickbot holdout (stable per account): make a fresh one until it isn't.
+  let p: Page | null = null;
+  for (let i = 0; i < 4 && !p; i++) {
+    const page = await newUser(browser, `asker${i}`);
+    await page.goto("/ask");
+    if (await page.getByLabel("Ask Pickbot").isVisible()) p = page;
+  }
+  test.skip(!p, "every account landed in the holdout");
+  const page = p!;
+  await expect(page.getByRole("link", { name: "Ask", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ask Pickbot" })).toBeVisible();
+  await snap(page, "pickbot-01-ask");
+  await page.getByLabel("Ask Pickbot").fill("Which dress for a winter wedding, the green or the burgundy?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.waitForURL(/\/ask\/[^/]+$/);
+
+  // Onboarding gave sex, age and ZIP; Pickbot asks every other card in the chat, with no way to skip.
+  const gate = page.getByTestId("pickbot-gate");
+  await expect(gate).toBeVisible();
+  await expect(page.getByText(/Before I answer, I need to know you a little/)).toBeVisible();
+  await expect(page.getByText("Skip, just answer")).toHaveCount(0);
+  await snap(page, "pickbot-02-gate");
+  let cards = 0;
+  while (await gate.isVisible().catch(() => false)) {
+    const label = await gate.getByText(/of 10/).textContent();
+    await gate.getByRole("button").first().click();
+    await expect(gate.getByText(label!)).toHaveCount(0, { timeout: 10_000 });
+    if (++cards > 10) throw new Error("too many cards");
+  }
+  expect(cards).toBe(6); // relationship, education, home, race, party, work (onboarding gave sex, age, ZIP and kids)
+
+  // Then the answer right away: General, since the taste profile isn't at 30 yet.
+  const answer = page.getByTestId("pickbot-answer").last();
+  await expect(answer.getByText("The first option")).toBeVisible();
+  await expect(answer.getByText("General")).toBeVisible();
+  await answer.getByRole("button", { name: "Helpful", exact: true }).click();
+  await expect(answer.getByRole("button", { name: "Helpful", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await snap(page, "pickbot-04-answer");
+  // No "better answer" offer until the crowd question is settled.
+  await expect(page.getByTestId("pickbot-better")).toHaveCount(0);
+
+  // Ask the crowd: draft → review → post as "Asked via Pickbot".
+  await page.getByRole("button", { name: "Yes, ask the crowd" }).click();
+  const draft = page.getByTestId("pickbot-draft");
+  await expect(draft.getByText("Anonymous · preview")).toBeVisible();
+  await snap(page, "pickbot-05-draft");
+  await draft.getByRole("button", { name: "Post anonymously" }).click();
+  await expect(page.getByText("Posted anonymously.", { exact: false })).toBeVisible();
+  await expect(page.getByText("With the crowd")).toBeVisible();
+
+  // Then: "Want a better answer?" with the 30-battle bar (all votes so far count).
+  const better = page.getByTestId("pickbot-better");
+  await expect(better.getByText(/Want a better answer, tailored to your personality\? Answer \d+ more battles?/)).toBeVisible();
+  await expect(better.getByText(/\d+ \/ 30 battles/)).toBeVisible();
+  await snap(page, "pickbot-06-better");
+  await better.getByRole("button", { name: "Yes, let’s go" }).click();
+  const battles = page.getByTestId("pickbot-battles");
+  const bar = battles.getByTestId("pickbot-taste-bar");
+  const before = Number((await bar.getByText(/\/ 30 battles/).textContent())!.split("/")[0].trim());
+  await battles.getByRole("button", { name: /^Vote for/ }).first().click();
+  await expect(bar.getByText(`${before + 1} / 30 battles`)).toBeVisible();
+  await snap(page, "pickbot-07-battles");
+
+  // Reach 30 votes (through the API, like voting in the deck), then the thread gives the tailored answer.
+  const need = 30 - (before + 1);
+  const cast = await apiVotes(page, need);
+  test.skip(cast.filter((c) => c.status === 200).length < need, "not enough open battles to reach 30");
+  await page.reload();
+  await expect(page.getByTestId("pickbot-answer").last().getByText("Tailored")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("pickbot-better")).toHaveCount(0);
+  await snap(page, "pickbot-08-tailored");
+
+  // The crowd battle never shows who asked; follow-ups work; history lists the question.
+  await page.getByRole("link", { name: "See it →" }).click();
+  await expect(page.getByText(/askedviapickbot|Asked via Pickbot/).first()).toBeVisible();
+  await expect(page.getByText(/asker\d_/)).toHaveCount(0);
+  await page.goBack();
+  await page.getByLabel("Ask a follow-up").fill("What shoes go with it?");
+  await page.getByLabel("Ask a follow-up").press("Enter");
+  await expect(page.getByTestId("pickbot-answer")).toHaveCount(3);
+  await page.goto("/ask");
+  await expect(page.getByRole("heading", { name: "Your questions" })).toBeVisible();
+});
+
+test("Ask Pickbot deck card: shows once, at the account's tested position (never the first 3)", async ({ browser }) => {
+  test.setTimeout(240_000);
+  // Find an account with Pickbot access and an early position, so the test doesn't vote 20 times.
+  let page: Page | null = null;
+  let at = 0;
+  for (let i = 0; i < 8 && !page; i++) {
+    const p = await newUser(browser, `promo${i}`);
+    const me = await (await p.request.get("/api/me/export")).json();
+    const pos = promoPosition(me.profile.id);
+    await p.goto("/ask");
+    if (pos <= 6 && (await p.getByLabel("Ask Pickbot").isVisible())) {
+      page = p;
+      at = pos;
+    }
+  }
+  test.skip(!page, "no account with an early position");
+  const p = page!;
+  expect(at).toBeGreaterThan(3);
+  await p.goto("/vote");
+  const promo = p.getByTestId("pickbot-promo");
+  let picks = 0;
+  for (let guard = 0; guard < 40 && !(await promo.isVisible()); guard++) {
+    const mindCard = p.getByTestId("mind-card");
+    if (await mindCard.isVisible()) {
+      await mindCard.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(mindCard).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const asking = p.getByTestId("asking-card");
+    if (await asking.isVisible().catch(() => false)) {
+      await asking.getByRole("button", { name: /^(Not now|Keep voting)$/ }).click({ timeout: 3000 }).catch(() => {});
+      await expect(asking).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const about = p.getByRole("article", { name: /^About you/ });
+    if (await about.isVisible()) {
+      await about.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(about).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const dialog = p.getByRole("dialog");
+    if (await dialog.isVisible().catch(() => false)) {
+      await dialog.getByRole("button", { name: "Keep voting" }).click();
+      await p.waitForTimeout(400);
+      continue;
+    }
+    const btn = p.getByRole("button", { name: /^Vote for/ }).first();
+    if (!(await btn.isVisible())) {
+      await p.waitForTimeout(400);
+      continue;
+    }
+    await btn.click();
+    picks++;
+    await p.waitForTimeout(2300);
+    if (picks < at) await expect(promo).toHaveCount(0);
+  }
+  await expect(promo.getByText("Ask Pickbot your question and get answers from our AI")).toBeVisible();
+  expect(picks).toBeGreaterThanOrEqual(at);
+  await snap(p, "pickbot-promo");
+  await promo.getByRole("button", { name: "Keep voting" }).click();
+  await expect(promo).toHaveCount(0);
+  // Once per person: let the events flush, then a new visit never shows it again.
+  await p.waitForTimeout(5000);
+  await p.evaluate(() => sessionStorage.clear());
+  await p.goto("/vote");
+  for (let i = 0, guard = 0; i < at + 1 && guard < 40; guard++) {
+    // Close other special cards (about-you, taste reveal) the same way a person would.
+    const mindCard = p.getByTestId("mind-card");
+    if (await mindCard.isVisible()) {
+      await mindCard.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(mindCard).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const asking = p.getByTestId("asking-card");
+    if (await asking.isVisible().catch(() => false)) {
+      await asking.getByRole("button", { name: /^(Not now|Keep voting)$/ }).click({ timeout: 3000 }).catch(() => {});
+      await expect(asking).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const about = p.getByRole("article", { name: /^About you/ });
+    if (await about.isVisible()) {
+      await about.getByRole("button", { name: "Skip" }).click({ timeout: 3000 }).catch(() => {});
+      await expect(about).toBeHidden({ timeout: 5000 }).catch(() => {});
+      continue;
+    }
+    const dialog = p.getByRole("dialog");
+    if (await dialog.isVisible().catch(() => false)) {
+      await dialog.getByRole("button", { name: "Keep voting" }).click();
+      await p.waitForTimeout(400);
+      continue;
+    }
+    const btn = p.getByRole("button", { name: /^Vote for/ }).first();
+    if (!(await btn.isVisible().catch(() => false))) break;
+    await btn.click();
+    i++;
+    await p.waitForTimeout(2300);
+  }
+  await expect(promo).toHaveCount(0);
 });

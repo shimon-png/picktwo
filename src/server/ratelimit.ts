@@ -23,6 +23,8 @@ export const RULES = {
   events: { limit: 60, windowSec: 60 },
   eventsIpHour: { limit: 3000, windowSec: 3600 },
   generic: { limit: 60, windowSec: 60 },
+  pickbotAsk: { limit: 30, windowSec: 3600 },
+  pickbotAnswer: { limit: 40, windowSec: 3600 },
 } satisfies Record<string, Rule>;
 
 const redis =

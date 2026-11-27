@@ -33,6 +33,7 @@ export type EmailData = {
   vote_milestone: { title: string; slug: string; n: number; labelA: string; labelB: string; votesA: number; votesB: number; topReason: string | null };
   needs_votes: { title: string; slug: string; votes: number };
   results_in: { title: string; slug: string; labelA: string; labelB: string; votesA: number; votesB: number; reasons: string[] };
+  pickbot_results: { threadId: string; title: string; labelA: string; labelB: string; votesA: number; votesB: number; agreed: boolean | null };
   loop_reminder: { title: string; slug: string; labelA: string; labelB: string; n: number };
   voter_updates: { outcomes: (Omit<T.VoterOutcome, "url"> & { slug: string })[]; helpful: (Omit<T.HelpfulItem, "url"> & { slug: string })[] };
   welcome: { name: string };
@@ -105,6 +106,10 @@ async function render<K extends EmailKind>(kind: K, d: EmailData[K]): Promise<T.
         battles: x.battles.map((b) => ({ ...b, url: link(`/b/${b.slug}`) })),
         outcomes: x.outcomes.map((b) => ({ ...b, url: link(`/b/${b.slug}`) })),
       });
+    }
+    case "pickbot_results": {
+      const x = d as EmailData["pickbot_results"];
+      return T.pickbotResults({ ...x, url: link(`/ask/${x.threadId}`) });
     }
     case "dm_request": {
       const x = d as EmailData["dm_request"];

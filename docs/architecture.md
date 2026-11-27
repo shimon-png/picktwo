@@ -72,6 +72,9 @@ API, so they show their plan price.
 
 - **Cron**: one daily job (`vercel.json`, 14:17 UTC) closes battles, refreshes engagement scores, sends reminders.
   Battles also close on read, so nothing breaks if cron is late.
+- **Auto-seeding** (`services/auto-seed.ts`, hourly cron `/api/cron/auto-seed`): when the 10th top voter of the
+  week has 50 or fewer battles left, Claude writes 100 seed battles (33% with Pexels photos checked by Claude Haiku),
+  each with 15–20 seed votes. Status and buttons on `/admin/battles`; numbers in economy `autoSeed*`.
 - **Migrations** run on every build (`npm run build`), including previews, against the production database.
 - **Admin pages**: `/admin` (metrics), `/admin/brain` (data notebook numbers), `/admin/finance` (costs),
   `/admin/reports` (moderation), `/admin/battles`, `/admin/messages`, `/admin/config` (economy numbers).

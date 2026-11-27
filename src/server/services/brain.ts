@@ -3,8 +3,10 @@ import { db } from "../db";
 import { users } from "../db/schema";
 import { or, eq, isNotNull } from "drizzle-orm";
 import { isAdmin } from "../viewer";
+import { parseChange, periodOf, summarize, type BaRow } from "./before-after-rules";
 import { getEconomy } from "./config";
-import { classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
+import { taggingStatus, untaggedCount } from "./tagging";
+import { campaignOf, classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 
 /**
  * Two ways to look at the Brain (Alex, Nov 23 2026). Nothing is ever deleted; the views only filter.
@@ -135,7 +137,7 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
   const votePlaces = await db.execute<{ place: string; kind: string; n: number }>(sql`
     SELECT CASE COALESCE(v.source, '')
         WHEN 'feed' THEN 'Vote deck' WHEN 'home' THEN 'Homepage card' WHEN 'discover' THEN 'Discover'
-        WHEN 'search' THEN 'Search' WHEN 'profile' THEN 'Profile' WHEN 'seed' THEN 'Seed votes (fake, All view only)' ELSE 'Battle page / shared link' END AS place,
+        WHEN 'search' THEN 'Search' WHEN 'profile' THEN 'Profile' WHEN 'asking' THEN 'People like you are asking' WHEN 'seed' THEN 'Seed votes (fake, All view only)' ELSE 'Battle page / shared link' END AS place,
       CASE WHEN EXISTS (SELECT 1 FROM "option" o WHERE o.battle_id = v.battle_id AND o.image_url IS NOT NULL) THEN 'photo' ELSE 'text' END AS kind,
       count(*)::int AS n
     FROM vote v WHERE v.created_at > ${since} AND ${voteOK} AND NOT v.flagged
@@ -221,14 +223,11 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       ) cv ON true
       WHERE b.tags ? 'brain' AND b.status <> 'DELETED'
       GROUP BY 1 HAVING COALESCE(sum(rv.n), 0) > 0 OR COALESCE(sum(cv.views), 0) > 0 ORDER BY 3 DESC`);
-  const [byStakes, [untagged]] = await Promise.all([
-    byTag("stakes"),
-    db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM battle WHERE status <> 'DELETED' AND NOT (tags ? 'brain')`),
-  ]);
+  const [byStakes, untagged, tagging] = await Promise.all([byTag("stakes"), untaggedCount(), taggingStatus()]);
 
   const [daily, visitSources] = await Promise.all([dailyNumbers(scope), visitsBySource(scope)]);
 
-  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byStakes, untagged: untagged?.n ?? 0, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
+  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byStakes, untagged, tagging, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
 }
 
 type Scope = Awaited<ReturnType<typeof brainScope>>;
@@ -236,8 +235,10 @@ type Scope = Awaited<ReturnType<typeof brainScope>>;
 export type DayRow = { day: string; visitors: number; visits: number; signups: number; votes: number; voters: number; posts: number };
 
 /** Day by day (New York days, newest first): visitors, visits, sign-ups, votes, people who voted, battles posted. */
-async function dailyNumbers(scope: Scope): Promise<DayRow[]> {
+/** `until` (ISO) cuts every count off at that moment, e.g. to split a day in two (Before vs after). */
+export async function dailyNumbers(scope: Scope, until?: string): Promise<DayRow[]> {
   const { since, ev, vt, bt, us } = scope;
+  const upTo = (col: SQL) => (until ? sql`AND ${col} < ${until}` : sql``);
   const day = (col: SQL) => sql`to_char((${col} AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD')`;
   const rows = await db.execute<DayRow>(sql`
     WITH days AS (
@@ -246,19 +247,19 @@ async function dailyNumbers(scope: Scope): Promise<DayRow[]> {
     ),
     s AS (
       SELECT ${day(sql`e.created_at`)} AS day, count(*)::int AS visits, count(DISTINCT ${WHO_E})::int AS visitors
-      FROM ${EV_FROM} WHERE e.name = 'session_start' AND e.created_at > ${since} AND ${ev} GROUP BY 1
+      FROM ${EV_FROM} WHERE e.name = 'session_start' AND e.created_at > ${since} ${upTo(sql`e.created_at`)} AND ${ev} GROUP BY 1
     ),
     g AS (
       SELECT ${day(sql`u.onboarded_at`)} AS day, count(*)::int AS signups
-      FROM "user" u WHERE u.onboarded_at > ${since} AND ${us} GROUP BY 1
+      FROM "user" u WHERE u.onboarded_at > ${since} ${upTo(sql`u.onboarded_at`)} AND ${us} GROUP BY 1
     ),
     v AS (
       SELECT ${day(sql`v.created_at`)} AS day, count(*)::int AS votes, count(DISTINCT ${WHO_V})::int AS voters
-      FROM ${V_FROM} WHERE v.created_at > ${since} AND NOT v.flagged AND ${vt} GROUP BY 1
+      FROM ${V_FROM} WHERE v.created_at > ${since} ${upTo(sql`v.created_at`)} AND NOT v.flagged AND ${vt} GROUP BY 1
     ),
     p AS (
       SELECT ${day(sql`b.created_at`)} AS day, count(*)::int AS posts
-      FROM battle b WHERE b.created_at > ${since} AND ${bt} GROUP BY 1
+      FROM battle b WHERE b.created_at > ${since} ${upTo(sql`b.created_at`)} AND ${bt} GROUP BY 1
     )
     SELECT days.day, COALESCE(s.visitors, 0) AS visitors, COALESCE(s.visits, 0) AS visits, COALESCE(g.signups, 0) AS signups,
       COALESCE(v.votes, 0) AS votes, COALESCE(v.voters, 0) AS voters, COALESCE(p.posts, 0) AS posts
@@ -292,7 +293,7 @@ async function visitsBySource(scope: Scope): Promise<VisitSourceRow[]> {
     b.who.add(who);
     if (r.day === r.today) b.today.add(who);
     if (r.day === r.yesterday) b.yesterday.add(who);
-    const tag = String(p.utm_source ?? p.referrerHost ?? (p.twclid ? "twclid" : ""));
+    const tag = campaignOf(p) ?? String(p.utm_source ?? p.referrerHost ?? (p.twclid ? "twclid" : ""));
     if (tag) b.hosts.set(tag, (b.hosts.get(tag) ?? 0) + 1);
     by.set(src, b);
   }
@@ -307,4 +308,80 @@ async function visitsBySource(scope: Scope): Promise<VisitSourceRow[]> {
       detail: [...b.hosts.entries()].sort((x, y) => y[1] - x[1]).slice(0, 3).map(([h, n]) => `${h} (${n})`).join(", "),
     }))
     .sort((a, b) => b.visits - a.visits);
+}
+
+/**
+ * Before vs after a product change (economy `beforeAfterFrom`, New York time as YYYYMMDDHHmm, or a whole day as
+ * YYYYMMDD; default the about-you go-live, Nov 25 2026 11:23): the same day-by-day numbers for up to 14 days
+ * before and every day since. With a time, the change day is split into an "until" and a "from" row on either
+ * side; partial days (those halves and today so far) count as fractions of a day in the averages
+ * (before-after-rules.ts, tested).
+ */
+export async function beforeAfterStats(view: BrainView) {
+  const e = await getEconomy();
+  const { day: changeDay, time } = parseChange(e.beforeAfterFrom);
+  const days = Math.max(1, Math.ceil((Date.now() - Date.parse(`${changeDay}T00:00:00Z`)) / 86400_000) + 15);
+  const scope = await brainScope(view, days);
+  // Epoch milliseconds from Postgres (New York day starts and the go-live minute), so JS never parses its text.
+  const ms = (x: SQL) => sql`(extract(epoch from ${x}) * 1000)::float8`;
+  const [t] = await db.execute<{ day_start: number; split: number | null; today: string; today_start: number }>(sql`
+    SELECT ${ms(sql`to_date(${changeDay}, 'YYYY-MM-DD')::timestamp AT TIME ZONE ${TZ}`)} AS day_start,
+      ${time ? ms(sql`(${changeDay} || ' ' || ${time})::timestamp AT TIME ZONE ${TZ}`) : sql`NULL`} AS split,
+      to_char((now() AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD') AS today,
+      ${ms(sql`(now() AT TIME ZONE ${TZ})::date::timestamp AT TIME ZONE ${TZ}`)} AS today_start`);
+  const DAY = 86400_000;
+  const now = Date.now();
+  const todayWeight = Math.min(1, Math.max(0.01, (now - Number(t.today_start)) / DAY));
+  const daily = await dailyNumbers(scope);
+  const rows: BaRow[] = daily
+    .filter((d) => !time || d.day !== changeDay)
+    .map((d) => ({ ...d, label: d.day, period: periodOf(d.day, changeDay), weight: d.day === t.today ? todayWeight : 1 }));
+  if (time && t.split != null) {
+    const dayStart = Number(t.day_start);
+    const split = Number(t.split);
+    const splitIso = new Date(split).toISOString();
+    const startIso = new Date(Math.max(dayStart, Date.parse(scope.since))).toISOString();
+    const [beforeHalf, afterHalf] = await Promise.all([
+      dailyNumbers({ ...scope, since: startIso }, splitIso),
+      split < now ? dailyNumbers({ ...scope, since: splitIso }) : Promise.resolve([] as DayRow[]),
+    ]);
+    const pick = (list: DayRow[]) => list.find((d) => d.day === changeDay);
+    const b = pick(beforeHalf);
+    const a = pick(afterHalf);
+    if (b) rows.push({ ...b, label: `${changeDay} until ${time}`, period: "before", weight: Math.max(0.01, (split - dayStart) / DAY) });
+    if (a) rows.push({ ...a, label: `${changeDay} from ${time}`, period: "after", weight: Math.max(0.01, (Math.min(now, dayStart + DAY) - split) / DAY) });
+  }
+  return { changeDay, changeTime: time, ...summarize(rows) };
+}
+
+export type PinnedDay = { votesPerVisitor: number | null; votersPerVisitor: number | null; newVoters: number; signups: number; posts: number };
+
+/**
+ * The pinned row at the top of the Brain (Alex, Nov 25): today so far and yesterday (New York days), same counting
+ * as Day by day. New voters = people whose first counted vote ever fell on that day (in Clean view: their first real
+ * vote since the clean start date).
+ */
+export async function pinnedNumbers(view: BrainView): Promise<{ today: PinnedDay; yesterday: PinnedDay; todayDay: string; yesterdayDay: string }> {
+  const scope = await brainScope(view, 2);
+  const [daily, firsts, [t]] = await Promise.all([
+    dailyNumbers(scope),
+    db.execute<{ day: string; n: number }>(sql`
+      WITH f AS (SELECT ${WHO_V} AS who, min(v.created_at) AS first FROM ${V_FROM} WHERE NOT v.flagged AND ${scope.vt} GROUP BY 1)
+      SELECT to_char((first AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD') AS day, count(*)::int AS n
+      FROM f WHERE who IS NOT NULL AND first > now() - interval '3 days' GROUP BY 1`),
+    db.execute<{ today: string; yesterday: string }>(sql`
+      SELECT to_char((now() AT TIME ZONE ${TZ})::date, 'YYYY-MM-DD') AS today, to_char((now() AT TIME ZONE ${TZ})::date - 1, 'YYYY-MM-DD') AS yesterday`),
+  ]);
+  const pin = (day: string): PinnedDay => {
+    const d = daily.find((r) => r.day === day);
+    const visitors = Number(d?.visitors ?? 0);
+    return {
+      votesPerVisitor: visitors ? Number(d!.votes) / visitors : null,
+      votersPerVisitor: visitors ? Number(d!.voters) / visitors : null,
+      newVoters: Number([...firsts].find((r) => r.day === day)?.n ?? 0),
+      signups: Number(d?.signups ?? 0),
+      posts: Number(d?.posts ?? 0),
+    };
+  };
+  return { today: pin(t.today), yesterday: pin(t.yesterday), todayDay: t.today, yesterdayDay: t.yesterday };
 }

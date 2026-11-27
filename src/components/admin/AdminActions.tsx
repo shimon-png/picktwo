@@ -82,30 +82,6 @@ export function ConfigEditor({ economy, features }: { economy: Record<string, nu
   );
 }
 
-export function AdminSeed() {
-  const [busy, setBusy] = useState(false);
-  const router = useRouter();
-  async function run() {
-    setBusy(true);
-    try {
-      const r = await api<{ demo: unknown }>("/api/admin/seed", { method: "POST" });
-      toast(`Seed: ${JSON.stringify(r.demo)}`, "ok");
-      router.refresh();
-    } catch (e) {
-      toast((e as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <section className="card space-y-2 p-4">
-      <h2 className="font-sans font-medium">Demo content</h2>
-      <p className="text-sm text-zinc-500">Adds ~18 sample gift/name/purchase battles (some with outcomes) so the feed isn’t empty at launch. Safe to run once.</p>
-      <button className="btn-outline" disabled={busy} onClick={run}>Seed demo battles</button>
-    </section>
-  );
-}
-
 export function RecomputeEngagement() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -134,8 +110,8 @@ export function TagBattles({ remaining }: { remaining: number }) {
   async function run() {
     setBusy(true);
     try {
-      const r = await api<{ tagged: number; failed: number; remaining: number; enabled: boolean }>("/api/admin/brain/tag", { method: "POST" });
-      toast(r.enabled ? `Tagged ${r.tagged}${r.failed ? `, ${r.failed} failed` : ""}. ${r.remaining} left.` : "Tagging is off: OPENAI_API_KEY isn't set in Vercel yet.", r.enabled ? "ok" : "error");
+      const r = await api<{ tagged: number; failed: number; remaining: number; enabled: boolean; error?: string | null }>("/api/admin/brain/tag", { method: "POST" });
+      toast(r.enabled ? `Tagged ${r.tagged}${r.failed ? `, ${r.failed} failed${r.error ? ` (${r.error})` : ""}` : ""}. ${r.remaining} left.` : "Tagging is off: neither OPENAI_API_KEY nor ANTHROPIC_API_KEY is set in Vercel.", r.enabled ? "ok" : "error");
       router.refresh();
     } catch (e) {
       toast((e as Error).message, "error");
@@ -146,6 +122,28 @@ export function TagBattles({ remaining }: { remaining: number }) {
   return (
     <button className="chip !py-1 text-xs" onClick={run} disabled={busy || remaining === 0}>
       {busy ? "Tagging…" : remaining ? `Tag next ${Math.min(100, remaining)} of ${remaining} untagged` : "All battles tagged"}
+    </button>
+  );
+}
+
+export function LoadZipIncome({ rows }: { rows: number }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    setBusy(true);
+    try {
+      const r = await api<{ loaded: number; year: number; error?: string }>("/api/admin/brain/zip-income", { method: "POST" });
+      toast(r.error ? `Census: ${r.error}` : `Loaded ${r.loaded.toLocaleString()} ZIP areas (ACS ${r.year})`, r.error ? "error" : "ok");
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <button className="chip !py-1 text-xs" onClick={run} disabled={busy}>
+      {busy ? "Loading Census data…" : rows ? `Reload Census income (${rows.toLocaleString()} ZIPs)` : "Load Census income by ZIP"}
     </button>
   );
 }

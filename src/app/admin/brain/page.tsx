@@ -1,5 +1,9 @@
+import { skipStats } from "@/server/services/skip-stats";
 import Link from "next/link";
-import { getBrainStats, type BrainView } from "@/server/services/brain";
+import { beforeAfterStats, getBrainStats, pinnedNumbers, type BrainView, type PinnedDay } from "@/server/services/brain";
+import { change } from "@/server/services/before-after-rules";
+import { unitEconomicsStats } from "@/server/services/unit-economics";
+import { money, unitEconomics } from "@/server/services/unit-economics-rules";
 import { tasteByGroup } from "@/server/services/taste-profiles";
 import { winbackStats } from "@/server/services/winback";
 import { signupSources } from "@/server/services/acquisition";
@@ -10,13 +14,79 @@ import { themeLabel } from "@/lib/theme-guess";
 import { signupJourneys } from "@/server/services/signup-journeys";
 import { gateTestResults } from "@/server/services/gate-test";
 import { ARM_LABELS, type GateCell } from "@/server/services/gate-test-rules";
-import { RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
+import { LoadZipIncome, RecomputeEngagement, TagBattles } from "@/components/admin/AdminActions";
+import { passiveStats, type GroupRow } from "@/server/services/passive-stats";
+import { aboutStats, type ArmNumbers } from "@/server/services/about-stats";
+import { mindStats } from "@/server/services/mind-stats";
+import { profileBarStats } from "@/server/services/profile-progress";
+import { pickbotStats } from "@/server/services/pickbot-stats";
+import { ABOUT_QUESTIONS } from "@/lib/about";
 import type { BrainListKind } from "@/server/services/brain-lists";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Brain" };
 
+const usd = (n: number, digits: number) => "$" + n.toFixed(digits);
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "—");
+
+type UeStats = Awaited<ReturnType<typeof unitEconomicsStats>>;
+
+/** Unit economics: how it's calculated, with the current Config assumptions spelled out. */
+function ueNote(ue: UeStats, view: BrainView) {
+  const a = ue.assumptions;
+  const lifetime =
+    a.ueLifetimeVisits > 0
+      ? `set to ${a.ueLifetimeVisits}`
+      : "= measured visits per visitor (ueLifetimeVisits 0); early on this undercounts people who will come back";
+  return [
+    "The most we can pay to acquire a visitor and break even = what a visitor brings in minus what serving them costs.",
+    `Measured from everyone who visited since ${ue.from} (all of it, whatever window is picked above; ueFrom in Config; ${view === "clean" ? "Clean" : "All data"} view): votes, visits and sign-ups, grouped by where they first came from.`,
+    `Prices are assumptions in Config: ads ${money(a.ueAdCpm)} per 1,000 views, one every ${a.ueVotesPerAd} votes (ueAdCpm, ueVotesPerAd);`,
+    `sponsored battles ${a.ueSponsoredSharePct}% of cards at ${money(a.ueSponsoredCpm)} per 1,000 votes (ueSponsoredSharePct, ueSponsoredCpm);`,
+    `a signed-up user is worth ${money(a.ueSignupValue)} a year (ueSignupValue); lifetime visits ${lifetime}.`,
+    "Serving cost = this month's usage above the fixed plan fees (/admin/finance) divided by this month's visitors; the fixed plans are a monthly bill the margin has to cover, shown below.",
+  ].join(" ");
+}
+
+function ueTiles(ue: UeStats): [string, string, string][] {
+  const o = ue.overall;
+  const a = ue.assumptions;
+  return [
+    ["Break-even per visitor", money(o.breakEven), "the most to pay per visitor"],
+    ["From ads", money(o.revenue.ads), `${o.lifetimeVotes.toFixed(1)} votes, 1 ad per ${a.ueVotesPerAd}`],
+    ["From sponsored battles", money(o.revenue.sponsored), `${a.ueSponsoredSharePct}% of votes`],
+    ["From sign-ups", money(o.revenue.signups), `${(100 * o.signupRate).toFixed(1)}% sign up × ${money(a.ueSignupValue)}`],
+    [
+      "Serving cost (usage)",
+      ue.cost.perVisitor == null ? "—" : money(-ue.cost.perVisitor),
+      ue.cost.usage == null ? "finance data unavailable" : `${money(ue.cost.usage)} usage ÷ ${ue.cost.visitors.toLocaleString()} visitors this month`,
+    ],
+  ];
+}
+
+/** One day of the Day by day table through the same unit economics (prices + this month's usage cost per visitor). */
+function dayBreakEven(ue: UeStats, d: { visitors: number; visits: number; votes: number; signups: number }) {
+  if (!d.visitors) return <span key="be">—</span>;
+  const be = unitEconomics({ ...d, costPerVisitor: ue.cost.perVisitor }, ue.assumptions).breakEven;
+  return (
+    <span key="be" className={be > 0 ? "text-green" : "text-b"}>
+      {money(be)}
+    </span>
+  );
+}
+
+/** Fixed plan fees vs the per-visitor margin: how many visitors a month cover them. */
+function ueFixedLine(ue: UeStats): string {
+  const fixed = ue.cost.fixedMonthly;
+  if (fixed == null) return "";
+  const be = ue.overall.breakEven;
+  return be > 0
+    ? `Fixed plans cost ${money(fixed)} a month; at ${money(be)} margin per visitor that takes about ${Math.ceil(fixed / be).toLocaleString()} visitors a month.`
+    : `Fixed plans cost ${money(fixed)} a month; with no margin per visitor yet, visitors don't cover them.`;
+}
+/** "14 days", "1.5 days", "40 min", "6 h" for how much time a Before / After side covers. */
+const spanLabel = (days: number) =>
+  days >= 1 ? `${Math.round(days * 10) / 10} day${Math.round(days * 10) / 10 === 1 ? "" : "s"}` : days * 24 >= 1 ? `${Math.round(days * 24)} h` : `${Math.round(days * 1440)} min`;
 const pctN = (x: number) => `${(100 * x).toFixed(1)}%`;
 const pctOf = (x: number | null) => (x == null ? "—" : `${Math.round(100 * x)}%`);
 const gateRow = (day: React.ReactNode, group: string, c: GateCell): React.ReactNode[] => [
@@ -31,9 +101,138 @@ const gateRow = (day: React.ReactNode, group: string, c: GateCell): React.ReactN
 ];
 const secs = (ms: number | null | undefined) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)}s`);
 
-function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+const QUESTION_LABELS: Record<string, string> = {
+  sex: "Sex",
+  age: "Age",
+  relationship: "Relationship",
+  zip: "ZIP (v1 only)",
+  kids: "Kids",
+  education: "Education",
+  housing: "Home (rent / own)",
+  race: "Race / ethnicity",
+  party: "Party",
+  work: "Work",
+};
+const perVisitor = (a: ArmNumbers | { visitors: number; votes: number }) => (a.visitors ? (a.votes / a.visitors).toFixed(2) : "—");
+/** Plain-language read of the no-cards group vs the cards group on votes per visitor. */
+function verdict(holdout: { visitors: number; votes: number }, cards: { visitors: number; votes: number }, p: number | null) {
+  if (!holdout.visitors || !cards.visitors) return "Not enough data yet";
+  const h = holdout.votes / holdout.visitors;
+  const c = cards.votes / cards.visitors;
+  const lift = h ? (c - h) / h : 0;
+  const side = `Cards ${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}% vs no cards`;
+  if (p == null) return `${side} · not enough data yet`;
+  return p < 0.05 ? `${side} · real difference (p = ${p.toFixed(3)})` : `${side} · could be chance (p = ${p.toFixed(2)})`;
+}
+
+function barVerdict(holdout: { visitors: number; votes: number }, bar: { visitors: number; votes: number }, p: number | null) {
+  if (!holdout.visitors || !bar.visitors) return "Not enough data yet";
+  const h = holdout.votes / holdout.visitors;
+  const lift = h ? (bar.votes / bar.visitors - h) / h : 0;
+  const side = `Votes per visitor with the bar ${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}% vs without`;
+  if (p == null) return `${side} · not enough data yet`;
+  return p < 0.05 ? `${side} · real difference (p = ${p.toFixed(3)})` : `${side} · could be chance (p = ${p.toFixed(2)})`;
+}
+
+/** Votes per visitor for one version, both groups together (cards + no cards). */
+function sinceV2(versions: { version: string; from: string; cards: ArmNumbers; holdout: ArmNumbers }[]) {
+  const v2 = versions.find((v) => v.version === "v2");
+  if (!v2) return undefined;
+  const v1 = versions.find((v) => v.version === "v1");
+  const all = (v: typeof v2) => {
+    const n = v.cards.visitors + v.holdout.visitors;
+    return n ? ((v.cards.votes + v.holdout.votes) / n).toFixed(2) : "—";
+  };
+  const from = new Date(v2.from).toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
+  return { now: all(v2), before: v1 ? all(v1) : "—", from: `${from} (cards v2)` };
+}
+
+/**
+ * Pinned big numbers (Alex, Nov 25): today so far, yesterday underneath. Every tile opens what's behind it
+ * (Alex, Nov 26): the big number opens today's list, the "Yesterday" line yesterday's. A ratio opens the people or
+ * votes it's made of (votes per visitor → today's votes; % who voted → today's voters).
+ */
+function PinnedRow({
+  today,
+  yesterday,
+  since,
+  todayHref,
+  yesterdayHref,
+}: {
+  today: PinnedDay;
+  yesterday: PinnedDay;
+  since?: { now: string; before: string; from: string };
+  todayHref: (k: BrainListKind) => string;
+  yesterdayHref: (k: BrainListKind) => string;
+}) {
+  const r = (x: number | null) => (x == null ? "—" : x.toFixed(2));
+  const pct = (x: number | null) => (x == null ? "—" : `${Math.round(x * 100)}%`);
+  type Item = { label: string; now: string | number; sub: string; href: string; subHref?: string };
+  const day = (label: string, now: string | number, before: string | number, kind: BrainListKind): Item => ({
+    label: `${label} · today`,
+    now,
+    sub: `Yesterday ${before}`,
+    href: todayHref(kind),
+    subHref: yesterdayHref(kind),
+  });
+  const items: Item[] = [
+    day("Votes per visitor", r(today.votesPerVisitor), r(yesterday.votesPerVisitor), "votes"),
+    day("% of visitors who voted", pct(today.votersPerVisitor), pct(yesterday.votersPerVisitor), "voters"),
+    day("New voters", today.newVoters, yesterday.newVoters, "newvoters"),
+    day("New sign-ups", today.signups, yesterday.signups, "signups"),
+    day("New battles posted", today.posts, yesterday.posts, "battles"),
+  ];
+  // Temporary (Alex, Nov 25): votes per visitor since cards v2 went live, everyone incl. the no-cards group. Opens the v1 vs v2 table.
+  if (since) items.splice(1, 0, { label: `Votes per visitor since ${since.from}`, now: since.now, sub: `Cards v1 ${since.before}`, href: "#cards-versions" });
   return (
-    <section className="card space-y-2 p-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" aria-label="Pinned numbers, today">
+      {items.map((it, i) => (
+        // The whole card opens `href` (stretched link); the Yesterday line sits above it with its own link.
+        <div key={it.label} className={`card relative p-4 transition hover:ring-1 hover:ring-accent ${i === 0 ? "col-span-2 sm:col-span-1" : ""}`}>
+          <Link href={it.href} className="text-xs text-zinc-500 after:absolute after:inset-0 after:content-['']">
+            {it.label} ›
+          </Link>
+          <div className="font-display text-[40px] font-semibold leading-none tabular-nums">{it.now}</div>
+          {it.subHref ? (
+            <Link href={it.subHref} className="relative z-10 mt-1 inline-block text-xs text-zinc-500 underline decoration-ink/20 underline-offset-2 hover:decoration-accent">
+              {it.sub}
+            </Link>
+          ) : (
+            <div className="mt-1 text-xs text-zinc-500">{it.sub}</div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A number that opens the list behind it (only when there's something to show). */
+function Num({ href, n, children }: { href: string; n: number; children?: React.ReactNode }) {
+  if (!n) return <>{children ?? n}</>;
+  return (
+    <Link href={href} className="underline decoration-ink/20 underline-offset-2 hover:decoration-accent">
+      {children ?? n}
+    </Link>
+  );
+}
+
+/** Deck position bucket label (skip-stats) → position range for the cards list. */
+const POS_RANGE: Record<string, string> = { "1": "1-1", "2–5": "2-5", "6–10": "6-10", "11–20": "11-20", "21+": "21-99999" };
+/** "Where votes were made" place label (brain.ts) → vote.source for the votes list. */
+const PLACE_KEY: Record<string, string> = {
+  "Vote deck": "feed",
+  "Homepage card": "home",
+  Discover: "discover",
+  Search: "search",
+  Profile: "profile",
+  "People like you are asking": "asking",
+  "Seed votes (fake, All view only)": "seed",
+  "Battle page / shared link": "page",
+};
+
+function Section({ title, note, id, children }: { title: string; note?: string; id?: string; children: React.ReactNode }) {
+  return (
+    <section id={id} className="card scroll-mt-4 space-y-2 p-4">
       <h2 className="font-sans font-medium">{title}</h2>
       {note && <p className="text-xs text-zinc-500">{note}</p>}
       {children}
@@ -105,13 +304,22 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   const days = [1, 7, 30].includes(Number(sp.days)) ? Number(sp.days) : 7;
   const view: BrainView = sp.view === "all" ? "all" : "clean";
   const href = (o: { days?: number; view?: BrainView }) => `/admin/brain?days=${o.days ?? days}${(o.view ?? view) === "all" ? "&view=all" : ""}`;
-  const [s, taste, wb, acq, journeys, gt, te] = await Promise.all([
+  const [s, taste, wb, acq, journeys, gt, ps, ab, ba, sk, ue, pins, pb, pk, md, te] = await Promise.all([
     getBrainStats(days, view),
     tasteByGroup(),
     winbackStats(),
     signupSources(Math.max(days, 30), view),
     signupJourneys(),
     gateTestResults(days),
+    passiveStats(view, days),
+    aboutStats(view, days),
+    beforeAfterStats(view),
+    skipStats(view, days),
+    unitEconomicsStats(view),
+    pinnedNumbers(view),
+    profileBarStats(view, days),
+    pickbotStats(view, days),
+    mindStats(view, days),
     themeEngagementData(days, view),
   ]);
   const themeHeadlines = themeHighlights(te, themeLabel);
@@ -142,24 +350,32 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
   });
   const failed = checks.filter((c) => !c.ok);
   // Third item = the list behind the number (/admin/brain/list/[kind]); everything with one is clickable.
-  const tiles: [string, string | number, BrainListKind?][] = [
-    ["Visits", n("sessions"), "visitors"],
-    ["Visitors (people)", n("visitors"), "visitors"],
-    ["Deck cards shown", n("views")],
+  const listHref = (kind: BrainListKind, day?: string, more?: Record<string, string>) => {
+    const q = new URLSearchParams({ days: String(days) });
+    if (view === "all") q.set("view", "all");
+    if (day) q.set("day", day);
+    for (const [k, v] of Object.entries(more ?? {})) q.set(k, v);
+    return `/admin/brain/list/${kind}?${q}`;
+  };
+  // Every tile opens the list behind it (Alex, Nov 26). A rate or median opens the rows it's computed from.
+  const tiles: [string, string | number, string][] = [
+    ["Visits", n("sessions"), listHref("visitors")],
+    ["Visitors (people)", n("visitors"), listHref("visitors")],
+    ["Deck cards shown", n("views"), listHref("cards")],
     // Share of cards seen (person × battle) that the same person voted on.
-    ["Cards seen → voted", pct(viewedVoted, viewedTotal)],
-    [view === "clean" ? "Votes by real people" : "Votes (incl. seed)", n("real_votes"), "votes"],
-    ["People who voted", n("voters"), "voters"],
-    ["Median time to pick", secs(t.median_pick_ms)],
-    ["Skips", n("skips")],
-    ["People who hit the sign-up wall", n("gates"), "gates"],
-    ["Sign-ups", n("signups"), "signups"],
-    ["Vote changes", n("changed")],
-    [view === "clean" ? "Battles posted by real people" : "Battles posted", n("real_battles"), "battles"],
-    ["Seed votes (all time, excluded)", n("seed_votes_all")],
+    ["Cards seen → voted", pct(viewedVoted, viewedTotal), listHref("cards", undefined, { outcome: "voted" })],
+    [view === "clean" ? "Votes by real people" : "Votes (incl. seed)", n("real_votes"), listHref("votes")],
+    ["People who voted", n("voters"), listHref("voters")],
+    ["Median time to pick", secs(t.median_pick_ms), listHref("votes", undefined, { place: "feed" })],
+    ["Skips", n("skips"), listHref("skips")],
+    // Of deck cards people decided on (voted or skipped), the share they skipped.
+    ["Deck skip rate", pct(sk.total.skipped, sk.total.voted + sk.total.skipped), listHref("cards", undefined, { outcome: "skipped" })],
+    ["People who hit the sign-up wall", n("gates"), listHref("gates")],
+    ["Sign-ups", n("signups"), listHref("signups")],
+    ["Vote changes", n("changed"), listHref("changes")],
+    [view === "clean" ? "Battles posted by real people" : "Battles posted", n("real_battles"), listHref("battles")],
+    ["Seed votes (all time, excluded)", n("seed_votes_all"), listHref("seedvotes")],
   ];
-  const listHref = (kind: BrainListKind, day?: string) =>
-    `/admin/brain/list/${kind}?days=${days}${view === "all" ? "&view=all" : ""}${day ? `&day=${day}` : ""}`;
 
   return (
     <div className="space-y-5">
@@ -184,6 +400,14 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         Hypotheses and requests live in the repo under docs/brain/.
       </p>
 
+      <PinnedRow
+        today={pins.today}
+        yesterday={pins.yesterday}
+        since={sinceV2(ab.versions)}
+        todayHref={(k) => listHref(k, pins.todayDay)}
+        yesterdayHref={(k) => listHref(k, pins.yesterdayDay)}
+      />
+
       <div className={`card p-3 text-sm ${failed.length ? "ring-1 ring-b" : ""}`}>
         {failed.length === 0 ? (
           <span>
@@ -203,9 +427,9 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         )}
       </div>
 
-      <Section title="Day by day" note="New York days, newest first. Tap any number to see who or what is behind it. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both. Votes per voter = votes ÷ people who voted that day; votes per visitor = votes ÷ everyone who visited.">
+      <Section title="Day by day" note="New York days, newest first. Tap any number to see who or what is behind it. The small number is the change from the day before. Visits, votes, sign-ups and battles add up to the tiles; Visitors and Voters are people, so someone active on two days counts on both. Votes per voter = votes ÷ people who voted that day; votes per visitor = votes ÷ everyone who visited. Break-even per visitor = that day's visitors, visits, votes and sign-ups run through Unit economics (same prices and serving cost).">
         <Rows
-          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Votes per voter", "Votes per visitor", "Battles posted"]}
+          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Votes per voter", "Votes per visitor", "Battles posted", "Break-even per visitor"]}
           rows={s.daily.map((d, i) => {
             const prev = s.daily[i + 1];
             const cell = (kind: BrainListKind, now: number, before: number | undefined) =>
@@ -226,9 +450,113 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
               <Ratio key="vpv" now={ratio(d.votes, d.voters)} prev={prev && ratio(prev.votes, prev.voters)} />,
               <Ratio key="vpvis" now={ratio(d.votes, d.visitors)} prev={prev && ratio(prev.votes, prev.visitors)} />,
               cell("battles", d.posts, prev?.posts),
+              dayBreakEven(ue, d),
             ];
           })}
         />
+      </Section>
+
+      <Section title={`Unit economics: what a visitor is worth · since ${ue.from}`} note={ueNote(ue, view)}>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
+          {ueTiles(ue).map(([label, value, sub], i) => (
+            <div key={label} className={`rounded-xl p-3 ${i === 0 ? (ue.overall.breakEven > 0 ? "bg-green-soft" : "bg-b-soft") : "bg-surface"}`}>
+              <div className="text-xs text-zinc-500">{label}</div>
+              <div className={`text-lg tabular-nums ${i === 0 ? (ue.overall.breakEven > 0 ? "text-green" : "text-b") : ""}`}>{value}</div>
+              <div className="text-[11px] text-zinc-500">{sub}</div>
+            </div>
+          ))}
+        </div>
+        <Rows
+          head={["First came from", "Visitors", "Votes per visitor", "Visits per visitor", "Sign-up rate", "Worth per visitor", "Break-even per visitor", "Per 1,000 visitors"]}
+          rows={[
+            { label: <b key="all">Everyone</b>, u: ue.overall },
+            ...ue.sources.map((r) => ({ label: r.visitors < 30 ? `${r.label} (few)` : r.label, u: r })),
+          ].map(({ label, u }) => [
+            label,
+            u.visitors,
+            u.votesPerVisitor.toFixed(1),
+            u.visitsPerVisitor.toFixed(2),
+            `${(100 * u.signupRate).toFixed(1)}%`,
+            money(u.revenue.total),
+            <b key="b" className={u.breakEven > 0 ? "text-green" : "text-b"}>
+              {money(u.breakEven)}
+            </b>,
+            money(u.breakEven * 1000),
+          ])}
+        />
+        <p className="text-xs text-zinc-500">
+          What moves it (everyone): sign-up rate ×2 → {money(ue.whatIf.doubleSignupRate)}; one more visit per person → {money(ue.whatIf.oneMoreVisit)}; a
+          signed-up user worth 3× → {money(ue.whatIf.signupValueX3)}. Compare with what an ad click costs on X or Meta (about $0.30–$2): break-even above
+          that means paid ads pay for themselves. {ueFixedLine(ue)}
+        </p>
+        <h3 className="pt-2 font-sans text-sm font-medium">By ad campaign</h3>
+        {ue.campaigns.length === 0 ? (
+          <p className="text-xs text-zinc-500">No ad visits yet. Tag each campaign link, e.g. ?utm_source=x&amp;utm_campaign=whos_right.</p>
+        ) : (
+          <Rows
+            head={["Campaign (utm_campaign)", "Source", "Landing page", "Visitors", "Votes per visitor", "Sign-up rate", "Came back another day", "Break-even per visitor"]}
+            rows={ue.campaigns.map((c) => [
+              c.visitors < 30 ? `${c.campaign} (few)` : c.campaign,
+              <span key="s" className="text-xs text-zinc-500">{c.label}</span>,
+              <span key="l" className="text-xs text-zinc-500">{c.landing || "—"}</span>,
+              c.visitors,
+              c.votesPerVisitor.toFixed(1),
+              `${(100 * c.signupRate).toFixed(1)}%`,
+              `${Math.round(100 * c.cameBack)}%`,
+              <b key="b" className={c.breakEven > 0 ? "text-green" : "text-b"}>
+                {money(c.breakEven)}
+              </b>,
+            ])}
+          />
+        )}
+        <p className="text-xs text-zinc-500">
+          Each person counts under the campaign of their first visit (an ad click or utm tag), with the page that visit landed on. Came back = visited on 2+
+          different New York days. Compare break-even with that campaign&apos;s cost per click in X Ads: break-even is the most a visitor can cost, so higher is
+          better. Under 30 visitors the numbers swing a lot.
+        </p>
+      </Section>
+
+      <Section
+        title={`Before vs after the change · ${ba.changeDay}${ba.changeTime ? ` ${ba.changeTime}` : ""}`}
+        note={`The about-you launch (cards in the deck, "people like you", one-tap sign-up, taste profile) went live on ${ba.changeDay}${ba.changeTime ? ` at ${ba.changeTime} New York time. That day is split in two rows: until ${ba.changeTime} counts as Before, from ${ba.changeTime} as After` : "; that day counts as neither side"}. Same counting as Day by day (${view === "clean" ? "Clean" : "All data"} view). Averages are per day; partial days (the split day's halves and today so far) count as that fraction of a day. While a side covers only a few hours its per-day numbers are scaled up from very little data, so they swing a lot; the ratios (votes per visitor, sign-up rate) settle sooner. To compare around a different change, set beforeAfterFrom in Config (YYYYMMDDHHmm New York time, or YYYYMMDD).`}
+      >
+        <Rows
+          head={["Per day", `Before (${spanLabel(ba.before.span)})`, `After (${spanLabel(ba.after.span)})`, "Change"]}
+          rows={(
+            [
+              ["Visitors", ba.before.visitors, ba.after.visitors, (x: number) => x.toFixed(1)],
+              ["Votes", ba.before.votes, ba.after.votes, (x: number) => x.toFixed(1)],
+              ["Voters", ba.before.voters, ba.after.voters, (x: number) => x.toFixed(1)],
+              ["Sign-ups", ba.before.signups, ba.after.signups, (x: number) => x.toFixed(1)],
+              ["Votes per visitor", ba.before.votesPerVisitor, ba.after.votesPerVisitor, (x: number) => x.toFixed(2)],
+              ["Votes per voter", ba.before.votesPerVoter, ba.after.votesPerVoter, (x: number) => x.toFixed(2)],
+              ["Sign-up rate (of visitors)", ba.before.signupRate, ba.after.signupRate, (x: number) => `${(100 * x).toFixed(1)}%`],
+            ] as const
+          ).map(([label, b, a, fmt]) => {
+            const c = ba.after.span > 0 && ba.before.span > 0 ? change(b, a) : null;
+            return [
+              label,
+              ba.before.span > 0 ? fmt(b) : "—",
+              ba.after.span > 0 ? fmt(a) : "—",
+              c == null ? "—" : <span key="c" className={c > 0 ? "text-green" : c < 0 ? "text-b" : ""}>{`${c > 0 ? "+" : c < 0 ? "−" : ""}${Math.abs(Math.round(c * 100))}%`}</span>,
+            ];
+          })}
+        />
+        <Rows
+          head={["Day", "Period", "Visitors", "Votes", "Voters", "Votes per visitor", "Votes per voter", "Sign-ups", "Sign-up rate"]}
+          rows={ba.rows.map((d) => [
+            d.label,
+            d.period === "launch" ? <b key="p">Launch day</b> : d.period === "after" ? <span key="p" className="text-green">After</span> : "Before",
+            d.visitors,
+            d.votes,
+            d.voters,
+            d.visitors ? (d.votes / d.visitors).toFixed(1) : "—",
+            d.voters ? (d.votes / d.voters).toFixed(1) : "—",
+            d.signups,
+            pct(d.signups, d.visitors),
+          ])}
+        />
+        {ba.after.span === 0 && <p className="text-xs text-zinc-500">Nothing after the change yet.</p>}
       </Section>
 
       <Section
@@ -273,29 +601,258 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
       </Section>
 
       <Section
+        title="Who visitors are (no questions asked)"
+        note={`People who visited in this window, from signals every browser sends: state from the IP address (Vercel's geolocation, metro-level), iPhone vs Android, phone price tier (iPhone screen size; Android model), the app they opened us in, and an income band estimated from their ZIP area's Census median income (typed ZIP, else the IP guess) nudged by phone tier. Estimates for groups, never shown to anyone. Collected from Nov 25; older visitors show as unknown.`}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          {(
+            [
+              ["State (IP)", ps.region.slice(0, 12)],
+              ["Platform", ps.platform],
+              ["Phone tier", ps.tier],
+              ["Opened in", ps.inApp],
+              ["Est. income band", ps.income],
+            ] as [string, GroupRow[]][]
+          ).map(([label, rows]) => (
+            <div key={label}>
+              <Rows
+                head={[label, "People", "Voted", "Signed up"]}
+                rows={rows.map((r) => [r.key, r.visitors, `${r.voted} (${pct(r.voted, r.visitors)})`, `${r.signedUp} (${pct(r.signedUp, r.visitors)})`])}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+          <span>{ps.zipIncomeRows ? `Census income loaded for ${ps.zipIncomeRows.toLocaleString()} ZIP areas.` : "Census income isn't loaded yet (the daily job loads it; or tap the button)."}</span>
+          <LoadZipIncome rows={ps.zipIncomeRows} />
+        </div>
+      </Section>
+
+      <Section
+        title="What’s on your mind this week?"
+        note={`One-tap deck card ${md.on ? "after vote 3 (Config mindAt), again after a week" : "(off: Config mindAt = 0)"}; the topic picked steers the next battles. "Other" lets people type their own answer, listed below (the typed words steer battles too). Signed-out people get the "personality map" sign-up card 8 votes after picking. ${md.holdoutPct}% of people never see the card.`}
+      >
+        <p className="text-sm">
+          Shown {md.shown} · answered {md.answered} ({pct(md.answered, md.shown)}) · skipped {md.skipped} · sign-up nudges {md.nudges}
+        </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Rows head={["Topic", "Picked", "Share"]} rows={md.topics.map((t) => [t.label, t.n, pct(t.n, md.answered)])} />
+          <Rows head={["Typed after “Other”", "Times", "Last"]} rows={md.typed.map((t) => [t.text, t.n, t.last.slice(5, 16)])} />
+        </div>
+      </Section>
+
+      <Section
+        title="About-you cards"
+        note={`One-tap questions in the Vote deck, no account needed: sex after vote 2, age 4, relationship 7, kids 9, education 11, home 13, race/ethnicity 16, party 19 (race and party have "Prefer not to say", which counts as answered); with an account, work 35. Numbers in Config. ZIP is no longer asked (since cards v2): it comes from the IP. ${ab.holdoutPct}% of people never see a card, so comparing them with everyone else shows what cards cost or add.`}
+      >
+        <div className="grid gap-2 md:grid-cols-2">
+          <div className="rounded-xl bg-surface p-3">
+            <div className="text-xs text-zinc-500">Votes per visitor, no-cards group → sees cards (this window)</div>
+            <div className="text-2xl tabular-nums">
+              {perVisitor(ab.arms.holdout)} → {perVisitor(ab.arms.cards)}
+            </div>
+            <div className="text-xs text-zinc-500">
+              {verdict(ab.arms.holdout, ab.arms.cards, ab.holdoutP)}
+            </div>
+          </div>
+          <div className="rounded-xl bg-surface p-3">
+            <div className="text-xs text-zinc-500">Card answers per visitor who sees cards (this window)</div>
+            <div className="text-2xl tabular-nums">
+              {ab.arms.cards.visitors ? (ab.questions.reduce((t, q) => t + q.answered, 0) / ab.arms.cards.visitors).toFixed(2) : "—"}
+            </div>
+            <div className="text-xs text-zinc-500">How many demographics we learn per visitor, on top of what the IP and phone give us.</div>
+          </div>
+        </div>
+        {ab.versions.length > 0 && (
+          <>
+            <h3 id="cards-versions" className="scroll-mt-4 pt-2 font-sans text-sm font-medium">Cards v1 vs v2</h3>
+            <p className="text-xs text-zinc-500">
+              v1 = sex, age, relationship, ZIP (from {nyTime(ab.versions[0].from)}). v2 = no ZIP card; kids, education, home, race, party without
+              an account (starts by itself at the first new question shown{ab.versions[1] ? `: ${nyTime(ab.versions[1].from)}` : ", not yet"}). Whole
+              version, not the day window. Goal: v2 keeps or raises votes per visitor AND learns more per visitor. The no-cards rows show what
+              the same days looked like without cards.
+            </p>
+            <Rows
+              head={["Version", "Group", "Visitors", "Votes per visitor", "Voters per visitor", "Answers per visitor", "Answered 1+", "Holdout vs cards"]}
+              rows={ab.versions.flatMap((v) =>
+                (["cards", "holdout"] as const).map((k) => [
+                  <b key="v">{v.version}</b>,
+                  k === "cards" ? "Sees cards" : `No cards (${ab.holdoutPct}%)`,
+                  v[k].visitors,
+                  perVisitor(v[k]),
+                  v[k].visitors ? (v[k].voters / v[k].visitors).toFixed(2) : "—",
+                  k === "cards" ? (v[k].visitors ? (v[k].answers / v[k].visitors).toFixed(2) : "—") : "—",
+                  k === "cards" ? pct(v[k].answered, v[k].visitors) : "—",
+                  k === "cards" ? <span key="p" className="text-xs">{verdict(v.holdout, v.cards, v.votesP)}</span> : "",
+                ]),
+              )}
+            />
+          </>
+        )}
+        <Rows
+          head={["Question", "Shown", "Answered", "Skipped", "Answer rate"]}
+          rows={ab.questions
+            .filter((r) => r.shown > 0 || ABOUT_QUESTIONS[r.id].inDeck)
+            .map((r) => [QUESTION_LABELS[r.id] ?? r.id, r.shown, r.answered, r.skipped, pct(r.answered, r.shown)])}
+        />
+      </Section>
+
+      <Section
+        title="Pickbot"
+        note={`Ask tab (docs/plans/pickbot-prd.html). ${pk.open ? "Open to every signed-in person" : "Admins only (Config pickbotOpen = 0)"}; answers by ${pk.model}; ${pk.holdoutPct}% of accounts never get it. People = distinct people who did each step in the window.`}
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <Link href={listHref("askers")} className="card block p-3 transition hover:ring-1 hover:ring-accent">
+            <div className="text-xs text-zinc-500">People who asked ›</div>
+            <div className="text-2xl font-medium">{pk.usage.askers}</div>
+          </Link>
+          <div className="card p-3">
+            <div className="text-xs text-zinc-500">Questions (not follow-ups)</div>
+            <div className="text-2xl font-medium">{pk.usage.questions}</div>
+          </div>
+          <div className="card p-3">
+            <div className="text-xs text-zinc-500">Questions per asker</div>
+            <div className="text-2xl font-medium">{pk.usage.askers ? (pk.usage.questions / pk.usage.askers).toFixed(1) : "—"}</div>
+          </div>
+          <div className="card p-3">
+            <div className="text-xs text-zinc-500">Asked again on another day</div>
+            <div className="text-2xl font-medium">{pct(pk.usage.repeat, pk.usage.askers)}</div>
+          </div>
+        </div>
+        <p className="text-xs text-zinc-500">
+          Got an answer: {pk.usage.answeredPeople} of {pk.usage.askers} askers ({pct(pk.usage.answeredPeople, pk.usage.askers)}); the rest stopped at the profile cards or
+          the question was off-topic. Questions are private: the Brain shows topics and counts, never the words.
+        </p>
+        <Rows
+          head={["Day", "Askers", "Questions", "Follow-ups", "Answers", "Tailored", "👍 / 👎", "Crowd posts", "Results back", "AI cost"]}
+          rows={pk.daily.map((d) => [
+            d.day,
+            d.askers ? (
+              <Link key="a" href={listHref("askers", d.day)} className="underline decoration-ink/20 underline-offset-2 hover:decoration-accent">
+                {d.askers}
+              </Link>
+            ) : (
+              0
+            ),
+            d.questions,
+            d.followups,
+            d.answers,
+            d.tailored,
+            `${d.up} / ${d.down}`,
+            d.crowd,
+            d.results,
+            usd(d.cost, 2),
+          ])}
+        />
+        <Rows
+          head={["What people ask about", "Kind", "Questions", "People"]}
+          rows={pk.themes.map((t) => [t.theme.replaceAll("_", " "), t.scope.replace("_", "-"), t.questions, t.people])}
+        />
+        <p className="pt-2 text-sm font-medium">“Ask Pickbot” card in the Vote deck: which position works best</p>
+        <p className="text-xs text-zinc-500">
+          {pk.promoOn ? "On" : "Off (Config pickbotPromo = 0)"}. Each signed-in person who hasn’t asked Pickbot yet sees it once, after a stable random number of
+          picks in one deck visit (never the first 3). Active = used the deck in the window; reached = got that far in one visit. The fairest
+          comparison is <b>asked per active person</b>: it counts people who never got far enough too.
+        </p>
+        <Rows
+          head={["After pick", "Active", "Reached", "Saw it", "Tapped", "Asked (7 days)", "Tap rate", "Asked / saw", "Asked / active"]}
+          rows={pk.promo.map((r) => {
+            const best = Math.max(...pk.promo.map((x) => (x.active >= 20 ? x.asked / x.active : 0)));
+            const rate = r.active ? r.asked / r.active : 0;
+            return [
+              r.at,
+              r.active,
+              r.reached,
+              r.saw,
+              r.tapped,
+              r.asked,
+              pct(r.tapped, r.saw),
+              pct(r.asked, r.saw),
+              <span key="b" className={r.active >= 20 && rate === best && best > 0 ? "font-semibold text-green" : undefined}>
+                {pct(r.asked, r.active)}
+              </span>,
+            ];
+          })}
+        />
+        <Rows head={["Step", "People", "Times"]} rows={pk.funnel.map((f) => [f.label, f.people, f.events])} />
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {(
+            [
+              ["Answers", pk.totalAnswers],
+              ["AI cost", usd(pk.totalCost, 2)],
+              ["Cost per answer", pk.totalAnswers ? usd(pk.totalCost / pk.totalAnswers, 3) : "—"],
+              [
+                "Took the better-answer offer",
+                pct(pk.choice.retailor ?? 0, (pk.choice.retailor ?? 0) + (pk.funnel.find((f) => f.name === "pickbot_battles_stopped")?.events ?? 0)),
+              ],
+              ["👍 rate", pct(pk.ratings.reduce((t, r) => t + r.up, 0), pk.ratings.reduce((t, r) => t + r.up + r.down, 0))],
+              ["Crowd agreed with Pickbot", pct(pk.agree.yes, pk.agree.yes + pk.agree.no)],
+            ] as [string, React.ReactNode][]
+          ).map(([k, val]) => (
+            <div key={k} className="card p-3">
+              <div className="text-xs text-zinc-500">{k}</div>
+              <div className="text-xl font-medium">{val}</div>
+            </div>
+          ))}
+        </div>
+        <Rows
+          head={["Model", "Answer type", "Answers", "Cost each", "Avg seconds"]}
+          rows={pk.answers.map((a) => [a.model, a.kind, a.n, usd(a.costPer, 3), a.latencyS.toFixed(1)])}
+        />
+        <Rows head={["Model", "👍", "👎", "👍 rate"]} rows={pk.ratings.map((r) => [r.model, r.up, r.down, pct(r.up, r.up + r.down)])} />
+        <Rows
+          head={["Group (accounts)", "Visitors", "Votes", "Votes per visitor"]}
+          rows={(["pickbot", "holdout"] as const).map((k) => [
+            k === "pickbot" ? "Has Pickbot" : `Holdout (${pk.holdoutPct}%, no Pickbot)`,
+            pk.arms[k].visitors,
+            pk.arms[k].votes,
+            pk.arms[k].visitors ? (pk.arms[k].votes / pk.arms[k].visitors).toFixed(2) : "—",
+          ])}
+        />
+        <p className="text-xs text-zinc-500">{pk.holdoutP == null ? "Holdout: not enough data yet." : `Holdout difference: ${pk.holdoutP < 0.05 ? "real" : "could be chance"} (p = ${pk.holdoutP.toFixed(3)}).`}</p>
+      </Section>
+
+      <Section
+        title="Profile bar test"
+        note={`The bar above the Vote deck (and on You) counts toward a complete profile: ${pb.target} battles plus sex, age, relationship and ZIP. ${pb.holdoutPct}% of people (stable per account/browser) never see it. Votes are in the page window; "reached ${pb.target}" counts all their votes ever.`}
+      >
+        <Rows
+          head={["Group", "Visitors", "Votes", "Votes per visitor", `Reached ${pb.target} votes`]}
+          rows={(["bar", "holdout"] as const).map((k) => [
+            k === "bar" ? "Sees the bar" : `Holdout (${pb.holdoutPct}%, no bar)`,
+            pb.arms[k].visitors,
+            pb.arms[k].votes,
+            pb.arms[k].visitors ? (pb.arms[k].votes / pb.arms[k].visitors).toFixed(2) : "—",
+            pct(pb.arms[k].reached, pb.arms[k].visitors),
+          ])}
+        />
+        <p className="text-xs text-zinc-500">{barVerdict(pb.arms.holdout, pb.arms.bar, pb.p)}</p>
+      </Section>
+
+      <Section
         title="Visits by source"
-        note="Each visit's own tags: an X ad click (twclid) or utm_source=x/twitter is the X campaign, a t.co / x.com referrer is X organic. Visits add up to the Visits tile; a person who came two ways counts under both. Tip: put utm_source on every campaign link, because apps often hide the referrer."
+        note="Each visit's own tags: an X ad click (twclid) or utm_source=x/twitter is the X campaign, a t.co / x.com referrer is X organic. Visits add up to the Visits tile; a person who came two ways counts under both. Top tags show the utm_campaign for ad visits. Tip: put utm_source and utm_campaign on every campaign link, because apps often hide the referrer."
       >
         <Rows
           head={["Source", "People today", "People yesterday", "People", "Visits", "Top tags"]}
-          rows={s.visitSources.map((r) => [r.label, r.today, r.yesterday, r.visitors, r.visits, <span key="t" className="text-xs text-zinc-500">{r.detail || "—"}</span>])}
+          rows={s.visitSources.map((r) => [
+            r.label,
+            <Num key="t" n={r.today} href={listHref("visitors", pins.todayDay, { source: r.source })} />,
+            <Num key="y" n={r.yesterday} href={listHref("visitors", pins.yesterdayDay, { source: r.source })} />,
+            <Num key="p" n={r.visitors} href={listHref("visitors", undefined, { source: r.source })} />,
+            <Num key="v" n={r.visits} href={listHref("visitors", undefined, { source: r.source })} />,
+            <span key="tags" className="text-xs text-zinc-500">{r.detail || "—"}</span>,
+          ])}
         />
       </Section>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {tiles.map(([k, v, list]) =>
-          list ? (
-            <Link key={k} href={listHref(list)} className="card block p-3 transition hover:ring-1 hover:ring-accent">
-              <div className="text-xs text-zinc-500">{k} ›</div>
-              <div className="text-2xl font-medium">{v}</div>
-            </Link>
-          ) : (
-            <div key={k} className="card p-3">
-              <div className="text-xs text-zinc-500">{k}</div>
-              <div className="text-2xl font-medium">{v}</div>
-            </div>
-          ),
-        )}
+        {tiles.map(([k, v, to]) => (
+          <Link key={k} href={to} className="card block p-3 transition hover:ring-1 hover:ring-accent">
+            <div className="text-xs text-zinc-500">{k} ›</div>
+            <div className="text-2xl font-medium">{v}</div>
+          </Link>
+        ))}
       </div>
 
       <Section
@@ -339,6 +896,12 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         </details>
         <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
           <TagBattles remaining={s.untagged} /> AI-tag the rest so seed battles use the AI theme instead of the word match.
+          {s.tagging && (
+            <span className={s.tagging.failed ? "text-b" : undefined}>
+              Last run {nyTime(s.tagging.at)}: {s.tagging.tagged} tagged
+              {s.tagging.failed ? `, ${s.tagging.failed} failed${s.tagging.error ? ` (${s.tagging.error})` : ""}` : ""}
+            </span>
+          )}
         </div>
       </Section>
 
@@ -440,7 +1003,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
                     {[j.sex, j.ageRange, j.zip3 && `ZIP ${j.zip3}xx`].filter(Boolean).join(" · ") || "no profile"}
                   </span>
                   <span className="ml-auto text-xs tabular-nums">
-                    votes {j.votesBefore} before / <b>{j.votesAfter} after</b> · posts {j.posts} · back days {j.returnDays}
+                    votes {j.votesBefore} before / <b>{j.votesAfter} after</b> · posts {j.posts} · Pickbot {j.asks.length} · back days {j.returnDays}
                   </span>
                 </summary>
                 <div className="mt-2 space-y-1 pl-1 text-xs">
@@ -555,12 +1118,96 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           rows={[
             ...kinds.map((k) => {
               const d = s.byKind.find((r) => (r.kind ?? "?") === k);
-              return [k, votesByKind(k), d?.views ?? 0, d?.seen ?? 0, d?.voted ?? 0, pct(d?.voted ?? 0, d?.seen ?? 0), secs(d?.median_ms ?? null)];
+              const kq = k === "text" || k === "photo" ? { kind: k } : undefined;
+              return [
+                k,
+                <Num key="v" n={votesByKind(k)} href={listHref("votes", undefined, kq)} />,
+                d?.views ?? 0,
+                <Num key="s" n={d?.seen ?? 0} href={listHref("cards", undefined, kq)} />,
+                <Num key="sv" n={d?.voted ?? 0} href={listHref("cards", undefined, { ...kq, outcome: "voted" })} />,
+                pct(d?.voted ?? 0, d?.seen ?? 0),
+                secs(d?.median_ms ?? null),
+              ];
             }),
-            ["Total", placeTotal, s.byKind.reduce((a, k) => a + k.views, 0), viewedTotal, viewedVoted, pct(viewedVoted, viewedTotal), ""],
+            [
+              "Total",
+              <Num key="v" n={placeTotal} href={listHref("votes")} />,
+              s.byKind.reduce((a, k) => a + k.views, 0),
+              <Num key="s" n={viewedTotal} href={listHref("cards")} />,
+              <Num key="sv" n={viewedVoted} href={listHref("cards", undefined, { outcome: "voted" })} />,
+              pct(viewedVoted, viewedTotal),
+              "",
+            ],
           ]}
         />
       </Section>
+
+      <Section
+        title="Voted vs skipped"
+        note={`Every Vote deck card a person saw in this window (person × battle, counted once) ends one way: voted, skipped, or neither (they left, reloaded or switched tab while it was on top). Skip rate = skipped ÷ (voted + skipped). The deck uses the same signal: battles people vote on move up, ones they skip move down (economy skipWeight; the 10% engagement holdout keeps the old order).`}
+      >
+        <Rows
+          head={["Card type", "Cards seen", "Voted", "Skipped", "Neither", "Skip rate", "Left on it"]}
+          rows={[
+            ...sk.byKind.map((r) => {
+              const kq: Record<string, string> = r.kind === "text" || r.kind === "photo" ? { kind: r.kind } : {};
+              return [
+                r.kind,
+                <Num key="s" n={r.seen} href={listHref("cards", undefined, kq)} />,
+                <Num key="v" n={r.voted} href={listHref("cards", undefined, { ...kq, outcome: "voted" })} />,
+                <Num key="k" n={r.skipped} href={listHref("cards", undefined, { ...kq, outcome: "skipped" })} />,
+                <Num key="n" n={r.neither} href={listHref("cards", undefined, { ...kq, outcome: "neither" })} />,
+                pct(r.skipped, r.voted + r.skipped),
+                pct(r.neither, r.seen),
+              ];
+            }),
+            [
+              "Total",
+              <Num key="s" n={sk.total.seen} href={listHref("cards")} />,
+              <Num key="v" n={sk.total.voted} href={listHref("cards", undefined, { outcome: "voted" })} />,
+              <Num key="k" n={sk.total.skipped} href={listHref("cards", undefined, { outcome: "skipped" })} />,
+              <Num key="n" n={sk.total.neither} href={listHref("cards", undefined, { outcome: "neither" })} />,
+              pct(sk.total.skipped, sk.total.voted + sk.total.skipped),
+              pct(sk.total.neither, sk.total.seen),
+            ],
+          ]}
+        />
+      </Section>
+
+      <Section title="Skips by deck position" note="Where in the deck load the card first appeared (1 = first card). A rising skip rate deeper in the deck means people get pickier or run into weaker battles.">
+        <Rows
+          head={["Position", "Cards seen", "Voted", "Skipped", "Neither", "Skip rate"]}
+          rows={sk.byPos.map((r) => {
+            const pq = POS_RANGE[r.bucket];
+            const cell = (key: string, v: number, outcome?: string) =>
+              pq ? <Num key={key} n={v} href={listHref("cards", undefined, { pos: pq, ...(outcome ? { outcome } : {}) })} /> : v;
+            return [r.bucket, cell("s", r.seen), cell("v", r.voted, "voted"), cell("k", r.skipped, "skipped"), cell("n", r.neither, "neither"), pct(r.skipped, r.voted + r.skipped)];
+          })}
+        />
+      </Section>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Section title="Most skipped battles" note={`Battles seen by 5+ people in this window (${sk.battlesRated} so far), highest skip rate first. Candidates to rewrite, relaunch with a better photo, or hide.`}>
+          <Rows
+            head={["Battle", "Seen", "Skip rate"]}
+            rows={sk.mostSkipped.map((b) => [
+              battleLink(b.slug, b.title),
+              <Num key="s" n={b.seen} href={listHref("cards", undefined, { battle: b.slug })} />,
+              <Num key="r" n={b.skipped} href={listHref("cards", undefined, { battle: b.slug, outcome: "skipped" })}>{pct(b.skipped, b.voted + b.skipped)}</Num>,
+            ])}
+          />
+        </Section>
+        <Section title="Least skipped battles" note="Same rule, lowest skip rate first. What these have in common is what to post more of.">
+          <Rows
+            head={["Battle", "Seen", "Skip rate"]}
+            rows={sk.leastSkipped.map((b) => [
+              battleLink(b.slug, b.title),
+              <Num key="s" n={b.seen} href={listHref("cards", undefined, { battle: b.slug })} />,
+              <Num key="r" n={b.skipped} href={listHref("cards", undefined, { battle: b.slug, outcome: "skipped" })}>{pct(b.skipped, b.voted + b.skipped)}</Num>,
+            ])}
+          />
+        </Section>
+      </div>
 
       <Section title="Where votes were made" note={`Every counted vote, by the screen it was made on. The total matches the "Votes by real people" tile.`}>
         <Rows
@@ -568,9 +1215,20 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           rows={[
             ...places.map((pl) => {
               const t = placeKind(pl, "text"), ph = placeKind(pl, "photo");
-              return [pl, t, ph, t + ph];
+              const place = PLACE_KEY[pl] ? { place: PLACE_KEY[pl] } : undefined;
+              return [
+                pl,
+                <Num key="t" n={t} href={listHref("votes", undefined, { ...place, kind: "text" })} />,
+                <Num key="p" n={ph} href={listHref("votes", undefined, { ...place, kind: "photo" })} />,
+                <Num key="a" n={t + ph} href={listHref("votes", undefined, place)} />,
+              ];
             }),
-            ["Total", votesByKind("text"), votesByKind("photo"), placeTotal],
+            [
+              "Total",
+              <Num key="t" n={votesByKind("text")} href={listHref("votes", undefined, { kind: "text" })} />,
+              <Num key="p" n={votesByKind("photo")} href={listHref("votes", undefined, { kind: "photo" })} />,
+              <Num key="a" n={placeTotal} href={listHref("votes")} />,
+            ],
           ]}
         />
       </Section>

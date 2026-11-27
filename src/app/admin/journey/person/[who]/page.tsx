@@ -26,6 +26,7 @@ export default async function PersonJourneyPage({ params }: { params: Promise<{ 
     j.guest ? ["Votes", j.votes.length] : ["Votes before / after sign-up", `${j.votesBefore} / ${j.votesAfter}`],
     ["Days back", j.returnDays],
     ["Posts · follows", `${j.posts} · ${j.follows}`],
+    ["Asked Pickbot", j.guest ? "—" : `${j.asks.length} question${j.asks.length === 1 ? "" : "s"} · ${j.asks.reduce((t, a) => t + a.answers, 0)} answers`],
     ["Last seen", j.lastSeen ? nyTime(j.lastSeen) : "—"],
   ];
   return (
@@ -47,6 +48,58 @@ export default async function PersonJourneyPage({ params }: { params: Promise<{ 
           </div>
         ))}
       </div>
+      {!j.guest && (
+        <section className="card space-y-2 p-4">
+          <h2 className="font-sans font-medium">Pickbot</h2>
+          <p className="text-xs text-zinc-500">
+            Topics and what happened only. Questions are private to the person, so their words aren&apos;t shown here. Profile cards answered inside
+            Pickbot: {j.pickbotCards}.
+          </p>
+          {j.asks.length === 0 ? (
+            <p className="text-sm text-zinc-500">Hasn&apos;t asked Pickbot yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-zinc-500">
+                  <th className="py-1 pr-2 font-normal">When</th>
+                  <th className="py-1 pr-2 font-normal">Topic</th>
+                  <th className="py-1 pr-2 text-right font-normal">Answers</th>
+                  <th className="py-1 pr-2 font-normal">Rated</th>
+                  <th className="py-1 pr-2 font-normal">Crowd</th>
+                  <th className="py-1 pr-2 text-right font-normal">AI cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {j.asks.map((a, i) => (
+                  <tr key={i} className="border-t border-ink/10 align-top">
+                    <td className="py-1.5 pr-2 text-xs text-zinc-500">{nyTime(a.at)}</td>
+                    <td className="py-1.5 pr-2">
+                      {a.theme.replaceAll("_", " ")}
+                      {a.scope !== "decision" && <span className="text-xs text-zinc-500"> · {a.scope.replace("_", "-")}</span>}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums">
+                      {a.answers}
+                      {a.tailored > 0 && <span className="text-xs text-green"> ({a.tailored} tailored)</span>}
+                      {a.followUps > 0 && <span className="text-xs text-zinc-500"> · {a.followUps} follow-up{a.followUps === 1 ? "" : "s"}</span>}
+                    </td>
+                    <td className="py-1.5 pr-2">{a.rating === "UP" ? "👍" : a.rating === "DOWN" ? "👎" : "—"}</td>
+                    <td className="py-1.5 pr-2 text-xs">
+                      {a.crowd ? (
+                        <Link href={`/b/${a.crowd.slug}`} className="underline-offset-2 hover:underline">
+                          {a.crowd.votes} votes{a.crowd.resultsBack ? " · results back" : ""}
+                        </Link>
+                      ) : (
+                        <span className="text-zinc-500">not posted</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right text-xs tabular-nums text-zinc-500">${a.costUsd.toFixed(3)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
       <section className="card space-y-2 p-4">
         <h2 className="font-sans font-medium">Every vote, in order</h2>
         {j.votes.length === 0 ? (

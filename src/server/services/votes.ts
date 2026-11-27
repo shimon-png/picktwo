@@ -5,6 +5,9 @@ import { AppError } from "../errors";
 import { assertCleanText } from "../moderation";
 import { awardPoints, votePointsToday } from "./points";
 import { gateArm } from "./gate-test";
+import { aboutAfterVote, likeYouFor, moveDeviceAnswers } from "./about";
+import { tasteProfileFor, voteTotal } from "./taste-profile";
+import { mindAfterVote } from "./mind";
 import { gateDecision, type GateArm } from "./gate-test-rules";
 import { getEconomy } from "./config";
 import { voteQualityIssue, isValidReason } from "./priority";
@@ -234,7 +237,30 @@ async function castVoteOnce(slug: string, viewer: VoteViewer, input: VoteInput) 
       { battleId: b.id, from: changedFrom, to: input.side, source: input.source, ...input.meta },
       { userId: user?.id, deviceId: viewer.deviceId },
     );
-  return res;
+  // About-you card next in the Vote deck (only the deck shows them; never together with the sign-up prompt).
+  // Deck extras after a new vote: a taste-profile moment wins over an about-you card (which simply waits a vote).
+  const inDeck = res.isNew && input.source === "feed" && !res.gatePrompt;
+  const [taste, likeYou] = await Promise.all([inDeck ? tasteMilestone(viewer, b.id) : null, likeYouFor(b.id, viewer)]);
+  // Then "What's on your mind this week?" or its sign-up nudge (lib/mind.ts); an about-you card waits a vote for it.
+  const mind = inDeck && !taste ? await mindAfterVote(viewer, await voteTotal(viewer)) : null;
+  const about = inDeck && !taste && !mind ? await aboutAfterVote(viewer) : null;
+  return { ...res, about, likeYou, taste, mind };
+}
+
+/**
+ * Taste profile moments in the deck: the first traits the moment two are really measured (economy tasteAxisMin battles
+ * each, from tasteFirstAt votes), the full wheel once all six are and they have tasteFullAt votes (Alex, Nov 27 2026:
+ * never show a wheel that says nothing).
+ */
+async function tasteMilestone(viewer: VoteViewer, battleId: string) {
+  try {
+    const t = await tasteProfileFor(viewer, { withoutBattle: battleId });
+    if (!t || !t.axes.length || t.prevStage == null || t.stage <= t.prevStage) return null;
+    return { milestone: t.votes, full: t.stage === 2, signedIn: !!viewer.user, name: t.name, missing: t.missing, axes: t.axes.map(({ id, left, right, score, crowd, why }) => ({ id, left, right, score, crowd, why })) };
+  } catch (e) {
+    console.error("[taste] milestone", e);
+    return null;
+  }
 }
 
 export async function skipBattle(slug: string, viewer: { user: User | null; deviceId: string | null }) {
@@ -320,4 +346,6 @@ export async function linkDevice(userId: string, deviceId: string) {
       WHERE s.device_id = ${deviceId} AND s.user_id IS NULL
       AND NOT EXISTS (SELECT 1 FROM skip s2 WHERE s2.battle_id = s.battle_id AND s2.user_id = ${userId})`);
   });
+  // About-you answers given as a guest fill the new account's profile (sign-up then skips them).
+  await moveDeviceAnswers(userId, deviceId).catch((e) => console.error("[about] carry over", e));
 }

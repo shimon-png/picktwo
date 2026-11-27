@@ -21,12 +21,33 @@ const CLICK_IDS = ["fbclid", "gclid", "ttclid", "msclkid", "li_fat_id", "rdt_cid
 /** `touch` = a session_start's props (or its `first` = the browser's very first visit, which wins when present). */
 export function classifySource(touch: Record<string, unknown> | null | undefined): Source {
   if (!touch) return "unknown";
-  const t = (touch.first && typeof touch.first === "object" ? touch.first : touch) as Record<string, unknown>;
-  const s = (k: string) => (typeof t[k] === "string" ? (t[k] as string).trim() : "");
+  const s = tagReader(touch);
   if (s("twclid") || X_UTM.test(s("utm_source"))) return "x_campaign";
   if (s("utm_source") || s("utm_campaign") || CLICK_IDS.some((k) => s(k))) return "other_campaign";
   if (s("referrerHost")) return X_HOSTS.test(s("referrerHost")) ? "x_organic" : "referral";
   return "direct";
+}
+
+/** Reads trimmed string tags from a touch, where the browser's first visit (`first`) wins when present. */
+function tagReader(touch: Record<string, unknown>) {
+  const t = (touch.first && typeof touch.first === "object" ? touch.first : touch) as Record<string, unknown>;
+  return (k: string) => (typeof t[k] === "string" ? (t[k] as string).trim() : "");
+}
+
+/** Shown for a campaign visit (an ad click) whose link carried no utm_campaign. */
+export const NO_CAMPAIGN_TAG = "(no utm_campaign)";
+
+/**
+ * Which ad campaign a visit came from (Alex + Shimon, Nov 26: compare the "Who's right?" and "Got a question?" X
+ * campaigns): its `utm_campaign`, cleaned (lower case, spaces to `_`, at most 40 characters). Only for campaign
+ * visits (X campaign / other campaigns); null for organic, referral, direct and unknown. Same first-visit rule as
+ * `classifySource()`.
+ */
+export function campaignOf(touch: Record<string, unknown> | null | undefined): string | null {
+  const src = classifySource(touch);
+  if (src !== "x_campaign" && src !== "other_campaign") return null;
+  const c = tagReader(touch!)("utm_campaign").toLowerCase().replace(/\s+/g, "_").slice(0, 40);
+  return c || NO_CAMPAIGN_TAG;
 }
 
 /** Engaged = voted on `minDays`+ different days, or posted a battle, within `windowDays` of signing up. */

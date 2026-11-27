@@ -19,6 +19,9 @@ Follow the Community guidelines. We may remove content or suspend accounts that 
 ## Links and shopping
 Option links may earn crowdpick.ai a commission. This never changes how battles are ranked.
 
+## Pickbot
+- Pickbot's answers are suggestions from an AI and from other people's votes. They're not professional advice (medical, legal, financial or otherwise), and you decide what to do.
+
 ## No warranty
 crowdpick.ai is provided "as is". Votes are opinions, not professional advice.
 

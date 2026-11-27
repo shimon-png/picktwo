@@ -18,6 +18,7 @@ sender `services/mailer.ts`, triggers `services/lifecycle.ts`, templates `src/se
 | `tier_up` | You're now High / Top priority | hourly: crossed into the tier in the last ~25h (points ledger), once per tier | Tips & reminders |
 | `weekly` | Your week on crowdpick (picked for you + how your picks turned out) | hourly, sends at `emailWeeklyDay`/`emailWeeklyHour` local time (Sunday 9 am), once per ISO week, skipped if empty | Weekly roundup |
 | `dm_request` | Someone who follows you wants to send you a message (no message text) | when a DM request is sent; skipped if they're in the app | Message requests |
+| `pickbot_results` | The crowd answered your Pickbot question: the split and whether it agreed with Pickbot, link to the thread | hourly, once a Pickbot crowd battle closes or reaches `pickbotResultsAt` votes (`deliverPickbotResults`) | My battles |
 
 Sign-in codes don't go through the mailer and always send.
 
