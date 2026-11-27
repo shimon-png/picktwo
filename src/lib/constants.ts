@@ -169,6 +169,11 @@ export const ECONOMY_DEFAULTS = {
    */
   tasteGapBoost: 3,
   hotBoost: 2,
+  /**
+   * Deck: generic photo cards ("Coffee or Tea?": two photos, a bare "X or Y?" title, no story) get this multiplier
+   * (Alex, Nov 27 2026: they're the last card bounced visitors see far more often than they're shown). 1 = off.
+   */
+  genericPhotoPenalty: 0.3,
   /** Votes between two about-you cards (2 = never two in a row, two battles between). */
   aboutMinGap: 2,
   /** A skipped question comes back once, this many votes later. */
