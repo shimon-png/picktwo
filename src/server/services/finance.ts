@@ -31,10 +31,10 @@ export type Live =
 
 export type ProviderRow = (typeof PLANS)[number] & { live: Live; mtd: number; projected: number };
 
-async function getJson(url: string, token: string, asText = false) {
+async function getJson(url: string, token: string, asText = false, noStore = false) {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
-    next: { revalidate: CACHE_S },
+    ...(noStore ? { cache: "no-store" as const } : { next: { revalidate: CACHE_S } }),
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 160)}`);
@@ -53,8 +53,9 @@ async function vercel(now: Date): Promise<Live> {
   const url = (q: URLSearchParams) => `https://api.vercel.com/v1/billing/charges?${q}`;
   let text: string;
   try {
-    text = (await getJson(url(qs), process.env.VERCEL_TOKEN!, true)) as string;
+    text = (await getJson(url(qs), process.env.VERCEL_TOKEN!, true, true)) as string;
   } catch (e) {
+    if (e instanceof Error && e.message.startsWith("403")) throw new Error(await explainVercel403());
     // Some ranges reaching past "now" are refused; fall back to ending at the current moment.
     if (!(e instanceof Error) || !e.message.startsWith("400")) throw e;
     qs.set("to", now.toISOString());
@@ -72,6 +73,38 @@ async function vercel(now: Date): Promise<Live> {
     detail: f.services,
     note: `Usage so far $${f.usage.toFixed(2)} (pace $${usageProjected.toFixed(2)}); the first $${VERCEL_INCLUDED_CREDIT} is covered by Pro.`,
   };
+}
+
+/**
+ * Billing said 403: ask Vercel who this token is and what it can see of the team, so the page says what to fix.
+ * Never shows the token itself, only its last 4 characters (to confirm the deployed value is the new one).
+ */
+async function explainVercel403(): Promise<string> {
+  const token = process.env.VERCEL_TOKEN!;
+  const teamId = process.env.VERCEL_TEAM_ID!;
+  const parts = [`Billing refused (403). Token …${token.slice(-4)}, team ${teamId}.`];
+  try {
+    const u = (await getJson("https://api.vercel.com/v2/user", token, false, true)) as { user?: { username?: string } };
+    parts.push(`Token owner: ${u.user?.username ?? "unknown"}.`);
+  } catch (e) {
+    parts.push(`Token owner lookup failed (${e instanceof Error ? e.message.slice(0, 40) : "?"}).`);
+  }
+  try {
+    const t = (await getJson(`https://api.vercel.com/v2/teams/${encodeURIComponent(teamId)}`, token, false, true)) as {
+      slug?: string;
+      membership?: { role?: string };
+    };
+    const role = t.membership?.role ?? "unknown";
+    parts.push(`Sees team ${t.slug ?? "?"} as ${role}.`);
+    if (!["OWNER", "MEMBER", "DEVELOPER", "SECURITY", "BILLING"].includes(role))
+      parts.push("Billing needs Owner, Member, Developer, Security or Billing.");
+    else parts.push("Role is fine, so the token itself is limited: create one scoped to the whole team (not a project).");
+  } catch (e) {
+    parts.push(
+      `Can't see that team (${e instanceof Error ? e.message.slice(0, 3) : "?"}): wrong VERCEL_TEAM_ID, or the token is scoped to another account.`,
+    );
+  }
+  return parts.join(" ");
 }
 
 async function neon(now: Date): Promise<Live> {
@@ -134,7 +167,7 @@ async function safe(fn: () => Promise<Live>): Promise<Live> {
   try {
     return await fn();
   } catch (e) {
-    return { state: "error", message: e instanceof Error ? e.message.slice(0, 200) : "failed" };
+    return { state: "error", message: e instanceof Error ? e.message.slice(0, 400) : "failed" };
   }
 }
 
