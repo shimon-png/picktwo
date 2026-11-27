@@ -29,6 +29,7 @@ import { RollCard } from "./RollCard";
 import { isRollMilestone, ROLL_KEY } from "@/lib/streak";
 import { PhotoFlag } from "./PhotoFlag";
 import { ResultBars } from "./ResultBars";
+import { rescueIndex } from "@/server/services/ranking";
 import { cardKind, contentHash, currentSessionId, logEvent } from "@/lib/events";
 
 type Side = "A" | "B";
@@ -66,6 +67,7 @@ export function SwipeDeck({
   progress: initialProgress = null,
   pickbotPromo = null,
   asking = null,
+  skipRescueAfter = 0,
 }: {
   initial: BattleCard[];
   signedIn: boolean;
@@ -84,6 +86,8 @@ export function SwipeDeck({
   pickbotPromo?: { at: number } | null;
   /** "People like you are asking" card (lib/asking.ts); null = off or nothing to show. */
   asking?: AskingCardData | null;
+  /** Skip-streak rescue: after this many skips in a row the best remaining card comes next (economy skipRescueAfter; 0 = off). */
+  skipRescueAfter?: number;
 }) {
   const [queue, setQueue] = useState(initial);
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
@@ -147,6 +151,9 @@ export function SwipeDeck({
   const justDragged = useRef(false);
   const cardRef = useRef<HTMLElement>(null);
   const seen = useRef(new Set(initial.map((i) => i.id)));
+  // Skips in a row (reset by any vote), for the skip-streak rescue; `rescued` marks the card it brought forward.
+  const skipStreak = useRef(0);
+  const rescued = useRef<string | null>(null);
   const card = queue[0];
   const peek = queue[1];
 
@@ -171,8 +178,19 @@ export function SwipeDeck({
       signedIn,
       surface: "deck",
       arm: card.arm ?? null,
+      opener: !!card.opener,
+      rescue: rescued.current === card.id,
     });
     lastKinds.current = [...lastKinds.current, kind].slice(-3);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card?.id]);
+
+  // Data brain: the deck ran out ("You're all caught up"), once per deck visit, so we can see when supply runs thin.
+  const emptyLogged = useRef(false);
+  useEffect(() => {
+    if (card || emptyLogged.current) return;
+    emptyLogged.current = true;
+    logEvent("deck_empty", { pos: deckPos.current, signedIn });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card?.id]);
 
@@ -230,6 +248,7 @@ export function SwipeDeck({
     setResult(pct(card.votesA + (side === "A" ? 1 : 0), card.votesB + (side === "B" ? 1 : 0)));
     // Remember it right away, so leaving the tab before the request finishes can't bring it back.
     markDone(card.id);
+    skipStreak.current = 0;
     // Wink the logo the instant the pick lands, not after the server answers.
     if (!prev) wink();
     try {
@@ -415,6 +434,16 @@ export function SwipeDeck({
     if (!card || voted || fly || thrown || roll || about || promo || mind || askingNow) return;
     markDone(card.id);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
+    skipStreak.current += 1;
+    // After a skip streak, bring the remaining card people vote on most to the front (it shows after this one leaves).
+    const rest = queue.slice(1);
+    const i = rescueIndex(rest, skipStreak.current, skipRescueAfter);
+    if (i > 0) {
+      const target = rest[i];
+      rescued.current = target.id;
+      skipStreak.current = 0;
+      setQueue((q) => [q[0], target, ...q.slice(1).filter((c) => c.id !== target.id)]);
+    }
     advance(-1);
   }
 

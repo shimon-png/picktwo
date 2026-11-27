@@ -134,8 +134,13 @@ ${btn(u("A"), `I picked ${o.labelA}`, A)}${btn(u("B"), `I picked ${o.labelB}`, B
 export type VoterOutcome = { title: string; url: string; poster: string; picked: string | null; thumb: "UP" | "DOWN" | null; calledIt: boolean; points: number; note: string | null };
 export type HelpfulItem = { title: string; url: string; points: number };
 
-export function voterUpdates(o: { outcomes: VoterOutcome[]; helpful: HelpfulItem[] }): Built {
-  const one = o.outcomes.length === 1 && !o.helpful.length ? o.outcomes[0] : null;
+/** A battle you voted on closed without an outcome: the final split and whether you were with the crowd. */
+export type FinalResult = { title: string; url: string; labelA: string; labelB: string; pctA: number; pctB: number; picked: string; withCrowd: boolean | null };
+
+export function voterUpdates(o: { outcomes: VoterOutcome[]; helpful: HelpfulItem[]; results?: FinalResult[]; voteUrl?: string }): Built {
+  const results = o.results ?? [];
+  if (!o.outcomes.length && !o.helpful.length && results.length) return finalResults(results, o.voteUrl);
+  const one = o.outcomes.length === 1 && !o.helpful.length && !results.length ? o.outcomes[0] : null;
   const called = o.outcomes.filter((x) => x.calledIt).length;
   const subject = one
     ? one.calledIt
@@ -156,8 +161,40 @@ ${x.note ? `<br><span style="font-size:14px;color:${MUTED};font-style:italic">�
   return {
     subject,
     preheader: called ? `You called ${called} of them.` : "See how it turned out.",
-    body: `${h1(o.outcomes.length ? "How it turned out" : "Your reason helped")}${outcomeHtml}${helpfulHtml}`,
-    text: [...o.outcomes.map((x) => `${x.title}: ${x.poster} picked ${x.picked ?? "neither"}${x.calledIt ? " — you called it!" : ""} ${x.url}`), ...o.helpful.map((x) => `Your reason helped: ${x.title} (+${x.points}) ${x.url}`)].join("\n"),
+    body: `${h1(o.outcomes.length ? "How it turned out" : "Your reason helped")}${outcomeHtml}${helpfulHtml}${results.length ? `<div style="height:14px"></div>${h1("Final results")}${resultsHtml(results)}` : ""}`,
+    text: [
+      ...o.outcomes.map((x) => `${x.title}: ${x.poster} picked ${x.picked ?? "neither"}${x.calledIt ? " — you called it!" : ""} ${x.url}`),
+      ...o.helpful.map((x) => `Your reason helped: ${x.title} (+${x.points}) ${x.url}`),
+      ...results.map(resultText),
+    ].join("\n"),
+  };
+}
+
+const crowdLine = (x: FinalResult) =>
+  x.withCrowd === null ? "It ended in a tie" : x.withCrowd ? "You were with the crowd" : "You went against the crowd";
+const resultText = (x: FinalResult) => `${x.title}: ${x.labelA} ${x.pctA}% / ${x.labelB} ${x.pctB}%. You picked ${x.picked}. ${crowdLine(x)}. ${x.url}`;
+const resultsHtml = (rs: FinalResult[]) =>
+  rs
+    .map(
+      (x) => `<div style="padding:12px 0;border-top:1px solid #F0EBE4">
+<a href="${x.url}" style="color:${INK};text-decoration:none;font-weight:600;font-size:15px">${esc(x.title)}</a><br>
+<span style="font-size:14px">${esc(x.labelA)} <b>${x.pctA}%</b> · ${esc(x.labelB)} <b>${x.pctB}%</b></span><br>
+<span style="font-size:14px;color:${MUTED}">You picked ${esc(x.picked)}. ${crowdLine(x)}.</span></div>`,
+    )
+    .join("");
+
+/** "Results are in" for voters: battles you voted on closed. */
+export function finalResults(rs: FinalResult[], voteUrl?: string): Built {
+  const one = rs.length === 1 ? rs[0] : null;
+  const withCrowd = rs.filter((x) => x.withCrowd).length;
+  const subject = one
+    ? `Results are in: ${one.pctA > one.pctB ? one.labelA : one.labelB} won ${Math.max(one.pctA, one.pctB)}%`
+    : `Results are in for ${rs.length} battles you voted on`;
+  return {
+    subject,
+    preheader: one ? `${crowdLine(one)}.` : `You were with the crowd on ${withCrowd} of ${rs.length}.`,
+    body: `${h1("Results are in")}${resultsHtml(rs)}${voteUrl ? `<div style="height:10px"></div>${btn(voteUrl, "Vote on new battles")}` : ""}`,
+    text: [...rs.map(resultText), ...(voteUrl ? [`Vote on new battles: ${voteUrl}`] : [])].join("\n"),
   };
 }
 
