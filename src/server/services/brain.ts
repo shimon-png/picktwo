@@ -5,6 +5,7 @@ import { or, eq, isNotNull } from "drizzle-orm";
 import { isAdmin } from "../viewer";
 import { parseChange, periodOf, summarize, type BaRow } from "./before-after-rules";
 import { getEconomy } from "./config";
+import { taggingStatus, untaggedCount } from "./tagging";
 import { campaignOf, classifySource, SOURCE_LABELS, type Source } from "./acquisition-rules";
 
 /**
@@ -216,15 +217,11 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       ) cv ON true
       WHERE b.tags ? 'brain' AND b.status <> 'DELETED' AND ${battleOK}
       GROUP BY 1 ORDER BY 3 DESC`);
-  const [byTheme, byStakes, [untagged]] = await Promise.all([
-    byTag("theme"),
-    byTag("stakes"),
-    db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM battle WHERE status <> 'DELETED' AND NOT (tags ? 'brain')`),
-  ]);
+  const [byTheme, byStakes, untagged, tagging] = await Promise.all([byTag("theme"), byTag("stakes"), untaggedCount(), taggingStatus()]);
 
   const [daily, visitSources] = await Promise.all([dailyNumbers(scope), visitsBySource(scope)]);
 
-  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byTheme, byStakes, untagged: untagged?.n ?? 0, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
+  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byTheme, byStakes, untagged, tagging, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
 }
 
 type Scope = Awaited<ReturnType<typeof brainScope>>;

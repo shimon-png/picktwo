@@ -952,9 +952,17 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 
       <Section
         title="By theme (AI tags)"
-        note="Each battle is tagged by AI when posted: theme, stakes, and what picking each side suggests about the voter. Battles posted by real people only (seed battles aren't AI-tagged). Votes and views are for the selected window."
+        note="Each battle is tagged by AI: theme, stakes, what picking each side suggests about the voter, and which taste traits it tests (these build everyone's taste wheel). Tagging runs every hour, most-voted battles first. Votes and views are for the selected window."
       >
-        <div><TagBattles remaining={s.untagged} /></div>
+        <div className="flex flex-wrap items-center gap-2">
+          <TagBattles remaining={s.untagged} />
+          {s.tagging && (
+            <span className={`text-xs ${s.tagging.failed ? "text-b" : "text-zinc-600"}`}>
+              Last run {new Date(s.tagging.at).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}: {s.tagging.tagged} tagged
+              {s.tagging.failed ? `, ${s.tagging.failed} failed${s.tagging.error ? ` (${s.tagging.error})` : ""}` : ""}
+            </span>
+          )}
+        </div>
         <Rows
           head={["Theme", "Battles", "Votes", "Vote rate", "Avg score"]}
           rows={s.byTheme.map((r) => [r.tag.replace(/_/g, " "), r.battles, r.real_votes, pct(r.voted_views, r.views), r.score == null ? "—" : Math.round(r.score * 100)])}

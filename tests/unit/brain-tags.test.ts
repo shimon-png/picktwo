@@ -15,6 +15,11 @@ describe("parseBrainTags", () => {
     expect(t.b).toEqual([]);
     expect(t.brands).toEqual([]);
   });
+  it("keeps valid taste axes only", () => {
+    const t = parseBrainTags({ axes: { romantic: "A", direct: "b", spender: "both", evil: "a" } }, "m");
+    expect(t.axes).toEqual({ romantic: "a", direct: "b" });
+    expect(parseBrainTags({}, "m").axes).toEqual({});
+  });
   it("survives a non-object reply", () => {
     expect(parseBrainTags(null, "m").theme).toBe("other");
   });

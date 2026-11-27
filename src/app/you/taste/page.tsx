@@ -21,7 +21,7 @@ export default async function TastePage() {
       </Link>
       <header className="space-y-1">
         <h1 className="text-[28px]">Your taste</h1>
-        <p className="display text-[26px] leading-tight text-cta">{t.name ?? (t.axes.length ? `${t.axes.length} of 6 traits so far` : "Not enough votes yet")}</p>
+        <p className="display text-[26px] leading-tight text-cta">{t.name ?? (t.axes.length ? `${t.axes.length} of 6 traits so far` : "Still learning you")}</p>
         <p className="text-sm text-zinc-600">
           Built from your picks on {t.tagged} battle{t.tagged === 1 ? "" : "s"}. The dashed ring is the average voter. Only you see this.
         </p>
@@ -58,7 +58,12 @@ export default async function TastePage() {
           </li>
         ))}
       </ul>
-      {t.axes.length < 6 && <p className="text-sm text-zinc-600">All six traits unlock at {t.fullAt} votes. You have {t.votes}.</p>}
+      {t.stage < 2 && (
+        <p className="text-sm text-zinc-600">
+          A trait shows once {t.axisMin} of your battles have tested it. Still learning: {t.missing.join(", ").toLowerCase()}. Your type unlocks when all six are measured
+          {t.votes < t.fullAt ? ` and you've voted on ${t.fullAt} battles (you have ${t.votes})` : ""}. Keep voting: the deck sends you battles that test the missing ones.
+        </p>
+      )}
       <Link href="/people-like-you" className="card block px-4 py-3 text-sm">
         <b className="block">Your taste twins</b>
         <span className="text-zinc-600">People who agree with you most often →</span>
