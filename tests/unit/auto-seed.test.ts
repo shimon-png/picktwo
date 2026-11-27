@@ -126,5 +126,8 @@ describe("real people's battles first", () => {
     const sorted = [row("seed1", false, false), row("seed2", false, false), row("human1", false, true), row("feat", true, false), row("human2", false, true)];
     expect(tieredPick(sorted, 10).map((x) => x.id)).toEqual(["feat", "human1", "human2", "seed1", "seed2"]);
     expect(tieredPick(sorted, 2).map((x) => x.id)).toEqual(["feat", "human1"]);
+    // Seed battles that fill a missing taste trait go before other seeds, never before real people's.
+    const withFill = sorted.map((x) => (x.id === "seed2" ? { ...x, fill: true } : x));
+    expect(tieredPick(withFill, 10).map((x) => x.id)).toEqual(["feat", "human1", "human2", "seed2", "seed1"]);
   });
 });

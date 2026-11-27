@@ -37,8 +37,8 @@ describe("unlocks, names, why", () => {
   it("only measured traits show (3+ battles each); all six only when every one is measured", () => {
     expect(visibleAxes(axes, 9, 10, 30)).toEqual([]);
     expect(visibleAxes(axes, 10, 10, 30).map((a) => a.id)).toEqual(["adventurous", "spender"]);
-    // At 30 votes direct has 2 battles and four traits none: still only the measured two.
-    expect(visibleAxes(axes, 30, 10, 30).map((a) => a.id)).toEqual(["adventurous", "spender"]);
+    // At 30 votes one battle is enough: direct (2) joins; four traits with none still wait.
+    expect(visibleAxes(axes, 30, 10, 30).map((a) => a.id)).toEqual(["adventurous", "spender", "direct"]);
     expect(tasteStage(axes, 30, 10, 30)).toBe(1);
     expect(missingAxes(axes)).toEqual(["romantic", "trendy", "forgiving", "direct"]);
   });
@@ -51,6 +51,11 @@ describe("unlocks, names, why", () => {
     expect(tasteStage(all, 29, 10, 30)).toBe(1);
     expect(tasteStage(all, 30, 10, 30)).toBe(2);
     expect(visibleAxes(all, 30, 10, 30)).toHaveLength(6);
+  });
+  it("from 30 votes a single battle per trait completes the chart", () => {
+    const thin = scoreAxes(["romantic", "risk_taking", "premium_taste", "trendy", "forgiving", "direct"].map((t) => pick([t])));
+    expect(tasteStage(thin, 29, 10, 30)).toBe(0);
+    expect(tasteStage(thin, 30, 10, 30)).toBe(2);
   });
   it("type name from the two strongest leans", () => {
     expect(typeName(axes)).toBe("Careful splurger");
