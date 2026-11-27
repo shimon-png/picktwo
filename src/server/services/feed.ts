@@ -4,7 +4,7 @@ import { battles, users, votes, follows, blocks, outcomes, type User } from "../
 import { getEconomy } from "./config";
 import { openLoopCountsFor } from "./points";
 import { priorityFactor } from "./priority";
-import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, hotFactor, gapFactor, pickOpener, pickRate, type ViewerProfile } from "./ranking";
+import { feedScore, tieredPick, shuffleFactor, shuffleSeed, engagementFactor, inHoldout, skipFactor, averagePickRate, hotFactor, gapFactor, isGenericPhoto, genericFactor, pickOpener, pickRate, type ViewerProfile } from "./ranking";
 import { missingAxesFor } from "./taste-profile";
 import { battleAxes } from "@/lib/taste-profile";
 import { friendIds, hydrateCards, type BattleCard } from "./battles";
@@ -56,6 +56,7 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
       oChosen: outcomes.chosen,
       oThumb: outcomes.thumb,
       oNote: outcomes.note,
+      photos: sql<number>`(SELECT count(o.image_url)::int FROM "option" o WHERE o.battle_id = ${battles.id})`,
     })
     .from(battles)
     .innerJoin(users, eq(users.id, battles.authorId))
@@ -138,7 +139,8 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     const brain = r.b.tags?.brain as { a?: string[]; b?: string[]; axes?: Record<string, string> } | undefined;
     const tests = battleAxes(brain?.a, brain?.b, brain?.axes);
     const fill = gapFactor(tests, missing, economy.tasteGapBoost);
-    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind * hotFactor(hot.get(r.b.id) ?? 0, economy.hotBoost) * fill;
+    const score = engaged * skipFactor(d?.votes ?? 0, d?.skips ?? 0, avgPick, sWeight) * onMind * hotFactor(hot.get(r.b.id) ?? 0, economy.hotBoost) * fill
+      * genericFactor(isGenericPhoto({ title: r.b.title, context: r.b.context, photos: Number(r.photos) || 0 }), economy.genericPhotoPenalty);
     const featured = !!r.b.tags?.featured;
     const human = isHumanBattle({ id: r.b.id, authorHasEmail: !!r.authorHasEmail, pickbot: r.b.tags?.pickbot });
     return { row: r, score, categoryId: r.b.categoryId, authorId: r.b.authorId, featured, human, fill: fill > 1, pf, openLoops: loops.get(r.b.authorId) ?? 0 };

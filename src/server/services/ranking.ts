@@ -151,6 +151,22 @@ export function hotFactor(recentVotes: number, boost: number, full = 5): number 
 }
 
 /**
+ * Generic photo card (Alex, Nov 27 2026): two photos, no story, and a bare "X or Y?" title with no personal stake
+ * ("Coffee or Tea?", "Sandwiches or Shrimp?"). Bounced visitors leave on these much more often than they see them.
+ */
+export function isGenericPhoto(b: { title: string; context?: string | null; photos: number }): boolean {
+  if (b.photos < 2 || (b.context ?? "").trim()) return false;
+  const t = b.title.trim();
+  if (t.length > 45 || !/^[^.!?:]{1,40} or [^.!?:]{1,40}\?$/i.test(t)) return false;
+  return !/\b(i|i'm|i've|my|me|we|our|us|mine)\b/i.test(t);
+}
+
+/** Deck multiplier for generic photo cards: `penalty` when generic (1 or more = off). */
+export function genericFactor(generic: boolean, penalty: number): number {
+  return generic && penalty > 0 && penalty < 1 ? penalty : 1;
+}
+
+/**
  * Taste gaps (Alex, Nov 27 2026): while someone's taste profile is missing traits, battles that test one of them
  * rise by `boost`, so the profile fills in fast. boost 1 = off; no missing traits = no change.
  */
