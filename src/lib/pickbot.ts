@@ -30,6 +30,8 @@ export type ThreadState = {
   retailor?: boolean;
   /** Started from a "People like you are asking" preset (lib/asking.ts). Posting it to the crowd retires the preset. */
   preset?: string;
+  /** "Get answers from the crowd" (Alex, Nov 27 2026): true = post to the crowd after the answer. Older threads: unset. */
+  crowd?: boolean;
 };
 
 export type Step =

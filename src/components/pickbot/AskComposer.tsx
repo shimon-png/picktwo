@@ -31,6 +31,8 @@ export function AskComposer({
   const [photos, setPhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(0);
   const [busy, setBusy] = useState(false);
+  // "Get answers from the crowd" (Alex, Nov 27): checked by default; unchecked keeps the question private.
+  const [crowd, setCrowd] = useState(true);
   const file = useRef<HTMLInputElement>(null);
 
   async function add(files: FileList | null) {
@@ -59,7 +61,7 @@ export function AskComposer({
         setPhotos([]);
         onSent?.();
       } else {
-        const { id } = await api<{ id: string }>("/api/pickbot/ask", { body: { text: t, photos, ...(preset ? { preset } : {}) } });
+        const { id } = await api<{ id: string }>("/api/pickbot/ask", { body: { text: t, photos, crowd, ...(preset ? { preset } : {}) } });
         router.push(`/ask/${id}`);
         return;
       }
@@ -129,6 +131,12 @@ export function AskComposer({
           </button>
         </div>
       </div>
+      {!threadId && (
+        <label className="flex cursor-pointer items-center gap-2.5 px-1 text-[15px] font-medium text-ink">
+          <input type="checkbox" checked={crowd} onChange={(e) => setCrowd(e.target.checked)} className="size-5 shrink-0 accent-green" data-testid="pickbot-crowd-ask" />
+          Get answers from the crowd
+        </label>
+      )}
     </div>
   );
 }

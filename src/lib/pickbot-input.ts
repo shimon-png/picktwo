@@ -9,7 +9,11 @@ export const askInput = z.object({
   photos: z.array(photo).max(4).default([]),
   /** "People like you are asking" preset it started from (lib/asking.ts). */
   preset: z.string().regex(/^[a-z_]{2,40}$/).optional(),
+  /** "Get answers from the crowd" box (checked by default). */
+  crowd: z.boolean().default(true),
 });
+
+export const crowdInput = z.object({ on: z.boolean() });
 
 export const gateInput = z.object({
   question: z.enum(ABOUT_QUESTION_IDS),

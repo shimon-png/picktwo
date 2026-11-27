@@ -54,7 +54,8 @@ Raw events live in `analytics_event` (`name`, `user_id`, `device_id`, `props` js
 | `pickbot_battles_stopped` | server, "Stop and answer now" during quick battles | 2026-11-26 | `threadId` |
 | `pickbot_answered` | server, an answer saved | 2026-11-26 | `threadId`, `kind` (tailored/general), `model`, `latencyMs`, `inputTokens`, `outputTokens`, `costUsd`, `similar`, `confidence` |
 | `pickbot_rated` | server, 👍/👎 on an answer | 2026-11-26 | `threadId`, `rating`, `model`, `withNote` |
-| `pickbot_crowd_drafted` / `pickbot_crowd_posted` | server, crowd draft made / posted | 2026-11-26 | `threadId`, `removed`; posted: `battleId`, `photos`, `targeted`, `hours`, `inReview` |
+| `pickbot_crowd_drafted` / `pickbot_crowd_posted` | server, crowd draft made / posted | 2026-11-26 | `threadId`, `removed`; posted: `battleId`, `photos`, `targeted`, `hours`, `inReview`, `auto` (2026-11-27: true = posted by itself after the answer because "Get answers from the crowd" was ticked) |
+| `pickbot_crowd_toggled` | server, the asker ticks / unticks "Let the crowd decide too" under the answer | 2026-11-27 | `threadId`, `on`, `hadBattle` (unticking hides the posted battle) |
 | `pickbot_results_delivered` | server (hourly), crowd results sent back | 2026-11-26 | `threadId`, `battleId`, `votes`, `agreed`, `closed` |
 | `pickbot_outcome` / `pickbot_thread_deleted` | server, the asker said what they picked / deleted a thread | 2026-11-26 | `threadId`, `chosen` |
 | `pickbot_promo_shown` / `pickbot_promo_tap` / `pickbot_promo_dismissed` | browser, the one-time "Ask Pickbot" card in the Vote deck | 2026-11-26 | `at` (tested position: picks before it shows), `picks` (picks this visit when it showed) |

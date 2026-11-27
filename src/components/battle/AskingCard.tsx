@@ -114,20 +114,23 @@ export function AskingCard({
     <>
       {signup && open && <SignupGate soft next={pickbotUrl(open.id)} place="asking" log={{ preset: open.id }} onClose={() => setSignup(false)} />}
       <article
-        aria-label="People like you are worried about"
+        aria-label="People similar to you are worried about"
         className="deck-card animate-pop absolute inset-0 z-40 flex flex-col gap-3 overflow-y-auto rounded-[20px] bg-white p-5 shadow-card"
         data-testid="asking-card"
       >
         {!open ? (
           <>
             <div className="space-y-2">
-              <h1 className="text-[26px] leading-tight text-green">People like you are worried about</h1>
+              <h1 className="leading-tight">
+                <span className="block text-[25px] text-green">You’re not alone.</span>
+                <span className="mt-1 block text-[17px] text-ink">People similar to you are worried about real day-to-day issues. Are any of these on your mind?</span>
+              </h1>
               <p className="flex items-center gap-2.5 text-[16px] font-medium leading-snug text-ink/85">
                 {mode === "pickbot" ? (
                   <>
                     <PickbotMark className="size-8" />
                     <span>
-                      Tap one and <PickbotWord /> answers it for you.
+                      Tap one, make it your own, and <PickbotWord /> will help you
                     </span>
                   </>
                 ) : (

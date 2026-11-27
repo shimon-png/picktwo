@@ -138,17 +138,19 @@ async function screen(user: User, photos: string[]) {
 }
 
 /** A new question: screen photos, classify, open the thread. Off-topic and crisis replies are added right away. */
-export async function askPickbot(userIn: User | null, input: { text: string; photos: string[]; preset?: string }) {
+export async function askPickbot(userIn: User | null, input: { text: string; photos: string[]; preset?: string; crowd?: boolean }) {
   const user = await requireAccess(userIn);
   if ((await answersLeftFor(user)) === 0) throw new AppError("LIMIT_REACHED", "You've used today's free answers. Come back tomorrow for more.");
   await screen(user, input.photos);
   const { c, stats } = await classifyQuestion(input.text, input.photos);
   const preset = presetById(input.preset)?.id;
-  const [t] = await db.insert(pickbotThreads).values({ userId: user.id, title: c.title, classification: c, state: preset ? { preset } : {} }).returning();
+  // "Get answers from the crowd" (Alex, Nov 27): checked by default; the question goes to the crowd after the answer.
+  const state: ThreadState = { ...(preset ? { preset } : {}), crowd: input.crowd !== false };
+  const [t] = await db.insert(pickbotThreads).values({ userId: user.id, title: c.title, classification: c, state }).returning();
   await addMessage(t.id, { role: "USER", kind: "question", text: input.text, photos: input.photos, model: stats?.model, costUsd: stats?.costUsd, inputTokens: stats?.inputTokens, outputTokens: stats?.outputTokens });
   if (c.crisis) await addMessage(t.id, { role: "BOT", kind: "note", text: CRISIS });
   if (c.scope === "off_topic") await addMessage(t.id, { role: "BOT", kind: "note", text: OFF_TOPIC });
-  track("pickbot_asked", { threadId: t.id, photos: input.photos.length, chars: input.text.length, scope: c.scope, theme: c.theme, crisis: c.crisis, followUp: false, preset: preset ?? null }, { userId: user.id });
+  track("pickbot_asked", { threadId: t.id, photos: input.photos.length, chars: input.text.length, scope: c.scope, theme: c.theme, crisis: c.crisis, followUp: false, preset: preset ?? null, crowd: state.crowd }, { userId: user.id });
   return { id: t.id };
 }
 
@@ -368,6 +370,10 @@ export async function answerThread(userIn: User | null, id: string, onText: (chu
     costUsd: stats.costUsd,
     latencyMs: stats.latencyMs,
   });
+  if (!t.battleId) {
+    const [fresh] = await db.select().from(pickbotThreads).where(eq(pickbotThreads.id, t.id));
+    if (fresh) await autoPostCrowd(user, fresh);
+  }
   track(
     "pickbot_answered",
     { threadId: t.id, kind: step.kind, model: stats.model, latencyMs: stats.latencyMs, inputTokens: stats.inputTokens, outputTokens: stats.outputTokens, costUsd: stats.costUsd, similar: similar.length, confidence: answer.confidence },
@@ -433,12 +439,8 @@ function lastAnswer(msgs: Message[]): (Answer & { kind: AnswerKind }) | null {
   return m?.answer ?? null;
 }
 
-/** Draft an anonymous battle from the thread for the asker to review (nothing is posted here). */
-export async function draftCrowd(userIn: User | null, id: string) {
-  const user = await requireAccess(userIn);
-  const t = await ownThread(user, id);
-  if (t.classification.scope === "sensitive" || t.classification.crisis) throw new AppError("FORBIDDEN", "This one stays private, so it can't go to the crowd.");
-  if (t.battleId) throw new AppError("CONFLICT", "This question is already with the crowd.");
+/** Draft an anonymous battle from the thread (saved as a `draft` message; nothing is posted here). */
+async function makeDraft(user: User, t: Thread) {
   const msgs = await db.select().from(pickbotMessages).where(eq(pickbotMessages.threadId, t.id)).orderBy(asc(pickbotMessages.createdAt));
   const ans = lastAnswer(msgs);
   if (!ans) throw new AppError("CONFLICT", "Get Pickbot's answer first.");
@@ -447,18 +449,80 @@ export async function draftCrowd(userIn: User | null, id: string) {
   const { draft, stats } = await draftCrowdBattle({ question: qs[0]?.text ?? t.title, followUps: qs.slice(1).map((m) => m.text), pick: ans.pick, photoCount: photos.length });
   const e = await getEconomy();
   const target = defaultTarget(user);
+  const two = photos.length >= 2 ? photos.slice(0, 2) : [];
   const row = await addMessage(t.id, {
     role: "BOT",
     kind: "draft",
     text: draft.title,
-    data: { draft, photos: photos.length >= 2 ? photos.slice(0, 2) : [], hours: e.pickbotCrowdHours, target },
+    data: { draft, photos: two, hours: e.pickbotCrowdHours, target },
     model: stats?.model,
     costUsd: stats?.costUsd,
     inputTokens: stats?.inputTokens,
     outputTokens: stats?.outputTokens,
   });
   track("pickbot_crowd_drafted", { threadId: t.id, removed: draft.removed.length }, { userId: user.id });
-  return { messageId: row.id, draft, photos: photos.length >= 2 ? photos.slice(0, 2) : [], hours: e.pickbotCrowdHours, target };
+  return { messageId: row.id, draft, photos: two, hours: e.pickbotCrowdHours, target };
+}
+
+/** Draft an anonymous battle from the thread for the asker to review (older threads; new ones post by themselves). */
+export async function draftCrowd(userIn: User | null, id: string) {
+  const user = await requireAccess(userIn);
+  const t = await ownThread(user, id);
+  if (t.classification.scope === "sensitive" || t.classification.crisis) throw new AppError("FORBIDDEN", "This one stays private, so it can't go to the crowd.");
+  if (t.battleId) throw new AppError("CONFLICT", "This question is already with the crowd.");
+  return makeDraft(user, t);
+}
+
+const crowdBlocked = (t: Thread) => t.classification.scope === "sensitive" || t.classification.crisis || t.classification.scope === "off_topic";
+
+/**
+ * "Get answers from the crowd" (Alex, Nov 27 2026): checked by default, so once Pickbot has answered, the question
+ * goes to the crowd by itself as an anonymous "Asked via Pickbot" battle (people like the asker, default length,
+ * their two photos if they gave two). Unchecked = private. Never for sensitive/crisis threads. Never throws: a
+ * problem leaves the thread private with a note, and the asker can tick the box again.
+ */
+async function autoPostCrowd(user: User, t: Thread): Promise<void> {
+  if (t.state.crowd !== true || t.battleId || crowdBlocked(t)) return;
+  try {
+    if (!user.onboardedAt || !user.handle) return;
+    const e = await getEconomy();
+    const cap = isPlus(user) || isAdmin(user) ? e.pickbotPlusCrowdPerDay : e.pickbotCrowdPerDay;
+    if ((await crowdToday(user.id)) >= cap) {
+      await db.update(pickbotThreads).set({ state: { ...t.state, crowd: false } }).where(eq(pickbotThreads.id, t.id));
+      await addMessage(t.id, { role: "BOT", kind: "note", text: "You've already asked the crowd today, so this one stays private. Tick the box again tomorrow to send it." });
+      return;
+    }
+    const d = await makeDraft(user, t);
+    await publishCrowd(user, t, { title: d.draft.title, context: d.draft.context, a: d.draft.a, b: d.draft.b, withPhotos: true, hours: d.hours, targetLikeMe: true }, d, true);
+  } catch (err) {
+    console.error("[pickbot auto-post]", err);
+    await db.update(pickbotThreads).set({ state: { ...t.state, crowd: false } }).where(eq(pickbotThreads.id, t.id));
+    await addMessage(t.id, { role: "BOT", kind: "note", text: "I couldn't send this one to the crowd just now. Tick the box to try again." }).catch(() => {});
+  }
+}
+
+/**
+ * The "Get answers from the crowd" box after the answer. On: posts now if the answer is in. Off: takes the crowd
+ * battle down (hidden, never deleted; votes stay in the data) and the thread is private again. Once the crowd's
+ * results are back it can't be taken down.
+ */
+export async function setCrowd(userIn: User | null, id: string, on: boolean) {
+  const user = await requireAccess(userIn);
+  const t = await ownThread(user, id);
+  if (on && crowdBlocked(t)) throw new AppError("FORBIDDEN", "This one stays private, so it can't go to the crowd.");
+  if (!on && t.resultsAt) throw new AppError("CONFLICT", "The crowd has already answered this one.");
+  const state: ThreadState = { ...t.state, crowd: on };
+  if (on) {
+    await db.update(pickbotThreads).set({ state }).where(eq(pickbotThreads.id, t.id));
+    const hasAnswer = (await db.select({ id: pickbotMessages.id }).from(pickbotMessages).where(and(eq(pickbotMessages.threadId, t.id), eq(pickbotMessages.kind, "answer"))).limit(1)).length > 0;
+    if (hasAnswer) await autoPostCrowd(user, { ...t, state });
+  } else {
+    if (t.battleId) await db.update(battles).set({ status: "HIDDEN" }).where(eq(battles.id, t.battleId));
+    await db.update(pickbotThreads).set({ state, battleId: null, pickSide: null }).where(eq(pickbotThreads.id, t.id));
+    if (t.battleId) await addMessage(t.id, { role: "BOT", kind: "note", text: "Done. It's private now and off the crowd's feed." });
+  }
+  track("pickbot_crowd_toggled", { threadId: t.id, on, hadBattle: !!t.battleId }, { userId: user.id });
+  return { ok: true };
 }
 
 /** People like the asker: same sex, their age range and the ones next to it. */
@@ -470,17 +534,15 @@ export function defaultTarget(u: Pick<User, "sex" | "ageRange">) {
   return t;
 }
 
-/** Post the reviewed draft as an anonymous "Asked via Pickbot" battle. Only on the asker's explicit tap. */
-export async function postCrowd(
-  userIn: User | null,
-  id: string,
-  input: { title: string; context: string; a: string; b: string; withPhotos: boolean; hours: number; targetLikeMe: boolean },
-) {
+type CrowdInput = { title: string; context: string; a: string; b: string; withPhotos: boolean; hours: number; targetLikeMe: boolean };
+
+/** Post a reviewed draft (older threads) as an anonymous "Asked via Pickbot" battle. */
+export async function postCrowd(userIn: User | null, id: string, input: CrowdInput) {
   const user = await requireAccess(userIn);
   if (!user.onboardedAt || !user.handle) throw new AppError("FORBIDDEN", "Finish setting up your profile first");
   const t = await ownThread(user, id);
   if (t.battleId) throw new AppError("CONFLICT", "This question is already with the crowd.");
-  if (t.classification.scope === "sensitive" || t.classification.crisis) throw new AppError("FORBIDDEN", "This one stays private, so it can't go to the crowd.");
+  if (crowdBlocked(t)) throw new AppError("FORBIDDEN", "This one stays private, so it can't go to the crowd.");
   const e = await getEconomy();
   const cap = isPlus(user) || isAdmin(user) ? e.pickbotPlusCrowdPerDay : e.pickbotCrowdPerDay;
   if ((await crowdToday(user.id)) >= cap) throw new AppError("LIMIT_REACHED", "You've asked the crowd today already. Try again tomorrow.");
@@ -491,7 +553,11 @@ export async function postCrowd(
     .orderBy(desc(pickbotMessages.createdAt))
     .limit(1);
   if (!d) throw new AppError("CONFLICT", "Make a draft first.");
-  const data = d.data as { draft: CrowdDraft; photos: string[] };
+  return publishCrowd(user, t, input, d.data as { draft: CrowdDraft; photos: string[] }, false);
+}
+
+async function publishCrowd(user: User, t: Thread, input: CrowdInput, data: { draft: CrowdDraft; photos: string[] }, auto: boolean) {
+  const e = await getEconomy();
   const photos = input.withPhotos ? data.photos : [];
   const created = await createBattle(
     user,
@@ -510,14 +576,16 @@ export async function postCrowd(
   );
   const [battle] = await db.select({ id: battles.id }).from(battles).where(eq(battles.slug, created.slug));
   await db.update(pickbotThreads).set({ battleId: battle.id, pickSide: data.draft.pickSide }).where(eq(pickbotThreads.id, t.id));
-  await addMessage(t.id, {
-    role: "BOT",
-    kind: "note",
-    text: created.inReview
-      ? "Thanks! A moderator checks it before it goes live (usually quick). I'll bring the results back here when the votes are in."
-      : "Posted anonymously. I'll bring the results back here when the votes are in.",
-  });
-  track("pickbot_crowd_posted", { threadId: t.id, battleId: battle.id, photos: photos.length, targeted: input.targetLikeMe, hours: input.hours, inReview: created.inReview }, { userId: user.id });
+  // Auto-posts show in the crowd box under the answer; a note only when a moderator has to check it first.
+  if (created.inReview || !auto)
+    await addMessage(t.id, {
+      role: "BOT",
+      kind: "note",
+      text: created.inReview
+        ? "I've sent it to the crowd anonymously. A moderator checks it before it goes live (usually quick). I'll bring their answers back here."
+        : "Posted anonymously to the crowd as “Asked via Pickbot”. I'll bring their answers back here when the votes are in.",
+    });
+  track("pickbot_crowd_posted", { threadId: t.id, battleId: battle.id, photos: photos.length, targeted: input.targetLikeMe, hours: input.hours, inReview: created.inReview, auto }, { userId: user.id });
   return { slug: created.slug, inReview: created.inReview };
 }
 
