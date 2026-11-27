@@ -554,6 +554,22 @@ export const pushSubscriptions = pgTable(
   (t) => [uniqueIndex("push_subscription_endpoint").on(t.endpoint), index("push_subscription_user").on(t.userId)],
 );
 
+// "People like you are worried about" questions written by AI for one person (Alex, Nov 27 2026): one row per user
+// per New York day, so the deck's refetches don't call the model again. `rounds` = groups of question strings.
+export const askingSuggestions = pgTable(
+  "asking_suggestion",
+  {
+    id: id(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    day: text("day").notNull(),
+    rounds: jsonb("rounds").$type<string[][]>().notNull(),
+    model: text("model"),
+    costUsd: doublePrecision("cost_usd"),
+    createdAt: now("created_at"),
+  },
+  (t) => [uniqueIndex("asking_suggestion_user_day").on(t.userId, t.day)],
+);
+
 // Every lifecycle email we decide about: one row per (user, kind, ref), so nothing sends twice.
 // status: QUEUED (waiting for sendAfter, e.g. quiet hours or a batch), SENT, SKIPPED (prefs/caps/budget), FAILED.
 export const emailLog = pgTable(

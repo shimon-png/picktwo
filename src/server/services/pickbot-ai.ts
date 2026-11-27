@@ -290,3 +290,80 @@ export async function draftCrowdBattle(a: { question: string; followUps: string[
   };
   return { draft: clean(draft), stats: stats(SMALL_MODEL, msg.usage, started) };
 }
+
+// ---------- "People like you are worried about" questions ----------
+
+const ASKING_SCHEMA = {
+  type: "object",
+  properties: { questions: { type: "array", items: { type: "string" } } },
+  required: ["questions"],
+  additionalProperties: false,
+} as const;
+
+const ASKING_SYSTEM = `You write the "People similar to you are worried about" card in crowdpick, a voting app with a decision helper called Pickbot.
+Write short questions this person would plausibly be stuck on right now, in their own casual first-person words, each one a real decision they could ask Pickbot about.
+
+Return JSON: {"questions": [...]} with exactly the number asked for.
+
+Each question:
+- 40 to 120 characters, one sentence or two short ones, ends with "?". Usually two clear options ("Stay or move?", "Text again or wait?").
+- Sounds like a real person typing, not an ad or a headline. No emoji, no names, no brands, no links.
+- Fits the person: their age range, sex, relationship, kids, home and work when given, the season, and what they've been voting on lately.
+- Weigh heavily toward what people are most worried about this year: money and affordability (rent, groceries, debt, saving), the economy, job security, layoffs and AI taking jobs, and political differences in families (e.g. a parent who votes the other way, whether to invite them, how to keep the peace). Mix in a little everyday life (dating, friends, family) so it doesn't feel heavy.
+- Never repeats or rewords anything in "Already asked or shown". Change the subject away from what they already asked Pickbot.
+- Vary the topics: no two questions about the same thing.
+- Nothing about self-harm, medical diagnoses, or anything sexual.`;
+
+/** Fresh questions for one person (Haiku). Ranges only: never a name, email, username or exact ZIP. */
+export async function writeAskingQuestions(input: {
+  count: number;
+  profile: Record<string, string | null | undefined>;
+  month: string;
+  recentVotes: string[];
+  pickbotTopics: string[];
+  already: string[];
+}): Promise<{ questions: unknown; stats: CallStats | null }> {
+  if (fake()) {
+    const bank = [
+      "Rent is going up again. Get a roommate or move further out?",
+      "Hearing layoff rumors at work. Start applying now or wait it out?",
+      "My dad votes the other way and it always blows up. Invite him for the holidays anyway?",
+      "Pay off my credit card first or build an emergency fund?",
+      "Worried AI will replace my job. Learn new skills or switch fields?",
+      "Grocery bill keeps climbing. Cancel the streaming apps or cook more?",
+      "Ask for a raise now or wait until reviews?",
+      "Skip the family group chat when it gets political, or say something?",
+      "Take a lower-paying job that feels safer, or stay where I am?",
+      "Lend my sister money for rent, or say no this time?",
+      "Second date went well. Ask for a third or let them ask?",
+      "Move back in with my parents to save, or keep my place?",
+      "Buy a used car now or keep fixing the old one?",
+      "Tell my friends I can't afford the trip, or just put it on my card?",
+      "My partner and I vote differently. Talk about it or keep politics out?",
+    ];
+    return { questions: { questions: bank.slice(0, input.count) }, stats: null };
+  }
+  const profile = Object.entries(input.profile)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("\n");
+  const text = [
+    `Write ${input.count} questions.`,
+    `Month: ${input.month}`,
+    profile ? `About them (ranges only):\n${profile}` : "About them: not much yet.",
+    input.recentVotes.length ? `Battles they voted on lately:\n- ${input.recentVotes.join("\n- ")}` : "",
+    input.pickbotTopics.length ? `What they already asked Pickbot about (change the subject):\n- ${input.pickbotTopics.join("\n- ")}` : "",
+    input.already.length ? `Already asked or shown (never repeat):\n- ${input.already.join("\n- ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const started = Date.now();
+  const msg = await anthropic().messages.create({
+    model: SMALL_MODEL,
+    max_tokens: 3000,
+    system: ASKING_SYSTEM,
+    output_config: { effort: "low", format: { type: "json_schema", schema: ASKING_SCHEMA } },
+    messages: [{ role: "user", content: [{ type: "text", text }] }],
+  });
+  return { questions: jsonText(msg), stats: stats(SMALL_MODEL, msg.usage, started) };
+}

@@ -147,6 +147,10 @@ export type AskingInput = {
   campaign?: string | null;
   /** "What's on your mind this week?" answer, when there is one. */
   topic?: AskingTopic | null;
+  /** Topics of the battles they voted on lately: a bit more likely. */
+  interests?: readonly AskingTopic[];
+  /** Topics they already took to Pickbot lately: change the subject (Alex, Nov 27). */
+  avoid?: readonly AskingTopic[];
   /** Stable per person and round, so the same person sees the same three until the next round. */
   seed: string;
   n?: number;
@@ -171,6 +175,65 @@ export function eligible(p: AskingPreset, a: Pick<AskingInput, "sex" | "age" | "
 }
 
 /** How likely a worry it is for this person. Topic pick > ad words > season > fits sex / age. */
+/** AI battle themes (lib/brain-tags.ts) → the card's topics. */
+export const THEME_TOPIC: Record<string, AskingTopic> = {
+  money: "money",
+  shopping: "money",
+  home: "life",
+  career: "work",
+  school: "work",
+  couples: "dating",
+  dating: "dating",
+  cheating_trust: "dating",
+  exes: "dating",
+  weddings: "family",
+  family_parenting: "family",
+  friends: "life",
+  travel: "life",
+  health_fitness: "life",
+};
+
+/** The topics that come up most in a list of themes (most first), at most `n`. */
+export function topTopics(themes: readonly (string | null | undefined)[], n = 2): AskingTopic[] {
+  const count = new Map<AskingTopic, number>();
+  for (const t of themes) {
+    const topic = t ? THEME_TOPIC[t] : undefined;
+    if (topic) count.set(topic, (count.get(topic) ?? 0) + 1);
+  }
+  return [...count.entries()].sort((x, y) => y[1] - x[1]).slice(0, n).map(([t]) => t);
+}
+
+/**
+ * Questions written by AI for one person: clean the model's JSON into `rounds` groups of `n` questions. Drops
+ * anything too short or long, with a link, email, @handle or emoji, repeats, and questions they already asked.
+ */
+export function parseAiAsking(raw: unknown, opts: { n: number; rounds: number; already?: readonly string[] }): string[][] {
+  const list = raw && typeof raw === "object" && Array.isArray((raw as { questions?: unknown }).questions) ? ((raw as { questions: unknown[] }).questions as unknown[]) : [];
+  const norm = (t: string) => t.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
+  const seen = new Set((opts.already ?? []).map(norm));
+  const out: string[] = [];
+  for (const x of list) {
+    if (typeof x !== "string") continue;
+    const q = x.replace(/^["“]|["”]$/g, "").replace(/\s+/g, " ").trim();
+    if (q.length < 12 || q.length > 140) continue;
+    if (/https?:|www\.|@|\p{Extended_Pictographic}/u.test(q)) continue;
+    const k = norm(q);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(q);
+  }
+  const rounds: string[][] = [];
+  for (let i = 0; i + opts.n <= out.length && rounds.length < opts.rounds; i += opts.n) rounds.push(out.slice(i, i + opts.n));
+  return rounds;
+}
+
+/** Ids of the presets shown in recent `asking_shown` events (comma-separated `ids`). */
+export function shownIds(rows: readonly { ids?: unknown }[]): Set<string> {
+  const out = new Set<string>();
+  for (const r of rows) if (typeof r.ids === "string") for (const id of r.ids.split(",")) if (id) out.add(id);
+  return out;
+}
+
 export function presetScore(p: AskingPreset, a: Omit<AskingInput, "exclude" | "seed" | "n">): number {
   let s = 1;
   if (a.topic && p.topic === a.topic) s += 4;
@@ -180,6 +243,8 @@ export function presetScore(p: AskingPreset, a: Omit<AskingInput, "exclude" | "s
   if (p.sex && a.sex === p.sex) s += 0.75;
   if (p.ages && a.age && p.ages.includes(a.age as Age)) s += 0.75;
   if (p.hot) s += 1.5;
+  if (a.interests?.includes(p.topic)) s += 1.5;
+  if (a.avoid?.includes(p.topic) && p.topic !== a.topic) s *= 0.3;
   return s;
 }
 
