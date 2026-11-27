@@ -1,13 +1,13 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "../db";
 import { battles, outcomes, users, votes } from "../db/schema";
-import { battleCards, hydrateCards, visibleStatuses, type BattleCard } from "./battles";
+import { battleCards, hydrateCards, mineCondition, visibleStatuses, type BattleCard } from "./battles";
 
 export type VotedCard = BattleCard & { mySide: "A" | "B"; votedAt: string };
 
-/** Battles the user posted (newest first), for Activity → Battles posted. */
+/** Battles the user posted plus their Pickbot crowd questions (newest first), for Activity → Battles posted. */
 export function postedBattles(userId: string, limit = 100) {
-  return battleCards(and(eq(battles.authorId, userId), visibleStatuses), limit);
+  return battleCards(and(mineCondition(userId), visibleStatuses), limit);
 }
 
 /** Battles the user voted on with their pick, most recent vote first, for Activity → Votes. */

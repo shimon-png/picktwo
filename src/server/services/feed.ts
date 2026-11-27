@@ -68,6 +68,8 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
         gt(battles.createdAt, new Date(now.getTime() - 7 * 86400_000)),
         visibilityCond,
         user ? sql`${battles.authorId} <> ${user.id}` : sql`true`,
+        // Your own Pickbot crowd questions (posted as @askedviapickbot) aren't yours to vote on.
+        user ? sql`NOT EXISTS (SELECT 1 FROM pickbot_thread pt WHERE pt.battle_id = ${battles.id} AND pt.user_id = ${user.id})` : sql`true`,
         blocked.length ? notInArray(battles.authorId, blocked) : sql`true`,
         sql`${users.bannedAt} IS NULL`,
         // "People like you are asking" preset battles (lib/asking.ts) only show through their card.

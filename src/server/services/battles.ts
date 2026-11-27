@@ -11,6 +11,7 @@ import {
   votes,
   reasonHelpful,
   follows,
+  pickbotThreads,
   type Battle,
   type User,
   type BattleTags,
@@ -308,9 +309,11 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
   }
 
   const isOwner = viewer.user?.id === b.authorId;
+  // A Pickbot crowd battle is posted under @askedviapickbot; the asker sees it as theirs (results, link back to the chat).
+  const askerThreadId = !isOwner && viewer.user && b.tags?.pickbot ? await pickbotThreadFor(b.id, viewer.user.id) : null;
   const isOpen = b.status === "OPEN";
   // Results (split, Expert score, reasons) only for the poster and people who voted on it, even after it closes (Alex, Nov 22).
-  const showResults = isOwner || !!myVote;
+  const showResults = isOwner || !!askerThreadId || !!myVote;
   const results = showResults ? pct(b.votesA, b.votesB) : null;
 
   let reasons: { A: ReasonView[]; B: ReasonView[] } = { A: [], B: [] };
@@ -359,6 +362,8 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
     voteCount: totalVotes,
     myVote,
     isOwner,
+    /** Set when the viewer asked this Pickbot crowd question: their thread id (only they ever get it). */
+    askerThreadId,
     reasons,
     outcome: outcome
       ? { chosen: outcome.chosen, thumb: outcome.thumb, note: outcome.note, photoUrl: outcome.photoUrl, reportedAt: outcome.reportedAt.toISOString() }
@@ -669,3 +674,23 @@ export async function expertScores(battleIds: string[], expertAt: number) {
 }
 
 export const visibleStatuses = notInArray(battles.status, ["DELETED", "HIDDEN"]);
+
+/** The asker's Pickbot thread behind a crowd battle, or null when this person didn't ask it. */
+export async function pickbotThreadFor(battleId: string, userId: string): Promise<string | null> {
+  const [t] = await db
+    .select({ id: pickbotThreads.id })
+    .from(pickbotThreads)
+    .where(and(eq(pickbotThreads.battleId, battleId), eq(pickbotThreads.userId, userId)));
+  return t?.id ?? null;
+}
+
+/**
+ * Battles that are the person's own in "Your battles": ones they posted plus Pickbot crowd questions they asked
+ * (posted under @askedviapickbot, linked through their thread). Publicly the Pickbot ones stay anonymous.
+ */
+export function mineCondition(userId: string) {
+  return or(
+    eq(battles.authorId, userId),
+    inArray(battles.id, db.select({ id: pickbotThreads.battleId }).from(pickbotThreads).where(and(eq(pickbotThreads.userId, userId), isNotNull(pickbotThreads.battleId)))),
+  )!;
+}

@@ -4,6 +4,7 @@ import { tasteProfileFor } from "@/server/services/taste-profile";
 import { TasteSection } from "@/components/taste/TasteSection";
 import { ProfileBar } from "@/components/taste/ProfileBar";
 import { PickbotHistory } from "@/components/pickbot/History";
+import { PickbotMark } from "@/components/pickbot/PickbotMark";
 import { answersLeftFor, listThreads, pickbotAccess } from "@/server/services/pickbot";
 import { profileProgressFor } from "@/server/services/profile-progress";
 import { redirect } from "next/navigation";
@@ -14,9 +15,9 @@ import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { unreadContactCount } from "@/server/services/contact";
 import { openReportCount } from "@/server/services/reports";
 import { db } from "@/server/db";
-import { battles, pointLedger, votes } from "@/server/db/schema";
+import { battles, pickbotThreads, pointLedger, votes } from "@/server/db/schema";
 import { getEconomy } from "@/server/services/config";
-import { battleCards, visibleStatuses, type BattleCard } from "@/server/services/battles";
+import { battleCards, mineCondition, visibleStatuses, type BattleCard } from "@/server/services/battles";
 import { countOpenLoops, countUnreported } from "@/server/services/points";
 import { TIER_LABEL, canPostBattle, expertTier, nextTier } from "@/server/services/expertise";
 import { ExpertBadge } from "@/components/ui/ExpertBadge";
@@ -59,7 +60,7 @@ export default async function YouPage() {
   const admin = isAdmin(user);
   // Everything below is independent, so it all runs at once (one round of DB trips instead of ~7 in a row).
   const [mine, openLoops, unreported, unread, ledger, followers, following, unreadDms, newMessages, flagged, reasonRows, taste, progress, pickbot] = await Promise.all([
-    battleCards(and(eq(battles.authorId, user.id), visibleStatuses), 100),
+    battleCards(and(mineCondition(user.id), visibleStatuses), 100),
     countOpenLoops(user.id, e),
     countUnreported(user.id),
     unreadCount(user.id),
@@ -87,7 +88,7 @@ export default async function YouPage() {
       .select({ id: votes.battleId, n: sql<number>`count(*)::int` })
       .from(votes)
       .innerJoin(battles, eq(battles.id, votes.battleId))
-      .where(and(eq(battles.authorId, user.id), isNotNull(votes.reason)))
+      .where(and(mineCondition(user.id), isNotNull(votes.reason)))
       .groupBy(votes.battleId),
     tasteProfileFor({ user, deviceId: null }),
     profileProgressFor({ user, deviceId: null }),
@@ -98,11 +99,20 @@ export default async function YouPage() {
     })().catch(() => null),
   ]);
   const reasonCounts = new Map(reasonRows.map((r) => [r.id, r.n]));
+  // Pickbot crowd questions are posted under @askedviapickbot: theirs to see here, closed from the Pickbot chat.
+  const askedThreads = new Map(
+    (
+      await db
+        .select({ battleId: pickbotThreads.battleId, id: pickbotThreads.id })
+        .from(pickbotThreads)
+        .where(and(eq(pickbotThreads.userId, user.id), isNotNull(pickbotThreads.battleId)))
+    ).map((r) => [r.battleId!, r.id]),
+  );
   const tier = expertTier(user.correctPicks, e);
   const next = nextTier(user.correctPicks, e);
   const blocked = !canPostBattle(unreported, e.maxUnreportedBattles);
   const t = pointsTier(user.ppBalance, e.tierHighAt, e.tierTopAt);
-  const awaiting = mine.filter((b) => b.status !== "OPEN" && !b.outcome);
+  const awaiting = mine.filter((b) => b.status !== "OPEN" && !b.outcome && !askedThreads.has(b.id));
   // Two groups, newest first: Active (still voting, by when posted) and Closed (by when voting ended).
   const live = mine.filter((b) => b.status === "OPEN");
   const closed = mine.filter((b) => b.status !== "OPEN").sort((x, y) => y.deadline.localeCompare(x.deadline));
@@ -224,7 +234,15 @@ export default async function YouPage() {
               key: b.id,
               section: b.status === "OPEN" ? "Active" : "Closed",
               text: `${b.title} ${b.context ?? ""} ${b.labelA} ${b.labelB}`,
-              node: <BattleRow b={b} reasons={reasonCounts.get(b.id) ?? 0} awaiting={awaiting.includes(b)} loopPoints={e.loopClosedPoints} />,
+              node: (
+                <BattleRow
+                  b={b}
+                  reasons={reasonCounts.get(b.id) ?? 0}
+                  awaiting={awaiting.includes(b)}
+                  loopPoints={e.loopClosedPoints}
+                  pickbotThread={askedThreads.get(b.id) ?? null}
+                />
+              ),
             }))}
           />
         )}
@@ -318,23 +336,43 @@ function Thumb({ img, label, side }: { img: string | null; label: string; side: 
   );
 }
 
-function BattleRow({ b, reasons, awaiting, loopPoints }: { b: BattleCard; reasons: number; awaiting: boolean; loopPoints: number }) {
+function BattleRow({
+  b,
+  reasons,
+  awaiting,
+  loopPoints,
+  pickbotThread,
+}: {
+  b: BattleCard;
+  reasons: number;
+  awaiting: boolean;
+  loopPoints: number;
+  /** Set for a Pickbot crowd question this person asked (posted anonymously as "Asked via Pickbot"). */
+  pickbotThread: string | null;
+}) {
   const votes = b.votesA + b.votesB;
   const picked = b.outcome ? (b.outcome.chosen === "A" ? b.labelA : b.outcome.chosen === "B" ? b.labelB : "neither") : null;
   const status = picked
     ? `Closed · picked ${picked}`
     : awaiting
       ? "Voting closed · tell people what you picked"
-      : `Live · ${votes} vote${votes === 1 ? "" : "s"} · ${reasons} reason${reasons === 1 ? "" : "s"} · ${timeLeft(b.deadline)}`;
+      : pickbotThread && b.status !== "OPEN"
+        ? `Voting closed · ${votes} vote${votes === 1 ? "" : "s"} · tell Pickbot what you picked`
+        : `Live · ${votes} vote${votes === 1 ? "" : "s"} · ${reasons} reason${reasons === 1 ? "" : "s"} · ${timeLeft(b.deadline)}`;
   return (
     <div className="flex items-center gap-2">
-      <Link href={awaiting ? `/b/${b.slug}/report` : `/b/${b.slug}`} className="flex min-w-0 flex-1 items-center gap-3 py-3">
+      <Link href={awaiting ? `/b/${b.slug}/report` : pickbotThread && b.status !== "OPEN" && !b.outcome ? `/ask/${pickbotThread}` : `/b/${b.slug}`} className="flex min-w-0 flex-1 items-center gap-3 py-3">
         <span className="flex gap-1">
           <Thumb img={b.imageA} label={b.labelA} side="A" />
           <Thumb img={b.imageB} label={b.labelB} side="B" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm">{b.title}</span>
+          {pickbotThread && (
+            <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-violet-soft px-2 py-0.5 text-[11px] text-violet" title="Others see it as “Asked via Pickbot”">
+              <PickbotMark className="size-3" /> Asked via Pickbot · anonymous to others
+            </span>
+          )}
           <span className="block truncate text-xs text-zinc-500">{status}</span>
           {votes > 0 && (
             <span className="mt-0.5 block text-xs text-zinc-500">
@@ -344,7 +382,7 @@ function BattleRow({ b, reasons, awaiting, loopPoints }: { b: BattleCard; reason
         </span>
         {awaiting && <span className="tag shrink-0 bg-accent-900 text-accent">+{loopPoints} ⚡</span>}
       </Link>
-      {b.status === "CLOSED" && <RepostButton slug={b.slug} />}
+      {b.status === "CLOSED" && !pickbotThread && <RepostButton slug={b.slug} />}
     </div>
   );
 }
