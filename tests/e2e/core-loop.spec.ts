@@ -3,6 +3,7 @@ import { pickArm, type GateArm } from "../../src/server/services/gate-test-rules
 import { ECONOMY_DEFAULTS } from "../../src/lib/constants";
 import { inHoldout } from "../../src/server/services/ranking";
 import { promoPosition } from "../../src/lib/pickbot-promo";
+import { pickTopicsArm } from "../../src/server/services/topics-test-rules";
 
 /** Free votes before the sign-up gate, and group B's dialog repeat (default config). */
 const FREE = ECONOMY_DEFAULTS.guestVoteLimit;
@@ -33,7 +34,7 @@ const stamp = Date.now().toString(36);
  */
 let guests = 0;
 const salt = Math.random().toString(36).slice(2, 8);
-async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm, opts: { mind?: boolean } = {}) {
+async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateArm, opts: { mind?: boolean; topics?: boolean } = {}) {
   const n = ++guests; // a new browser every call
   let id = "";
   // …and outside the about-you cards holdout, so the deck asks its questions.
@@ -45,10 +46,12 @@ async function guestIn(browser: Browser, baseURL: string | undefined, arm: GateA
     inHoldout(`about:${id}`, ECONOMY_DEFAULTS.aboutHoldoutPct) ||
     inHoldout(`pbar:${id}`, ECONOMY_DEFAULTS.profileBarHoldoutPct) ||
     // "What's on your mind" card (vote 3): only where a test asks for it; elsewhere a browser in its holdout.
-    inHoldout(`mind:${id}`, ECONOMY_DEFAULTS.mindHoldoutPct) !== !opts.mind;
+    inHoldout(`mind:${id}`, ECONOMY_DEFAULTS.mindHoldoutPct) !== !opts.mind ||
+    // Topics A/B test: only browsers with "topics" in the id can join it under e2e; pin those into the topics group.
+    (!!opts.topics && pickTopicsArm(id, ECONOMY_DEFAULTS.topicsTestPct) !== "topics");
     i++
   )
-    id = `d_e2e${stamp}${salt}${arm}${n}x${i}`;
+    id = `d_e2e${opts.topics ? "topics" : ""}${stamp}${salt}${arm}${n}x${i}`;
   const ctx = await browser.newContext();
   await ctx.addCookies([{ name: "pt_vid", value: id, url: baseURL ?? "http://localhost:3000" }]);
   await ctx.addInitScript(() => localStorage.setItem("cp_tour_v1", "seen"));
@@ -361,6 +364,34 @@ test("what's on your mind: one tap at vote 3, then the personality map sign-up w
   await expect(dialog.getByRole("button", { name: "Email me a code" })).toBeEnabled();
   await snap(page, "mind-signup");
   await ctx.close();
+});
+
+test("topics test: chips above the deck, a topic narrows it, homepage tiles open it (Alex, Nov 27)", async ({ browser, baseURL }) => {
+  const ctx = await guestIn(browser, baseURL, "control", { topics: true });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await expect(page.getByTestId("home-topics")).toBeVisible();
+  await page.goto("/vote");
+  const chips = page.getByTestId("topic-chips");
+  await expect(chips).toBeVisible();
+  await expect(chips.getByRole("button", { name: "Mix" })).toHaveAttribute("aria-pressed", "true");
+  await chips.getByRole("button", { name: "Couples" }).click();
+  await expect(chips.getByRole("button", { name: "Couples" })).toHaveAttribute("aria-pressed", "true");
+  // Every card in the deck is now a Couples battle (or the topic's end card when there are none).
+  const badge = page.locator(".deck-card").getByTestId("topic-badge");
+  await expect(badge.or(page.getByTestId("topic-empty")).first()).toBeVisible();
+  if (await badge.count()) await expect(badge.first()).toHaveText("Couples");
+  // The topic is remembered for the next visit.
+  await page.goto("/vote");
+  await expect(page.getByTestId("topic-chips").getByRole("button", { name: "Couples" })).toHaveAttribute("aria-pressed", "true");
+  // The old deck (control group) has no chips.
+  const old = await guestIn(browser, baseURL, "control");
+  const p2 = await old.newPage();
+  await p2.goto("/vote");
+  await expect(p2.locator(".deck-card").first()).toBeVisible();
+  await expect(p2.getByTestId("topic-chips")).toHaveCount(0);
+  await ctx.close();
+  await old.close();
 });
 
 test("non-admin cannot post as another user", async ({ browser }) => {
