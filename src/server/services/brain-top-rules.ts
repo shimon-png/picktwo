@@ -13,6 +13,8 @@ export type Kpi = {
   change: number | null;
   /** Oldest → newest, up to 14 points ending on the headline day; null = no data that day. */
   series: (number | null)[];
+  /** The New York day of each series point (YYYY-MM-DD), same order. */
+  seriesDays: string[];
   /** The New York day the headline number is for (YYYY-MM-DD). */
   day: string | null;
 };
@@ -22,7 +24,7 @@ const rel = (now: number | null, avg: number | null) => (now == null || avg == n
 /** A ratio per day (bounce = bounced ÷ visitors). `rows` newest first; `at` = index of the headline day. */
 export function ratioKpi(rows: { day: string; num: number; den: number }[], at = 0): Kpi {
   const r = rows[at];
-  if (!r) return { now: null, avg: null, change: null, series: [], day: null };
+  if (!r) return { now: null, avg: null, change: null, series: [], seriesDays: [], day: null };
   const now = r.den ? r.num / r.den : null;
   const prior = rows.slice(at + 1, at + 8);
   const den = prior.reduce((t, x) => t + x.den, 0);
@@ -31,7 +33,8 @@ export function ratioKpi(rows: { day: string; num: number; den: number }[], at =
     .slice(at, at + 14)
     .map((x) => (x.den ? x.num / x.den : null))
     .reverse();
-  return { now, avg, change: rel(now, avg), series, day: r.day };
+  const seriesDays = rows.slice(at, at + 14).map((x) => x.day).reverse();
+  return { now, avg, change: rel(now, avg), series, seriesDays, day: r.day };
 }
 
 /**
@@ -40,20 +43,20 @@ export function ratioKpi(rows: { day: string; num: number; den: number }[], at =
  */
 export function countKpi(rows: { day: string; n: number }[], dayFraction: number): Kpi {
   const r = rows[0];
-  if (!r) return { now: null, avg: null, change: null, series: [], day: null };
+  if (!r) return { now: null, avg: null, change: null, series: [], seriesDays: [], day: null };
   const prior = rows.slice(1, 8);
   const avg = prior.length ? prior.reduce((t, x) => t + x.n, 0) / prior.length : null;
   const pace = dayFraction >= 1 / 24 ? r.n / Math.min(1, dayFraction) : null;
-  return { now: r.n, avg, change: rel(pace, avg), series: rows.slice(0, 14).map((x) => x.n).reverse(), day: r.day };
+  return { now: r.n, avg, change: rel(pace, avg), series: rows.slice(0, 14).map((x) => x.n).reverse(), seriesDays: rows.slice(0, 14).map((x) => x.day).reverse(), day: r.day };
 }
 
 /** A value already worked out per day (break-even per visitor), with the 7-day value worked out from pooled inputs. */
 export function valueKpi(values: { day: string; v: number | null }[], avg: number | null): Kpi {
   const r = values[0];
-  if (!r) return { now: null, avg: null, change: null, series: [], day: null };
+  if (!r) return { now: null, avg: null, change: null, series: [], seriesDays: [], day: null };
   // Money can be negative, so the change is in dollars against |avg|.
   const change = r.v == null || avg == null || avg === 0 ? null : (r.v - avg) / Math.abs(avg);
-  return { now: r.v, avg, change, series: values.slice(0, 14).map((x) => x.v).reverse(), day: r.day };
+  return { now: r.v, avg, change, series: values.slice(0, 14).map((x) => x.v).reverse(), seriesDays: values.slice(0, 14).map((x) => x.day).reverse(), day: r.day };
 }
 
 /** YYYY-MM-DD of a moment in New York. */

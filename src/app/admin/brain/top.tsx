@@ -6,7 +6,7 @@ import Link from "next/link";
 import type { Kpi, FunnelStep } from "@/server/services/brain-top-rules";
 import type { TopNumbers } from "@/server/services/brain-top";
 import { money } from "@/server/services/unit-economics-rules";
-import { Sparkline } from "./charts";
+import { Sparkline } from "./charts-client";
 
 type Tile = { key: string; label: string; kpi: Kpi; fmt: (v: number) => string; higherIsBetter: boolean; sub: string; href: string; bench?: number };
 
@@ -53,7 +53,7 @@ export function KpiTiles({ top, listHref, journeyHref, growthHref }: { top: TopN
             <Change k={t.kpi} higherIsBetter={t.higherIsBetter} pace={t.key === "visitors"} />
             {t.kpi.avg != null && <span className="text-zinc-500"> ({t.fmt(t.kpi.avg)})</span>}
           </div>
-          <Sparkline values={t.kpi.series} bench={t.bench} label={`${t.label}, last 14 days`} />
+          <Sparkline values={t.kpi.series} days={t.kpi.seriesDays} labels={t.kpi.series.map((v) => (v == null ? null : t.fmt(v)))} bench={t.bench} label={`${t.label}, last 14 days`} />
           <div className="text-[11px] text-zinc-500">{t.sub}</div>
         </Link>
       ))}
@@ -72,19 +72,20 @@ export function FunnelStrip({ steps, days, journeyHref, gateHref }: { steps: Fun
         <h2 className="mr-auto font-sans font-medium">Funnel · {days === 1 ? "last 24h" : `last ${days} days`}</h2>
         <span className="text-xs text-zinc-500">Bar = share of visitors; small number = share of the step before. Tap a step for its people.</span>
       </div>
-      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+      <ol className="grid auto-rows-fr grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {steps.map((s) => (
-          <li key={s.key}>
-            <Link href={s.key === "gate" ? gateHref : journeyHref(STEP_HREF[s.key])} className="block rounded-xl bg-a-soft p-2.5 transition hover:ring-1 hover:ring-accent">
-              <div className="text-xs text-zinc-500">{s.label}</div>
+          <li key={s.key} className="min-w-0">
+            <Link
+              href={s.key === "gate" ? gateHref : journeyHref(STEP_HREF[s.key])}
+              className="flex h-full flex-col rounded-xl bg-a-soft p-2.5 transition hover:ring-1 hover:ring-accent"
+            >
+              <div className="truncate text-xs text-zinc-500">{s.label}</div>
               <div className="text-xl font-medium tabular-nums">{s.n.toLocaleString()}</div>
               <div className="mt-1 h-1.5 rounded-full bg-white/70">
                 <div className="h-1.5 rounded-full bg-a" style={{ width: `${Math.max(2, (100 * s.n) / first)}%` }} />
               </div>
-              <div className="mt-1 text-[11px] text-zinc-500">
-                {s.ofVisitors == null ? "—" : `${Math.round(100 * s.ofVisitors)}% of visitors`}
-                {s.fromPrev != null && ` · ${Math.round(100 * s.fromPrev)}% of prev`}
-              </div>
+              <div className="mt-1 truncate text-[11px] text-zinc-500">{s.ofVisitors == null ? "—" : `${Math.round(100 * s.ofVisitors)}% of visitors`}</div>
+              <div className="truncate text-[11px] text-zinc-500">{s.fromPrev == null ? "\u00a0" : `${Math.round(100 * s.fromPrev)}% of step before`}</div>
             </Link>
           </li>
         ))}

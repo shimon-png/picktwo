@@ -1,8 +1,8 @@
+import Link from "next/link";
 import { ARM_LABELS } from "@/server/services/gate-test-rules";
+import { TOPICS_ARM_LABELS } from "@/server/services/topics-test-rules";
 import { Rows, gateRow, nyTime, pct, pctN, perVisitor, verdict, barVerdict, type TabProps } from "../ui";
 import { TestCard, loadTests } from "../tests";
-import { TOPICS_ARM_LABELS } from "@/server/services/topics-test-rules";
-import Link from "next/link";
 
 /** Every test on the same card, live ones first; the old per-test tables sit behind "Show details". */
 export async function ExperimentsTab({ days, view }: TabProps) {
@@ -14,8 +14,8 @@ export async function ExperimentsTab({ days, view }: TabProps) {
       <>
         <p className="text-xs text-zinc-500">
           New signed-out browsers (no votes yet) are split at random: {TOPICS_ARM_LABELS.control} vs {TOPICS_ARM_LABELS.topics} (chip row, &quot;stay on Mix?&quot; card, topic sign-up nudge). Came back = active on 2+ days in their first week.
-          {tp.startedAt ? ` Started ${nyTime(tp.startedAt)}.` : " Not started yet."}{" "}
-          <Link href="/admin/topics" className="underline">Full dashboard</Link>
+          {tp.startedAt ? ` Started ${tp.startedAt} New York time.` : " Not started yet."}{" "}
+          <Link href="/admin/topics" className="text-accent underline">Full dashboard (per topic, topic cards funnel)</Link>
         </p>
         <Rows
           head={["Metric", TOPICS_ARM_LABELS.control, TOPICS_ARM_LABELS.topics, "p"]}
