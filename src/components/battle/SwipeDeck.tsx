@@ -603,7 +603,7 @@ export function SwipeDeck({
   const tierLine = tier ? (tier.next ? `${tier.toNext} ⚡ to ${tier.next} priority.` : "Top priority — your battles go first.") : null;
 
   const header = (
-    <div className="sticky top-16 z-30 -mx-4 bg-page/95 px-4 pb-3 backdrop-blur">
+    <div className="sticky top-16 z-30 -mx-4 px-4 pb-3">
       <p className="text-xs text-zinc-500" data-tour="status">
         {tierLine ?? (
           <>

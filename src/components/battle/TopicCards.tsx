@@ -36,7 +36,9 @@ export function TopicChips({ current, counts, onPick }: { current: DeckTopic; co
       ref={row}
       role="toolbar"
       aria-label="Topics"
-      className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // Phones: one scrolling row whose right edge fades out, so a cut-off chip reads as "more this way". Wider
+      // screens: the chips wrap so every topic is visible (Alex, Nov 28: "Everyday life is cut off").
+      className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 pt-1 [mask-image:linear-gradient(to_right,#000_85%,transparent)] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible sm:[mask-image:none] [&::-webkit-scrollbar]:hidden"
       data-testid="topic-chips"
     >
       {chips.map((t) => {
@@ -51,8 +53,9 @@ export function TopicChips({ current, counts, onPick }: { current: DeckTopic; co
             className={cn(
               "shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-bold text-[#15112b] shadow-[0_2px_0_rgb(0_0_0/0.18)] transition",
               toneClass(t),
-              on ? "scale-105 ring-2 ring-ink ring-offset-2 ring-offset-page" : "opacity-80 hover:opacity-100",
-              empty && !on && "opacity-45",
+              // Full-strength candy colours (Alex, Nov 28: the dimmed chips looked muted); only empty topics fade.
+              on ? "scale-105 ring-2 ring-ink ring-offset-2 ring-offset-page" : "hover:brightness-105",
+              empty && !on && "opacity-50",
             )}
           >
             {topicLabel(t)}
@@ -86,7 +89,7 @@ function TopicGrid({ counts, onPick, current }: { counts: Partial<Record<TopicId
           >
             <span className="text-[15px] leading-tight">{topicLabel(t)}</span>
             <span className="text-[11px] font-medium leading-snug opacity-80">{n === 0 ? "Back tomorrow" : hook}</span>
-            {n != null && n > 0 && <span className="rounded-full bg-white/70 px-1.5 text-[10.5px] font-bold">{n >= 100 ? "99+" : n} new</span>}
+            {n != null && n > 0 && <span className="rounded-full bg-[#ffffff] px-1.5 text-[10.5px] font-bold text-[#15112b] shadow-[0_1px_0_rgb(0_0_0/0.12)]">{n >= 100 ? "99+" : n} new</span>}
           </button>
         );
       })}
