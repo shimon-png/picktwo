@@ -4,6 +4,7 @@ import { brainScope, type BrainView } from "@/server/services/brain";
 import { funnelNumbers, topNumbers } from "@/server/services/brain-top";
 import { nyDate, makeListHref } from "./ui";
 import { FunnelStrip, KpiTiles } from "./top";
+import { DayTable } from "./day-table";
 import { LiveTests, loadTests } from "./tests";
 import { TrendsTab } from "./tabs/trends";
 import { GrowthTab } from "./tabs/growth";
@@ -23,7 +24,7 @@ export const metadata = { title: "Brain" };
  * the top screen plus one tab. Nothing was deleted: secondary tables sit behind "Show more" / collapsed cards.
  */
 const TABS = [
-  { key: "trends", label: "Trends", holds: "day by day, before vs after" },
+  { key: "trends", label: "Trends", holds: "the day-by-day chart, before vs after (the day-by-day table is up top)" },
   { key: "growth", label: "Growth", holds: "visits and sign-ups by source, ad campaigns, unit economics, who visitors are" },
   { key: "deck", label: "Deck", holds: "engagement score, themes, where bounced visitors left, skips" },
   { key: "experiments", label: "Experiments", holds: "every A/B test and holdout" },
@@ -113,7 +114,7 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
 }
 
 async function TopScreen({ days, view }: { days: number; view: BrainView }) {
-  const [top, funnel, tests, cleanFrom] = await Promise.all([topNumbers(view), funnelNumbers(view, days), loadTests(view, days), cleanStart(view)]);
+  const [top, funnel, tests, cleanFrom] = await Promise.all([topNumbers(view, days), funnelNumbers(view, days), loadTests(view, days), cleanStart(view)]);
   const listHref = makeListHref(days, view);
   const journeyHref = (step: string) => `/admin/journey?days=${days}${view === "all" ? "&view=all" : ""}${step ? `&step=${encodeURIComponent(step)}` : ""}#people`;
   const testHref = (id: string) => `/admin/brain?tab=experiments&days=${days}${view === "all" ? "&view=all" : ""}${id ? `#test-${id}` : ""}`;
@@ -123,6 +124,7 @@ async function TopScreen({ days, view }: { days: number; view: BrainView }) {
       <p className="text-[11px] text-zinc-500">
         Headline tiles: today so far (New York time) against the 7 days before, whatever window is picked. {view === "clean" ? `Clean view: real people only, from ${cleanFrom}; seed votes, made-up accounts, admins and bots left out.` : "All data: includes seed votes and admin test activity (bots still left out)."} Number checks are on the Checks tab.
       </p>
+      <DayTable daily={top.daily} ue={top.ue} listHref={listHref} days={days} trendsHref={`/admin/brain?tab=trends&days=${days}${view === "all" ? "&view=all" : ""}`} />
       <FunnelStrip steps={funnel} days={days} journeyHref={journeyHref} gateHref={listHref("gates")} />
       <LiveTests tests={tests.summaries} href={testHref} />
     </>
@@ -145,6 +147,7 @@ function TopSkeleton() {
         ))}
       </div>
       <div className="h-4" />
+      <div className="card h-[380px] animate-pulse" />
       <div className="card h-[170px] animate-pulse" />
       <div className="card h-[260px] animate-pulse" />
     </div>

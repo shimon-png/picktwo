@@ -26,10 +26,13 @@ export type TopNumbers = {
   breakEven: Kpi;
   today: string;
   signupsToday: number;
+  /** Day by day for the table on the top screen, newest first (at least 16 days, more for a 30-day window). */
+  daily: { day: string; visitors: number; visits: number; signups: number; votes: number; voters: number; posts: number }[];
+  ue: Awaited<ReturnType<typeof ueBasics>>;
 };
 
-export async function topNumbers(view: BrainView): Promise<TopNumbers> {
-  const scope = await brainScope(view, 16);
+export async function topNumbers(view: BrainView, days = 7): Promise<TopNumbers> {
+  const scope = await brainScope(view, Math.max(16, days + 1));
   const { since, ev, vt } = scope;
   const firstFrom = scope.cleanFrom ?? "1970-01-01T00:00:00.000Z";
   const [daily, bounce, ret, ue] = await Promise.all([
@@ -69,7 +72,15 @@ export async function topNumbers(view: BrainView): Promise<TopNumbers> {
 
   const now = new Date();
   const today = nyDayOf(now);
-  const rows = daily.map((d) => ({ ...d, visitors: Number(d.visitors), visits: Number(d.visits), votes: Number(d.votes), signups: Number(d.signups) }));
+  const rows = daily.map((d) => ({
+    day: d.day,
+    visitors: Number(d.visitors),
+    visits: Number(d.visits),
+    votes: Number(d.votes),
+    signups: Number(d.signups),
+    voters: Number(d.voters),
+    posts: Number(d.posts),
+  }));
   const bounceBy = new Map([...bounce].map((r) => [r.day, r]));
   const retBy = new Map([...ret].map((r) => [r.day, r]));
   const be = (r: { visitors: number; visits: number; votes: number; signups: number }) =>
@@ -98,6 +109,8 @@ export async function topNumbers(view: BrainView): Promise<TopNumbers> {
     ),
     today,
     signupsToday: rows[0]?.day === today ? rows[0].signups : 0,
+    daily: rows,
+    ue,
   };
 }
 
