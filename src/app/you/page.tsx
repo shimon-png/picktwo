@@ -251,36 +251,16 @@ export default async function YouPage() {
       <PeopleSection title="Followers" people={followers} viewerId={user.id} empty="No followers yet. Share a battle and people can follow you from your name." />
       <PeopleSection title="Following" people={following} viewerId={user.id} empty="You're not following anyone yet. Find people in Discover." />
 
-      <section className="card divide-y divide-ink/8 overflow-hidden !bg-white shadow-ring">
-        {(
-          [
-            ["/activity", Bell, "Activity", unread],
-            ["/messages", MessageCircle, "Messages", unreadDms],
-            ["/people-like-you", Users, "People who vote like you", 0],
-            [`/u/${user.handle}`, User, "Public profile", 0],
-            ["/settings", Settings, "Settings", 0],
-            [TOUR_URL, GraduationCap, "Tutorial", 0],
-            ["/contact", LifeBuoy, "Contact us & feedback", 0],
-            ...(admin ? ([["/admin/messages", Mail, "Admin · contact messages", newMessages]] as const) : []),
-            ...(admin ? ([["/admin/reports", Flag, "Admin · flagged photos", flagged]] as const) : []),
-          ] as const
-        ).map(([href, Icon, label, badge]) => (
-          <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface">
-            <Icon className="size-4 text-zinc-500" aria-hidden />
-            <span className="flex-1">{label}</span>
-            {badge > 0 && <span className="rounded-full bg-b px-1.5 text-[11px] text-white">{badge}</span>}
-            <ChevronRight className="size-4 text-zinc-400" aria-hidden />
-          </Link>
-        ))}
-      </section>
-
       <section>
         <h2 className="mb-2 text-[22px]">Recent ⚡</h2>
         {ledger.length === 0 ? (
           <p className="text-sm text-zinc-500">No points yet — start voting!</p>
         ) : (
-          <ul className="card divide-y divide-ink/8">
-            {ledger.map((l) => {
+          <ExpandList
+            initial={3}
+            searchable={false}
+            className="card !space-y-0 divide-y divide-ink/8"
+            items={ledger.map((l) => {
               const body = (
                 <>
                   <span className="min-w-0 flex-1">
@@ -305,21 +285,44 @@ export default async function YouPage() {
                   {l.slug && <ChevronRight className="size-4 shrink-0 text-zinc-400" aria-hidden />}
                 </>
               );
-              return (
-                <li key={l.id}>
-                  {l.slug ? (
-                    <Link href={`/b/${l.slug}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface">
-                      {body}
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-3 px-4 py-2.5 text-sm">{body}</div>
-                  )}
-                </li>
-              );
+              return {
+                key: l.id,
+                text: l.title ?? "",
+                node: l.slug ? (
+                  <Link href={`/b/${l.slug}`} className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-surface">
+                    {body}
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-3 px-4 py-2.5 text-sm">{body}</div>
+                ),
+              };
             })}
-          </ul>
+          />
         )}
       </section>
+      <section className="card divide-y divide-ink/8 overflow-hidden !bg-white shadow-ring">
+        {(
+          [
+            ["/activity", Bell, "Activity", unread],
+            ["/messages", MessageCircle, "Messages", unreadDms],
+            ["/people-like-you", Users, "People who vote like you", 0],
+            [`/u/${user.handle}`, User, "Public profile", 0],
+            ["/settings", Settings, "Settings", 0],
+            [TOUR_URL, GraduationCap, "Tutorial", 0],
+            ["/contact", LifeBuoy, "Contact us & feedback", 0],
+            ...(admin ? ([["/admin/messages", Mail, "Admin · contact messages", newMessages]] as const) : []),
+            ...(admin ? ([["/admin/reports", Flag, "Admin · flagged photos", flagged]] as const) : []),
+          ] as const
+        ).map(([href, Icon, label, badge]) => (
+          <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-surface">
+            <Icon className="size-4 text-zinc-500" aria-hidden />
+            <span className="flex-1">{label}</span>
+            {badge > 0 && <span className="rounded-full bg-b px-1.5 text-[11px] text-white">{badge}</span>}
+            <ChevronRight className="size-4 text-zinc-400" aria-hidden />
+          </Link>
+        ))}
+      </section>
+
     </div>
   );
 }

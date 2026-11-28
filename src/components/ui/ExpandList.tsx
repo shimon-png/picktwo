@@ -13,7 +13,7 @@ export type ExpandItem = {
 };
 
 /**
- * Shows the first `initial` items with "Show more", plus a search box whenever there's more than one item.
+ * Shows the first `initial` items with "Show more", plus a search box whenever there's more than one item (unless `searchable` is false).
  * While searching, every match shows.
  * With `sections`, items are grouped under those headings (in that order, empty ones hidden); one search box covers all,
  * and each section shows its first `initial` items.
@@ -25,6 +25,7 @@ export function ExpandList({
   empty,
   className,
   sections,
+  searchable = true,
 }: {
   items: ExpandItem[];
   initial?: number;
@@ -32,6 +33,8 @@ export function ExpandList({
   empty?: React.ReactNode;
   className?: string;
   sections?: string[];
+  /** false hides the search box (short lists like Recent ⚡). */
+  searchable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -54,7 +57,7 @@ export function ExpandList({
   );
   return (
     <div className="space-y-2">
-      {items.length > 1 && (
+      {searchable && items.length > 1 && (
         <label className="relative block">
           <span className="sr-only">{searchPlaceholder}</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" aria-hidden />
