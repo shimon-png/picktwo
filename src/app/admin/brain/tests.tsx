@@ -11,6 +11,8 @@ import { aboutStats } from "@/server/services/about-stats";
 import { profileBarStats } from "@/server/services/profile-progress";
 import { pickbotStats } from "@/server/services/pickbot-stats";
 import { winbackStats } from "@/server/services/winback";
+import { topicsTestResults } from "@/server/services/topics-test";
+import { TOPICS_ARM_LABELS } from "@/server/services/topics-test-rules";
 import { testBadge, type TestArm, type TestBadge } from "@/server/services/brain-top-rules";
 import type { BrainView } from "@/server/services/brain";
 
@@ -31,8 +33,15 @@ export type TestSummary = {
 };
 
 export async function loadTests(view: BrainView, days: number) {
-  const [gt, ab, pb, pk, wb] = await Promise.all([gateTestResults(days), aboutStats(view, days), profileBarStats(view, days), pickbotStats(view, days), winbackStats()]);
-  return { gt, ab, pb, pk, wb, summaries: summarize({ gt, ab, pb, pk, wb }) };
+  const [gt, ab, pb, pk, wb, tp] = await Promise.all([
+    gateTestResults(days),
+    aboutStats(view, days),
+    profileBarStats(view, days),
+    pickbotStats(view, days),
+    winbackStats(),
+    topicsTestResults(),
+  ]);
+  return { gt, ab, pb, pk, wb, tp, summaries: summarize({ gt, ab, pb, pk, wb, tp }) };
 }
 
 type Loaded = {
@@ -41,6 +50,7 @@ type Loaded = {
   pb: Awaited<ReturnType<typeof profileBarStats>>;
   pk: Awaited<ReturnType<typeof pickbotStats>>;
   wb: Awaited<ReturnType<typeof winbackStats>>;
+  tp: Awaited<ReturnType<typeof topicsTestResults>>;
 };
 
 const per = (a: { visitors: number; votes: number }) => (a.visitors ? a.votes / a.visitors : null);
@@ -48,20 +58,26 @@ const lift = (base: number | null, test: number | null) => (base == null || test
 const pct1 = (v: number) => `${(100 * v).toFixed(1)}%`;
 const two = (v: number) => v.toFixed(2);
 
-function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
+function summarize({ gt, ab, pb, pk, wb, tp }: Loaded): TestSummary[] {
   const out: TestSummary[] = [];
-  // Topics test (50/50 on new browsers): built in its own PR; until its numbers are wired here it shows as not live.
+  // Topics test (50/50 on new browsers, deck_topics_v1). Decided on sign-up rate (Alex's hypothesis); votes per
+  // visitor and return are in the details and on /admin/topics.
+  const tOn = tp.pct > 0 && !!tp.startedAt;
+  const tArms: TestArm[] = [
+    { label: TOPICS_ARM_LABELS.control, people: tp.total.control.visitors, value: tp.total.control.signupRate },
+    { label: TOPICS_ARM_LABELS.topics, people: tp.total.topics.visitors, value: tp.total.topics.signupRate },
+  ];
   out.push({
     id: "topics",
     name: "Topics test",
-    who: "50/50 on new browsers: topics in the Vote deck vs the mixed deck",
-    metric: "came back on day 1 and day 3",
+    who: `${tp.pct}% of new browsers get topics in the Vote deck; the rest keep the mixed deck`,
+    metric: "sign-up rate",
     fmt: pct1,
-    arms: [],
-    lift: null,
-    p: null,
-    badge: { label: "Not live yet", tone: "off" },
-    live: false,
+    arms: tArms,
+    lift: tp.signupLift,
+    p: tp.signupP,
+    badge: testBadge({ on: tOn, arms: tArms, p: tp.signupP }),
+    live: tOn,
   });
 
   const gOn = gt.pct > 0 && !!gt.startedAt;
