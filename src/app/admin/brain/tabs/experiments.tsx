@@ -1,12 +1,44 @@
+import Link from "next/link";
 import { ARM_LABELS } from "@/server/services/gate-test-rules";
+import { TOPICS_ARM_LABELS } from "@/server/services/topics-test-rules";
 import { Rows, gateRow, nyTime, pct, pctN, perVisitor, verdict, barVerdict, type TabProps } from "../ui";
 import { TestCard, loadTests } from "../tests";
 
 /** Every test on the same card, live ones first; the old per-test tables sit behind "Show details". */
 export async function ExperimentsTab({ days, view }: TabProps) {
-  const { gt, ab, pb, pk, wb, summaries } = await loadTests(view, days);
+  const { gt, ab, pb, pk, wb, tp, summaries } = await loadTests(view, days);
   const order = [...summaries].sort((a, b) => Number(b.live) - Number(a.live));
+  const tRow = (label: string, c: (typeof tp.total)["control"], lift: number | null, p: number | null, f: (x: typeof c) => string) => [
+    label,
+    f(tp.total.control),
+    f(tp.total.topics),
+    lift == null ? "—" : `${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}%`,
+    p == null ? "—" : p < 0.05 ? <span key="p" className="text-green">{`real (p = ${p.toFixed(3)})`}</span> : `could be chance (p = ${p.toFixed(2)})`,
+  ];
   const details: Record<string, React.ReactNode> = {
+    topics: (
+      <>
+        <Rows
+          head={["Whole test so far", TOPICS_ARM_LABELS.control, TOPICS_ARM_LABELS.topics, "Topics vs old", "Difference"]}
+          rows={[
+            ["Visitors", tp.total.control.visitors.toLocaleString(), tp.total.topics.visitors.toLocaleString(), "", ""],
+            tRow("Votes per visitor", tp.total.control, tp.votesLift, tp.votesP, (c) => c.avgVotes.toFixed(2)),
+            tRow("Sign-up rate", tp.total.control, tp.signupLift, tp.signupP, (c) => pctN(c.signupRate)),
+            tRow("Share who voted", tp.total.control, tp.voteRateLift, tp.voteRateP, (c) => pctN(c.voteRate)),
+            tRow("Came back (2+ days in first 7)", tp.total.control, tp.returnLift, tp.returnP, (c) => pctN(c.returnRate)),
+            ["Picked a topic (not Mix)", "—", tp.total.topics.visitors ? pctN(tp.total.topics.choseTopic / tp.total.topics.visitors) : "—", "", ""],
+          ]}
+        />
+        <p className="text-xs text-zinc-500">
+          Started {tp.startedAt ?? "—"} New York time; topicsTestPct = {tp.pct}% in Config (0 stops it). Per-topic numbers, day by day and the topic
+          cards&apos; funnel are on the{" "}
+          <Link href="/admin/topics" className="text-accent underline">
+            Topics test page
+          </Link>
+          .
+        </p>
+      </>
+    ),
     gate: (
       <>
         <p className="text-xs text-zinc-500">{`Every new signed-out browser is put in a group at random and stays there. A (control): after ${gt.limit} free votes, a sign-up wall they can't skip. B: a sign-up dialog they can close and keep voting; it shows again every ${gt.every} votes. ${gt.pct}% go to B (gateTestPct in Config; 0 stops the test, everyone gets A). Rows are by the day the browser was first seen (New York). Votes count everything that browser did since, as a guest and in the account it signed up to. Reached the gate = saw the wall or dialog at least once.`}</p>

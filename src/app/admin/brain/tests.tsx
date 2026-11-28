@@ -2,7 +2,8 @@
  * Every experiment on one card layout (Alex, Nov 28 2026): who's in it, the arms side by side on the one metric that
  * decides it, lift + p-value, and a badge from `testBadge()` (Too early / "<arm> ahead" / No difference / Off).
  * The top screen's "Live experiments" row and the Experiments tab read the same summaries.
- * To add a test (e.g. the Topics test): load its numbers in `loadTests()` and push a `TestSummary` in `summarize()`.
+ * To add a test: load its numbers in `loadTests()` and push a `TestSummary` in `summarize()`, with an `about` paragraph
+ * in plain English (Alex, Nov 28: "we might forget what we're testing").
  */
 import Link from "next/link";
 import { gateTestResults } from "@/server/services/gate-test";
@@ -11,12 +12,16 @@ import { aboutStats } from "@/server/services/about-stats";
 import { profileBarStats } from "@/server/services/profile-progress";
 import { pickbotStats } from "@/server/services/pickbot-stats";
 import { winbackStats } from "@/server/services/winback";
+import { topicsTestResults } from "@/server/services/topics-test";
+import { TOPICS_ARM_LABELS } from "@/server/services/topics-test-rules";
 import { testBadge, type TestArm, type TestBadge } from "@/server/services/brain-top-rules";
 import type { BrainView } from "@/server/services/brain";
 
 export type TestSummary = {
   id: string;
   name: string;
+  /** What we're testing and why, in plain English (shown at the top of the card). */
+  about: string;
   /** Who is in it, one line. */
   who: string;
   /** The metric that decides it. */
@@ -31,8 +36,15 @@ export type TestSummary = {
 };
 
 export async function loadTests(view: BrainView, days: number) {
-  const [gt, ab, pb, pk, wb] = await Promise.all([gateTestResults(days), aboutStats(view, days), profileBarStats(view, days), pickbotStats(view, days), winbackStats()]);
-  return { gt, ab, pb, pk, wb, summaries: summarize({ gt, ab, pb, pk, wb }) };
+  const [gt, ab, pb, pk, wb, tp] = await Promise.all([
+    gateTestResults(days),
+    aboutStats(view, days),
+    profileBarStats(view, days),
+    pickbotStats(view, days),
+    winbackStats(),
+    topicsTestResults(),
+  ]);
+  return { gt, ab, pb, pk, wb, tp, summaries: summarize({ gt, ab, pb, pk, wb, tp }) };
 }
 
 type Loaded = {
@@ -41,6 +53,7 @@ type Loaded = {
   pb: Awaited<ReturnType<typeof profileBarStats>>;
   pk: Awaited<ReturnType<typeof pickbotStats>>;
   wb: Awaited<ReturnType<typeof winbackStats>>;
+  tp: Awaited<ReturnType<typeof topicsTestResults>>;
 };
 
 const per = (a: { visitors: number; votes: number }) => (a.visitors ? a.votes / a.visitors : null);
@@ -48,20 +61,26 @@ const lift = (base: number | null, test: number | null) => (base == null || test
 const pct1 = (v: number) => `${(100 * v).toFixed(1)}%`;
 const two = (v: number) => v.toFixed(2);
 
-function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
+function summarize({ gt, ab, pb, pk, wb, tp }: Loaded): TestSummary[] {
   const out: TestSummary[] = [];
-  // Topics test (50/50 on new browsers): built in its own PR; until its numbers are wired here it shows as not live.
+  const tOn = tp.pct > 0 && !!tp.startedAt;
+  const tArms: TestArm[] = [
+    { label: TOPICS_ARM_LABELS.control, people: tp.total.control.visitors, value: tp.total.control.signupRate },
+    { label: TOPICS_ARM_LABELS.topics, people: tp.total.topics.visitors, value: tp.total.topics.signupRate },
+  ];
   out.push({
     id: "topics",
     name: "Topics test",
-    who: "50/50 on new browsers: topics in the Vote deck vs the mixed deck",
-    metric: "came back on day 1 and day 3",
+    about:
+      "Does letting people pick a topic in the Vote deck keep them around longer? Half of brand-new visitors get the old deck, where every battle is mixed together. The other half get a row of topic chips above the deck (Mix, Couples, Money & jobs, Family, Weddings, Friends, Everyday life, Babies, Investing, Current events), a card after 6 picks asking if they want to get more specific, and a sign-up wall named after their topic (\u201cYou\u2019ve judged 10 Couples battles\u201d). Our bet: choosing a topic holds interest, so people vote more and sign up more. We\u2019re less sure it brings them back the next day. Plan: read it after 4\u20135 days of data.",
+    who: `New browsers since ${tp.startedAt ?? "launch"} (no votes, no account), ${tp.pct}% to Topics; the whole test, not the picked window`,
+    metric: "sign-up rate",
     fmt: pct1,
-    arms: [],
-    lift: null,
-    p: null,
-    badge: { label: "Not live yet", tone: "off" },
-    live: false,
+    arms: tArms,
+    lift: tp.signupLift,
+    p: tp.signupP,
+    badge: testBadge({ on: tOn, arms: tArms, p: tp.signupP }),
+    live: tOn,
   });
 
   const gOn = gt.pct > 0 && !!gt.startedAt;
@@ -72,6 +91,8 @@ function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
   out.push({
     id: "gate",
     name: "Sign-up gate test (A/B)",
+    about:
+      "When a signed-out visitor uses up their free votes, should we block them until they sign up, or just ask? Group A (control) hits a hard wall: no more votes without an account. Group B gets a sign-up box they can close (\u201cNot now, keep voting\u201d) that comes back every few votes. We\u2019re checking whether the softer ask loses sign-ups, or wins them by letting people get more hooked first.",
     who: `New signed-out browsers, ${gt.pct}% to B`,
     metric: "sign-up rate",
     fmt: pct1,
@@ -89,6 +110,8 @@ function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
   out.push({
     id: "about",
     name: "About-you cards holdout",
+    about:
+      "The deck mixes in quick about-you questions (sex, age, relationship, kids and so on) between battles. They power \u201cpeople like you\u201d results and the personality map, but they could also annoy people into leaving. A small group never sees them, so we can tell whether the cards cost us votes.",
     who: `${ab.holdoutPct}% of people never see an about-you card`,
     metric: "votes per visitor",
     fmt: two,
@@ -106,6 +129,8 @@ function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
   out.push({
     id: "profile-bar",
     name: "Profile bar",
+    about:
+      "A slim progress bar at the top of the deck counts toward a complete profile (four about-you answers and 30 battles). The idea is that a visible goal keeps people voting. A small group never sees the bar so we can measure whether it really adds votes.",
     who: `${pb.holdoutPct}% of people never see the profile bar`,
     metric: "votes per visitor",
     fmt: two,
@@ -124,6 +149,8 @@ function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
   out.push({
     id: "pickbot",
     name: "Pickbot holdout",
+    about:
+      "Pickbot is the AI that answers your own questions in the Ask tab. We hold back a small share of signed-in people who never get it, to see whether having Pickbot makes people vote more on the crowd\u2019s battles (or less, because they\u2019re busy chatting).",
     who: `Signed-in accounts; ${pk.holdoutPct}% never get Pickbot`,
     metric: "votes per visitor",
     fmt: two,
@@ -139,6 +166,8 @@ function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
   out.push({
     id: "pickbot-promo",
     name: "“Ask Pickbot” card position",
+    about:
+      "A one-time card in the deck invites signed-in people to ask Pickbot a question. Each person gets it at a random spot (after 4, 5, 6, 8, 10, 12, 15 or 20 picks). Too early and it interrupts, too late and people have left, so we\u2019re looking for the spot where the most people go on to ask.",
     who: "Signed-in people who haven’t asked yet; a stable random spot per person",
     metric: "asked Pickbot per active person",
     fmt: pct1,
@@ -158,6 +187,8 @@ function summarize({ gt, ab, pb, pk, wb }: Loaded): TestSummary[] {
   out.push({
     id: "winback",
     name: "Win-back emails",
+    about:
+      "When a signed-in person who usually comes back goes quiet for twice their normal gap, we email them three battles picked for them. Some drifting people get no email so we can see whether the email actually brings people back to vote. This stays off until win-back emails are switched on in Config.",
     who: `People drifting away (${wb.lapsingNow} right now); ${wb.holdoutPct}% get no email`,
     metric: "voted within 3 days",
     fmt: pct1,
@@ -195,6 +226,10 @@ export function TestCard({ t, children }: { t: TestSummary; children?: React.Rea
         <h2 className="mr-auto font-sans font-medium">{t.name}</h2>
         <Badge b={t.badge} />
       </div>
+      <p className="rounded-xl bg-a-soft p-3 text-sm leading-relaxed">
+        <span className="font-medium">What we&apos;re testing: </span>
+        {t.about}
+      </p>
       <p className="text-xs text-zinc-500">
         {t.who}. Decided on <b>{t.metric}</b>.
         {t.lift != null && ` Test arm ${t.lift >= 0 ? "+" : "−"}${Math.abs(Math.round(t.lift * 100))}% vs control.`}

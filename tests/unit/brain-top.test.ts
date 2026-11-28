@@ -13,6 +13,8 @@ describe("ratioKpi", () => {
     expect(k.day).toBe("2026-11-28");
     expect(k.series).toHaveLength(9);
     expect(k.series.at(-1)).toBeCloseTo(0.9);
+    expect(k.seriesDays.at(-1)).toBe("2026-11-28");
+    expect(k.seriesDays[0]).toBe("2026-11-20");
   });
   it("pools, so a tiny day doesn't swing the average", () => {
     const k = ratioKpi([

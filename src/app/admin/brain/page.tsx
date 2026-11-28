@@ -23,13 +23,13 @@ export const metadata = { title: "Brain" };
  * the top screen plus one tab. Nothing was deleted: secondary tables sit behind "Show more" / collapsed cards.
  */
 const TABS = [
-  { key: "trends", label: "Trends" },
-  { key: "growth", label: "Growth" },
-  { key: "deck", label: "Deck" },
-  { key: "experiments", label: "Experiments" },
-  { key: "features", label: "Features" },
-  { key: "people", label: "People" },
-  { key: "checks", label: "Checks" },
+  { key: "trends", label: "Trends", holds: "day by day, before vs after" },
+  { key: "growth", label: "Growth", holds: "visits and sign-ups by source, ad campaigns, unit economics, who visitors are" },
+  { key: "deck", label: "Deck", holds: "engagement score, themes, where bounced visitors left, skips" },
+  { key: "experiments", label: "Experiments", holds: "every A/B test and holdout" },
+  { key: "features", label: "Features", holds: "Pickbot, about-you cards, \u201cWhat\u2019s on your mind\u201d, taste profiles" },
+  { key: "people", label: "People", holds: "new sign-ups and real voters one by one, Journey" },
+  { key: "checks", label: "Checks", holds: "number checks, the old tile grid, where votes were made, raw tables" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
@@ -63,6 +63,21 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
         <TopScreen days={days} view={view} />
       </Suspense>
 
+      {/* Alex, Nov 28: "what happened to the rest of the data?" Everything is still here; this says which tab holds what. */}
+      <details className="card px-4 py-2.5 text-sm">
+        <summary className="cursor-pointer text-accent">Where is everything? All the old Brain numbers are still here, by tab ›</summary>
+        <ul className="mt-2 space-y-1">
+          {TABS.map((t) => (
+            <li key={t.key}>
+              <Link href={href({ tab: t.key })} scroll={false} className="font-medium hover:text-accent">
+                {t.label}
+              </Link>
+              <span className="text-zinc-500">: {t.holds}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+
       {/* A div, not <nav>: the Arcade theme turns nav a[aria-current] text lime, which vanishes on the lime chip-on. */}
       <div role="tablist" className="sticky top-0 z-20 -mx-1 flex gap-1.5 overflow-x-auto bg-page/90 px-1 py-2 backdrop-blur" aria-label="Brain sections">
         {TABS.map((t) => (
@@ -78,8 +93,11 @@ export default async function BrainPage({ searchParams }: { searchParams: Promis
           </Link>
         ))}
       </div>
+      <p className="-mt-2 text-xs text-zinc-500">
+        {TABS.find((t) => t.key === tab)!.label} holds {TABS.find((t) => t.key === tab)!.holds}.
+      </p>
 
-      <Suspense key={`${tab}-${days}-${view}-${sp.metric ?? ""}`} fallback={<p className="card p-4 text-sm text-zinc-500">Loading {TABS.find((t) => t.key === tab)!.label}…</p>}>
+      <Suspense key={`${tab}-${days}-${view}`} fallback={<p className="card min-h-[70vh] p-4 text-sm text-zinc-500">Loading {TABS.find((t) => t.key === tab)!.label}…</p>}>
         <div className="space-y-5">
           {tab === "trends" && <TrendsTab {...props} metric={sp.metric} />}
           {tab === "growth" && <GrowthTab {...props} />}
@@ -117,12 +135,18 @@ async function cleanStart(view: BrainView) {
   return s.cleanFrom ? nyDate(s.cleanFrom) : "";
 }
 
+/** Roughly the real top screen's height, so the page doesn't jump when the numbers arrive. */
 function TopSkeleton() {
   return (
-    <div className="grid grid-cols-2 gap-2 md:grid-cols-3" aria-hidden>
-      {Array.from({ length: 6 }, (_, i) => (
-        <div key={i} className="card h-[150px] animate-pulse p-4" />
-      ))}
+    <div className="space-y-4" aria-hidden>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="card h-[170px] animate-pulse p-4" />
+        ))}
+      </div>
+      <div className="h-4" />
+      <div className="card h-[170px] animate-pulse" />
+      <div className="card h-[260px] animate-pulse" />
     </div>
   );
 }

@@ -2,21 +2,21 @@ import Link from "next/link";
 import { beforeAfterStats, brainScope, dailyNumbers } from "@/server/services/brain";
 import { change } from "@/server/services/before-after-rules";
 import { ueBasics } from "@/server/services/unit-economics";
-import { money, unitEconomics } from "@/server/services/unit-economics-rules";
+import { unitEconomics } from "@/server/services/unit-economics-rules";
 import type { BrainListKind } from "@/server/services/brain-lists";
-import { TrendChart } from "../charts";
+import { TrendChart, type FmtKey, type TrendMetric } from "../charts-client";
 import { Delta, Ratio, Rows, Section, ShowMore, dayBreakEven, makeListHref, pct, ratio, spanLabel, type TabProps } from "../ui";
 
-/** Day by day as one chart at a time (pick the number), the full table behind "Show table"; Before vs after. */
-const METRICS: { key: string; label: string; kind: BrainListKind; fmt: (v: number) => string; value: (d: Day, be: (d: Day) => number | null) => number | null }[] = [
-  { key: "visitors", label: "Visitors", kind: "visitors", fmt: (v) => Math.round(v).toLocaleString(), value: (d) => d.visitors },
-  { key: "votes", label: "Votes", kind: "votes", fmt: (v) => Math.round(v).toLocaleString(), value: (d) => d.votes },
-  { key: "vpv", label: "Votes per visitor", kind: "votes", fmt: (v) => v.toFixed(1), value: (d) => (d.visitors ? d.votes / d.visitors : null) },
-  { key: "voted", label: "% who voted", kind: "voters", fmt: (v) => `${Math.round(v * 100)}%`, value: (d) => (d.visitors ? d.voters / d.visitors : null) },
-  { key: "signups", label: "Sign-ups", kind: "signups", fmt: (v) => Math.round(v).toLocaleString(), value: (d) => d.signups },
-  { key: "signupRate", label: "Sign-up rate", kind: "signups", fmt: (v) => `${(v * 100).toFixed(1)}%`, value: (d) => (d.visitors ? d.signups / d.visitors : null) },
-  { key: "posts", label: "Battles posted", kind: "battles", fmt: (v) => Math.round(v).toLocaleString(), value: (d) => d.posts },
-  { key: "be", label: "Break-even per visitor", kind: "visitors", fmt: money, value: (d, be) => be(d) },
+/** Day by day as one chart at a time (pick the number; every metric is sent up front so switching is instant), the full table behind "Show table"; Before vs after. */
+const METRICS: { key: string; label: string; kind: BrainListKind; fmt: FmtKey; value: (d: Day, be: (d: Day) => number | null) => number | null }[] = [
+  { key: "visitors", label: "Visitors", kind: "visitors", fmt: "int", value: (d) => d.visitors },
+  { key: "votes", label: "Votes", kind: "votes", fmt: "int", value: (d) => d.votes },
+  { key: "vpv", label: "Votes per visitor", kind: "votes", fmt: "dec1", value: (d) => (d.visitors ? d.votes / d.visitors : null) },
+  { key: "voted", label: "% who voted", kind: "voters", fmt: "pct0", value: (d) => (d.visitors ? d.voters / d.visitors : null) },
+  { key: "signups", label: "Sign-ups", kind: "signups", fmt: "int", value: (d) => d.signups },
+  { key: "signupRate", label: "Sign-up rate", kind: "signups", fmt: "pct1", value: (d) => (d.visitors ? d.signups / d.visitors : null) },
+  { key: "posts", label: "Battles posted", kind: "battles", fmt: "int", value: (d) => d.posts },
+  { key: "be", label: "Break-even per visitor", kind: "visitors", fmt: "money", value: (d, be) => be(d) },
 ];
 type Day = { day: string; visitors: number; visits: number; signups: number; votes: number; voters: number; posts: number };
 
@@ -26,25 +26,22 @@ export async function TrendsTab({ days, view, metric }: TabProps & { metric?: st
   const [rawDaily, ba, ue] = await Promise.all([dailyNumbers(scope), beforeAfterStats(view), ueBasics()]);
   const daily: Day[] = rawDaily.map((d) => ({ day: d.day, visitors: Number(d.visitors), visits: Number(d.visits), signups: Number(d.signups), votes: Number(d.votes), voters: Number(d.voters), posts: Number(d.posts) }));
   const s = { daily: daily.slice(0, days === 1 ? 2 : days + 1) };
-  const m = METRICS.find((x) => x.key === metric) ?? METRICS[2];
   const be = (d: Day) => (d.visitors ? unitEconomics({ ...d, costPerVisitor: ue.costPerVisitor }, ue.assumptions).breakEven : null);
-  const points = [...daily].reverse().map((d) => ({ day: d.day, value: m.value(d, be), href: listHref(m.kind, d.day) }));
+  const oldestFirst = [...daily].reverse();
+  const metrics: TrendMetric[] = METRICS.map((m) => ({
+    key: m.key,
+    label: m.label,
+    fmt: m.fmt,
+    points: oldestFirst.map((d) => ({ day: d.day, value: m.value(d, be), href: listHref(m.kind, d.day), visitors: d.visitors, votes: d.votes, signups: d.signups })),
+  }));
   const old = Date.parse(`${ba.changeDay}T12:00:00Z`) < Date.now() - 14 * 86400_000;
-  const q = (k: string) => `/admin/brain?tab=trends&days=${days}${view === "all" ? "&view=all" : ""}&metric=${k}`;
   return (
     <>
       <Section
-        title={`Day by day · ${m.label}`}
-        note="New York days, last 14 at least (whatever window is picked). The dashed line is the 7-day average, so one odd day doesn't hide the trend. Tap a dot for that day's list."
+        title="Day by day"
+        note="New York days, last 14 at least (whatever window is picked). Pick a number to chart. Hover a dot (tap on a phone) for that day's numbers; click it for the list. The dashed line is the 7-day average, so one odd day doesn't hide the trend."
       >
-        <div className="flex flex-wrap gap-1.5">
-          {METRICS.map((x) => (
-            <Link key={x.key} href={q(x.key)} scroll={false} className={`chip !py-1 text-xs ${x.key === m.key ? "chip-on" : ""}`}>
-              {x.label}
-            </Link>
-          ))}
-        </div>
-        <TrendChart points={points} fmt={m.fmt} label={`${m.label} by day`} />
+        <TrendChart metrics={metrics} initial={metric ?? "vpv"} />
         <ShowMore label="Show table">
           <p className="text-xs text-zinc-500">
             Tap any number to see who or what is behind it. The small number is the change from the day before. Visitors and Voters are people, so someone
