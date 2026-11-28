@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { X } from "lucide-react";
 import { logEvent } from "@/lib/events";
-import { OneTapSignup } from "./OneTapSignup";
+import { OneTapSignup, type SignupHeadline } from "./OneTapSignup";
 
 type Props = {
   limit?: number;
@@ -17,10 +17,12 @@ type Props = {
   silent?: boolean;
   /** "map": opened from "See my personality map"; asks for any missing sex / age (OneTapSignup). */
   variant?: "map";
+  /** Custom words on top (e.g. the topics test: "You've judged 10 Couples battles."). */
+  headline?: SignupHeadline;
 };
 
 /** "Sign up to keep voting": shown to signed-out visitors once their free votes are used. */
-export function SignupGate({ limit, next, onClose, soft = false, place, log, silent = false, variant }: Props) {
+export function SignupGate({ limit, next, onClose, soft = false, place, log, silent = false, variant, headline }: Props) {
   const arm = soft ? "soft" : "control";
   useEffect(() => {
     if (silent) return;
@@ -34,7 +36,7 @@ export function SignupGate({ limit, next, onClose, soft = false, place, log, sil
       }
     : undefined;
   // One-tap sign-up (About-you plan §3b): everything we know is prefilled; Google or email + code finishes it.
-  const body = <OneTapSignup next={next} soft={soft} variant={variant} />;
+  const body = <OneTapSignup next={next} soft={soft} variant={variant} headline={headline} />;
   if (!close)
     return (
       <section aria-label="Sign up to keep voting" className="mx-auto mt-2 max-w-md rounded-[14px] bg-white p-5 shadow-ring">

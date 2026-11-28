@@ -31,6 +31,34 @@ import { PhotoFlag } from "./PhotoFlag";
 import { ResultBars } from "./ResultBars";
 import { rescueIndex } from "@/server/services/ranking";
 import { cardKind, contentHash, currentSessionId, logEvent } from "@/lib/events";
+import { MIX, TOPIC_COOKIE, pickerDue, streakTopic, topicGate, topicLabel, type DeckTopic, type TopicId } from "@/lib/topics";
+import { TopicBadge, TopicChips, TopicEmpty, TopicPickerCard, TopicStreakCard } from "./TopicCards";
+
+/** Topics A/B test, "topics" group (lib/topics.ts): what the deck needs. null = old deck. */
+export type DeckTopics = {
+  current: DeckTopic;
+  counts: Record<TopicId, number>;
+  pickerAt: number;
+  streakRun: number;
+  streakSkips: number;
+  gateAt: number;
+  softEvery: number;
+};
+type Card = BattleCard & { topic?: TopicId };
+const TOPIC_KEYS = { picker: "cp:topicPicker", skips: "cp:skips", streak: "cp:topicStreak", votes: "cp:topicVotes" };
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeJson(key: string, v: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(v));
+  } catch {}
+}
 
 type Side = "A" | "B";
 type PickMethod = "tap" | "swipe" | "key";
@@ -68,8 +96,9 @@ export function SwipeDeck({
   pickbotPromo = null,
   asking = null,
   skipRescueAfter = 0,
+  topics = null,
 }: {
-  initial: BattleCard[];
+  initial: Card[];
   signedIn: boolean;
   pp: number | null;
   tiers: { highAt: number; topAt: number };
@@ -88,8 +117,41 @@ export function SwipeDeck({
   asking?: AskingCardData | null;
   /** Skip-streak rescue: after this many skips in a row the best remaining card comes next (economy skipRescueAfter; 0 = off). */
   skipRescueAfter?: number;
+  /** Topics A/B test (lib/topics.ts): the chip row and topic cards; null = old deck (control group). */
+  topics?: DeckTopics | null;
 }) {
-  const [queue, setQueue] = useState(initial);
+  const [queue, setQueue] = useState<Card[]>(initial);
+  // Topics (topics group only): the deck's topic, battles left per topic, and the topic cards.
+  const [topic, setTopic] = useState<DeckTopic>(topics?.current ?? MIX);
+  const topicRef = useRef<DeckTopic>(topics?.current ?? MIX);
+  const [counts, setCounts] = useState<Partial<Record<TopicId, number>>>(topics?.counts ?? {});
+  const [switching, setSwitching] = useState(false);
+  const [picker, setPicker] = useState(false);
+  const pickerShown = useRef(true);
+  const [streak, setStreak] = useState<{ topic: TopicId; run: number } | null>(null);
+  const recentTopics = useRef<TopicId[]>([]);
+  const [topicVotes, setTopicVotes] = useState<Record<string, number>>({});
+  const [topicPrompt, setTopicPrompt] = useState(false);
+  useEffect(() => {
+    if (!topics) return;
+    try {
+      pickerShown.current = localStorage.getItem(TOPIC_KEYS.picker) === "1";
+    } catch {}
+    setTopicVotes(readJson(TOPIC_KEYS.votes, {}));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Opened straight into a topic from a link (homepage tile, ad): log it as a topic choice.
+  useEffect(() => {
+    if (!topics || topics.current === MIX) return;
+    if (new URLSearchParams(window.location.search).get("topic") === topics.current)
+      logEvent("topic_selected", { topic: topics.current, from: "link", prev: MIX, picks: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // The deck's topic lives in a cookie so the Vote page opens on it next time (and after sign-up).
+  useEffect(() => {
+    if (!topics) return;
+    document.cookie = `${TOPIC_COOKIE}=${topic}; path=/; max-age=31536000; samesite=lax`;
+  }, [topic, topics]);
   const [guestLeft, setGuestLeft] = useState(initialGuestLeft);
   const [soft, setSoft] = useState(initialSoft);
   const [prompt, setPrompt] = useState(false);
@@ -180,6 +242,8 @@ export function SwipeDeck({
       arm: card.arm ?? null,
       opener: !!card.opener,
       rescue: rescued.current === card.id,
+      topic: card.topic ?? null,
+      ...(topics ? { deckTopic: topicRef.current } : {}),
     });
     lastKinds.current = [...lastKinds.current, kind].slice(-3);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -212,16 +276,49 @@ export function SwipeDeck({
 
   const loadMore = useCallback(async () => {
     try {
-      const r = await api<{ items: BattleCard[] }>("/api/feed");
+      const r = await api<{ items: Card[]; counts?: Record<TopicId, number> }>(`/api/feed${topics ? `?topic=${topicRef.current}` : ""}`);
+      if (topics && r.counts) setCounts(r.counts);
       const done = doneIds();
       const fresh = r.items.filter((i) => !seen.current.has(i.id) && !done.has(i.id));
       fresh.forEach((i) => seen.current.add(i.id));
       if (fresh.length) setQueue((q) => [...q, ...fresh]);
     } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Switch the deck to another topic (or back to Mix): a fresh deck from the server for it. */
+  const switchTopic = useCallback(
+    async (t: DeckTopic, from: string) => {
+      if (!topics) return;
+      logEvent("topic_selected", { topic: t, from, prev: topicRef.current, picks: rollCount.current });
+      topicRef.current = t;
+      setTopic(t);
+      setStreak(null);
+      setPicker(false);
+      recentTopics.current = [];
+      emptyLogged.current = false;
+      setSwitching(true);
+      try {
+        const r = await api<{ items: Card[]; counts?: Record<TopicId, number> }>(`/api/feed?topic=${t}`);
+        if (topicRef.current !== t) return;
+        if (r.counts) setCounts(r.counts);
+        const done = doneIds();
+        const fresh = r.items.filter((i) => !done.has(i.id));
+        fresh.forEach((i) => seen.current.add(i.id));
+        setQueue(fresh);
+      } catch {
+        toast("Couldn’t load that topic. Try again.", "error");
+      } finally {
+        if (topicRef.current === t) setSwitching(false);
+      }
+    },
+    [topics],
+  );
+
   useEffect(() => {
+    if (switching) return;
     if (queue.length < 3) loadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queue.length, loadMore]);
 
   const advance = useCallback((dir: -1 | 1) => {
@@ -253,7 +350,7 @@ export function SwipeDeck({
     if (!prev) wink();
     try {
       const r = await api<VoteRes>(`/api/battles/${card.slug}/vote`, {
-        body: { side, source: "feed", ...(prev ? {} : { dwellMs }), meta: { method, pos: deckPos.current, sessionId: currentSessionId() ?? undefined } },
+        body: { side, source: "feed", ...(prev ? {} : { dwellMs }), meta: { method, pos: deckPos.current, sessionId: currentSessionId() ?? undefined, ...(topics ? { topic: topicRef.current } : {}) } },
       });
       if (r.guestVotesLeft != null) setGuestLeft(r.guestVotesLeft);
       if (r.softGate != null) setSoft(r.softGate);
@@ -355,7 +452,7 @@ export function SwipeDeck({
   // Every pick (tap, swipe-away, ← / →): the pick fills the card, its scores show for
   // RESULT_MS, then the next battle.
   async function pick(side: Side, method: PickMethod, dir: -1 | 1 = side === "A" ? -1 : 1) {
-    if (!card || voted || fly || roll || about || taste || promo || mind || askingNow) return;
+    if (!card || voted || fly || roll || about || taste || promo || mind || askingNow || picker || streak || switching) return;
     const started = Date.now();
     likeYouShown.current = false;
     const ok = await vote(side, method);
@@ -367,6 +464,25 @@ export function SwipeDeck({
     try {
       sessionStorage.setItem(ROLL_KEY, String(n));
     } catch {}
+    // Topics group: count votes per topic (for the topic sign-up nudge) and the run of same-topic votes on Mix.
+    let topicCard: "picker" | { topic: TopicId; run: number } | null = null;
+    if (topics) {
+      const on = topicRef.current;
+      if (on !== MIX && !signedIn) {
+        const tv = { ...readJson<Record<string, number>>(TOPIC_KEYS.votes, {}) };
+        tv[on] = (tv[on] ?? 0) + 1;
+        writeJson(TOPIC_KEYS.votes, tv);
+        setTopicVotes(tv);
+        if (topicGate({ votes: tv[on], at: topics.gateAt, soft, every: topics.softEvery }) === "prompt") setTopicPrompt(true);
+      }
+      if (on === MIX && card.topic) recentTopics.current = [...recentTopics.current, card.topic].slice(-10);
+      if (pickerDue({ picks: n, at: topics.pickerAt, topic: on, shown: pickerShown.current, busy: false })) topicCard = "picker";
+      else {
+        const offered = readJson<string[]>(TOPIC_KEYS.streak, []);
+        const t = streakTopic({ recent: recentTopics.current, run: topics.streakRun, skips: readJson<number>(TOPIC_KEYS.skips, 0), minSkips: topics.streakSkips, topic: on, offered });
+        if (t) topicCard = { topic: t, run: topics.streakRun };
+      }
+    }
     setTimeout(() => buzz(10), 120);
     setTimeout(() => {
       advance(dir);
@@ -390,8 +506,25 @@ export function SwipeDeck({
         setRoll(n);
         buzz(30);
       }
-      // The Ask Pickbot card waits for a pick with no other special card (about-you, taste, roll) coming up.
-      const busy = special || isRollMilestone(n);
+      // Topic cards (topics group) wait for a pick with no about-you, taste, mind or roll card coming up.
+      let topicNow = false;
+      if (topicCard && !special && !isRollMilestone(n)) {
+        topicNow = true;
+        if (topicCard === "picker") {
+          pickerShown.current = true;
+          try {
+            localStorage.setItem(TOPIC_KEYS.picker, "1");
+          } catch {}
+          setTimeout(() => setPicker(true), FLY_MS);
+        } else {
+          const tc = topicCard;
+          writeJson(TOPIC_KEYS.streak, [...readJson<string[]>(TOPIC_KEYS.streak, []), tc.topic]);
+          recentTopics.current = [];
+          setTimeout(() => setStreak(tc), FLY_MS);
+        }
+      }
+      // The Ask Pickbot card waits for a pick with no other special card (about-you, taste, roll, topic) coming up.
+      const busy = special || isRollMilestone(n) || topicNow;
       const promoNow = !!pickbotPromo && promoDue({ picks: n, at: pickbotPromo.at, shown: promoShown.current, busy });
       if (pickbotPromo && promoNow) {
         promoShown.current = true;
@@ -431,8 +564,9 @@ export function SwipeDeck({
   }
 
   function skip() {
-    if (!card || voted || fly || thrown || roll || about || promo || mind || askingNow) return;
+    if (!card || voted || fly || thrown || roll || about || promo || mind || askingNow || picker || streak || switching) return;
     markDone(card.id);
+    if (topics) writeJson(TOPIC_KEYS.skips, readJson<number>(TOPIC_KEYS.skips, 0) + 1);
     api(`/api/battles/${card.slug}/skip`, { method: "POST" }).catch(() => {});
     skipStreak.current += 1;
     // After a skip streak, bring the remaining card people vote on most to the front (it shows after this one leaves).
@@ -489,8 +623,41 @@ export function SwipeDeck({
       {showBar && progress && (
         <ProfileBar p={progress} place="deck" celebrate={celebrate} className="mt-2" onAsk={about || taste ? undefined : (q) => setAbout({ id: q })} />
       )}
+      {topics && <TopicChips current={topic} counts={counts} onPick={(t) => !voted && !fly && switchTopic(t, "chips")} />}
     </div>
   );
+
+  // Topics group, guest in a topic: after `gateAt` votes in it, "You've judged 10 Couples battles. Sign in to keep going."
+  const topicHeadline =
+    topics && topic !== MIX
+      ? {
+          badge: topicLabel(topic),
+          title: `You’ve judged ${topicVotes[topic] ?? 0} ${topicLabel(topic)} battles.`,
+          sub: "Sign in to keep going, and see how people like you voted on them.",
+        }
+      : undefined;
+  const topicWall = !!topics && !signedIn && !soft && topic !== MIX && topics.gateAt > 0 && (topicVotes[topic] ?? 0) >= topics.gateAt;
+  const topicGateOn = topicWall || topicPrompt;
+  useEffect(() => {
+    if (topicGateOn) logEvent("topic_gate_shown", { topic, votes: topicVotes[topic] ?? 0, wall: topicWall });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicGateOn]);
+
+  if (switching)
+    return (
+      <div>
+        {header}
+        <div className="mt-2 h-[440px] animate-pulse rounded-[20px] bg-white/60" aria-label="Loading" />
+      </div>
+    );
+
+  if (!card && topics && topic !== MIX)
+    return (
+      <div>
+        {header}
+        <TopicEmpty key={topic} topic={topic} signedIn={signedIn} onMix={() => switchTopic(MIX, "empty")} />
+      </div>
+    );
 
   if (!card)
     return (
@@ -507,11 +674,18 @@ export function SwipeDeck({
       </div>
     );
 
-  if (gated && !voted)
+  if ((gated || topicWall) && !voted)
     return (
       <div>
         {header}
-        <SignupGate limit={guestLimit} next="/vote" place="deck" log={{ pos: deckPos.current, battleId: card.id }} />
+        <SignupGate
+          key={topicWall ? `t-${topic}` : "free"}
+          limit={guestLimit}
+          next="/vote"
+          place={topicWall ? "deck_topic" : "deck"}
+          headline={topicWall ? topicHeadline : undefined}
+          log={{ pos: deckPos.current, battleId: card.id, ...(topics ? { topic } : {}) }}
+        />
       </div>
     );
 
@@ -571,7 +745,58 @@ export function SwipeDeck({
       {prompt && (
         <SignupGate soft limit={guestLimit} next="/vote" place="deck" log={{ pos: deckPos.current }} onClose={() => setPrompt(false)} />
       )}
-      <div className={cn("relative min-h-[440px]", showBar ? "h-[calc(100dvh-18.1rem)] md:h-[calc(100dvh-12.75rem)]" : "h-[calc(100dvh-15.35rem)] md:h-[calc(100dvh-10rem)]")}>
+      {topicPrompt && !prompt && (
+        <SignupGate
+          soft
+          limit={guestLimit}
+          next="/vote"
+          place="deck_topic"
+          headline={topicHeadline}
+          log={{ pos: deckPos.current, topic }}
+          onClose={() => setTopicPrompt(false)}
+        />
+      )}
+      <div
+        className={cn(
+          "relative min-h-[440px]",
+          topics
+            ? showBar
+              ? "h-[calc(100dvh-20.85rem)] md:h-[calc(100dvh-15.5rem)]"
+              : "h-[calc(100dvh-18.1rem)] md:h-[calc(100dvh-12.75rem)]"
+            : showBar
+              ? "h-[calc(100dvh-18.1rem)] md:h-[calc(100dvh-12.75rem)]"
+              : "h-[calc(100dvh-15.35rem)] md:h-[calc(100dvh-10rem)]",
+        )}
+      >
+        {picker && topics && (
+          <TopicPickerCard
+            picks={rollCount.current}
+            counts={counts}
+            onPick={(t) => {
+              setPicker(false);
+              if (t === MIX) logEvent("topic_selected", { topic: MIX, from: "picker", prev: MIX, picks: rollCount.current });
+              else switchTopic(t, "picker");
+            }}
+            onSkip={() => {
+              logEvent("topic_picker_skipped", { picks: rollCount.current });
+              setPicker(false);
+            }}
+          />
+        )}
+        {streak && !picker && (
+          <TopicStreakCard
+            topic={streak.topic}
+            run={streak.run}
+            onYes={() => {
+              logEvent("topic_streak_tap", { topic: streak.topic });
+              switchTopic(streak.topic, "streak");
+            }}
+            onNo={() => {
+              logEvent("topic_streak_dismissed", { topic: streak.topic });
+              setStreak(null);
+            }}
+          />
+        )}
         {roll != null && <RollCard count={roll} onDone={() => setRoll(null)} />}
         {about && (
           <AboutCard
@@ -645,7 +870,12 @@ export function SwipeDeck({
                 </span>
               </>
             )}
-            <span className="ml-auto shrink-0">{timeLeft(card.deadline)}</span>
+            {topics && card.topic && (
+              <span className="ml-auto">
+                <TopicBadge topic={card.topic} />
+              </span>
+            )}
+            <span className={cn("shrink-0", !(topics && card.topic) && "ml-auto")}>{timeLeft(card.deadline)}</span>
           </div>
           <h1 className={`mt-3 ${titleSizeClass(card.title)}`} data-tour="question">
             <Link href={`/b/${card.slug}?src=feed`} data-nodrag className="hover:underline">

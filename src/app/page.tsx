@@ -8,6 +8,8 @@ import { getViewer } from "@/server/viewer";
 import { getFeed } from "@/server/services/feed";
 import { guestVotesLeft } from "@/server/services/votes";
 import { softGateFor } from "@/server/services/gate-test";
+import { topicsArm } from "@/server/services/topics-test";
+import { TOPICS } from "@/lib/topics";
 import { getEconomy } from "@/server/services/config";
 import { battleCards, type BattleCard } from "@/server/services/battles";
 import { db } from "@/server/db";
@@ -35,13 +37,14 @@ export default async function HomePage() {
 
   track("landing_viewed", {}, { deviceId: viewer.deviceId });
   const weekAgo = new Date(Date.now() - 7 * 86400_000);
-  const [feed, stories, [{ weekVotes }], economy, guestLeft, softGate] = await Promise.all([
+  const [feed, stories, [{ weekVotes }], economy, guestLeft, softGate, arm] = await Promise.all([
     getFeed({ user: null, deviceId: viewer.deviceId }, { limit: 200 }),
     battleCards(and(eq(battles.visibility, "PUBLIC"), eq(battles.status, "CLOSED"), isNotNull(outcomes.id)), 20),
     db.select({ weekVotes: sql<number>`count(*)::int` }).from(votes).where(gte(votes.createdAt, weekAgo)),
     getEconomy(),
     guestVotesLeft({ user: null, deviceId: viewer.deviceId }),
     softGateFor({ user: null, deviceId: viewer.deviceId }),
+    topicsArm({ user: null, deviceId: viewer.deviceId }),
   ]);
   // Skip repeat stories (same question/options posted more than once).
   const seenStories = new Set<string>();
@@ -105,6 +108,29 @@ export default async function HomePage() {
           </div>
         )}
       </section>
+
+      {/* ---------- Topics (topics A/B test group only; lib/topics.ts) ---------- */}
+      {arm === "topics" && (
+        <section className="px-4 pb-10" data-testid="home-topics">
+          <h2 className="text-[22px]">What are you into?</h2>
+          <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {TOPICS.slice(0, 6).map((t) => (
+              <Link
+                key={t.id}
+                href={`/vote?topic=${t.id}`}
+                data-track={`home_topic_${t.id}`}
+                className={cn("qtile !items-start !justify-start flex-col !gap-0.5 px-3.5 py-3 !text-left", `qtile-${t.tone}`)}
+              >
+                <span className="text-[16px]">{t.label}</span>
+                <span className="text-[12px] font-medium opacity-80">{t.hook}</span>
+              </Link>
+            ))}
+          </div>
+          <p className="mt-3 text-center text-xs text-zinc-500">
+            Tap a topic and its battles come first · <Link href="/vote" className="underline underline-offset-2">or see everything</Link>
+          </p>
+        </section>
+      )}
 
       {/* ---------- Deciding right now ---------- */}
       {deciding.length > 0 && (

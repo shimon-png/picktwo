@@ -1,3 +1,4 @@
+import { TOPIC_IDS } from "./topics";
 import { REPORT_REASON_IDS } from "@/server/services/safety";
 import { z } from "zod";
 import { AGE_RANGE_IDS, KID_AGE_IDS, KIDS_STATUS_IDS, SEX_IDS, TITLE_MAX } from "./constants";
@@ -38,6 +39,8 @@ export const createBattleInput = z.object({
       recipient: z.string().max(30).optional(),
       budget: z.string().max(30).optional(),
       occasion: z.string().max(30).optional(),
+      /** The poster's own topic pick (lib/topics.ts); wins over the AI theme for the Vote deck topics. */
+      topic: z.enum(TOPIC_IDS as [string, ...string[]]).optional(),
       target: z
         .object({
           zips: z.array(z.string().trim().max(10)).max(20).optional(),
@@ -81,12 +84,14 @@ export const voteInput = z.object({
       method: z.enum(["tap", "swipe", "key", "button"]).optional(),
       pos: z.number().int().min(0).max(100_000).optional(),
       sessionId: z.string().regex(/^[A-Za-z0-9_-]{6,40}$/).optional(),
+      /** Topics A/B test: the deck topic the vote was made on ("mix" or a lib/topics.ts id). */
+      topic: z.enum(["mix", ...TOPIC_IDS] as [string, ...string[]]).optional(),
     })
     .optional(),
 });
 
 /** Event names the browser may log through POST /api/events. Keep docs/brain/data-dictionary.md in sync. */
-export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "device_hints", "about_card_shown", "taste_shared", "engaged", "home_click", "profile_bar_tap", "pickbot_promo_shown", "pickbot_promo_tap", "pickbot_promo_dismissed", "mind_card_shown", "mind_nudge_shown", "mind_nudge_tap", "mind_nudge_dismissed", "asking_shown", "asking_tap", "asking_voted", "asking_signup_tap", "asking_dismissed", "deck_empty"] as const;
+export const CLIENT_EVENTS = ["session_start", "page_view", "card_shown", "signup_gate_shown", "signup_gate_closed", "device_hints", "about_card_shown", "taste_shared", "engaged", "home_click", "profile_bar_tap", "pickbot_promo_shown", "pickbot_promo_tap", "pickbot_promo_dismissed", "mind_card_shown", "mind_nudge_shown", "mind_nudge_tap", "mind_nudge_dismissed", "asking_shown", "asking_tap", "asking_voted", "asking_signup_tap", "asking_dismissed", "deck_empty", "topic_bar_shown", "topic_selected", "topic_picker_shown", "topic_picker_skipped", "topic_streak_shown", "topic_streak_tap", "topic_streak_dismissed", "topic_empty", "topic_empty_tap", "topic_gate_shown"] as const;
 export type ClientEventName = (typeof CLIENT_EVENTS)[number];
 const safeId = z.string().regex(/^[A-Za-z0-9_-]{6,40}$/);
 export const clientEventsInput = z.object({

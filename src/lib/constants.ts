@@ -122,6 +122,20 @@ export const ECONOMY_DEFAULTS = {
    */
   gateTestPct: 50,
   /**
+   * Topics in the Vote deck A/B test (services/topics-test.ts, Alex Nov 27 2026): % of new browsers put in the
+   * "topics" group (chip row, "stay on Mix or get more specific?" card, streak card, topic sign-up nudges, homepage
+   * topic tiles). The rest keep today's deck. 0 = test off, nobody new gets topics. Assignments are saved.
+   */
+  topicsTestPct: 50,
+  /** Topics group: the "stay on Mix or get more specific?" card shows after this many picks in a deck visit (0 = off). */
+  topicPickerAt: 6,
+  /** Topics group: "N <topic> battles in a row, want only <topic>?" after this many same-topic votes in a row… */
+  topicStreakRun: 3,
+  /** …but only for someone who has used Skip at least this many times. */
+  topicStreakSkips: 2,
+  /** Topics group: a guest in a topic gets "You've judged N <topic> battles. Sign in to keep going." after this many votes in it (0 = off). */
+  topicGateAt: 10,
+  /**
    * About-you cards in the Vote deck (lib/about.ts): the vote number each question is first asked after (0 = off).
    * No account needed: sex, age, relationship, kids, education, home, race/ethnicity, party (Alex, Nov 25: ZIP is
    * no longer asked; it comes from the IP). With an account: work. The ZIP card stays off (0).

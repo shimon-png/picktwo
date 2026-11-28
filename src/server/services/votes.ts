@@ -19,7 +19,7 @@ import { pct } from "@/lib/utils";
 const VOTE_MILESTONES = [1, 10, 50, 100];
 
 type VoteViewer = { user: User | null; deviceId: string | null };
-type VoteInput = { side: "A" | "B"; reason?: string; dwellMs?: number; source?: string; meta?: { method?: string; pos?: number; sessionId?: string } };
+type VoteInput = { side: "A" | "B"; reason?: string; dwellMs?: number; source?: string; meta?: { method?: string; pos?: number; sessionId?: string; topic?: string } };
 
 type Exec = Pick<typeof db, "execute">;
 
