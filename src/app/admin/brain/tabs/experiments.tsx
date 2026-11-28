@@ -8,35 +8,33 @@ import { TestCard, loadTests } from "../tests";
 export async function ExperimentsTab({ days, view }: TabProps) {
   const { gt, ab, pb, pk, wb, tp, summaries } = await loadTests(view, days);
   const order = [...summaries].sort((a, b) => Number(b.live) - Number(a.live));
-  const tRow = (label: string, c: (typeof tp.total)["control"], lift: number | null, p: number | null, f: (x: typeof c) => string) => [
-    label,
-    f(tp.total.control),
-    f(tp.total.topics),
-    lift == null ? "—" : `${lift >= 0 ? "+" : "−"}${Math.abs(Math.round(lift * 100))}%`,
-    p == null ? "—" : p < 0.05 ? <span key="p" className="text-green">{`real (p = ${p.toFixed(3)})`}</span> : `could be chance (p = ${p.toFixed(2)})`,
-  ];
+  const pv = (p: number | null) => (p == null ? "no p yet" : p < 0.05 ? `real difference (p = ${p.toFixed(3)})` : `could be chance (p = ${p.toFixed(2)})`);
   const details: Record<string, React.ReactNode> = {
     topics: (
       <>
+        <p className="text-xs text-zinc-500">
+          New signed-out browsers (no votes yet) are split at random: {TOPICS_ARM_LABELS.control} vs {TOPICS_ARM_LABELS.topics} (chip row, &quot;stay on Mix?&quot; card, topic sign-up nudge). Came back = active on 2+ days in their first week.
+          {tp.startedAt ? ` Started ${tp.startedAt} New York time.` : " Not started yet."}{" "}
+          <Link href="/admin/topics" className="text-accent underline">Full dashboard (per topic, topic cards funnel)</Link>
+        </p>
         <Rows
-          head={["Whole test so far", TOPICS_ARM_LABELS.control, TOPICS_ARM_LABELS.topics, "Topics vs old", "Difference"]}
+          head={["Metric", TOPICS_ARM_LABELS.control, TOPICS_ARM_LABELS.topics, "p"]}
           rows={[
-            ["Visitors", tp.total.control.visitors.toLocaleString(), tp.total.topics.visitors.toLocaleString(), "", ""],
-            tRow("Votes per visitor", tp.total.control, tp.votesLift, tp.votesP, (c) => c.avgVotes.toFixed(2)),
-            tRow("Sign-up rate", tp.total.control, tp.signupLift, tp.signupP, (c) => pctN(c.signupRate)),
-            tRow("Share who voted", tp.total.control, tp.voteRateLift, tp.voteRateP, (c) => pctN(c.voteRate)),
-            tRow("Came back (2+ days in first 7)", tp.total.control, tp.returnLift, tp.returnP, (c) => pctN(c.returnRate)),
-            ["Picked a topic (not Mix)", "—", tp.total.topics.visitors ? pctN(tp.total.topics.choseTopic / tp.total.topics.visitors) : "—", "", ""],
+            ["Visitors", tp.total.control.visitors, tp.total.topics.visitors, ""],
+            ["Votes per visitor", tp.total.control.avgVotes.toFixed(2), tp.total.topics.avgVotes.toFixed(2), pv(tp.votesP)],
+            ["Voted at all", pctN(tp.total.control.voteRate), pctN(tp.total.topics.voteRate), pv(tp.voteRateP)],
+            ["Sign-up rate", pctN(tp.total.control.signupRate), pctN(tp.total.topics.signupRate), pv(tp.signupP)],
+            ["Came back", pctN(tp.total.control.returnRate), pctN(tp.total.topics.returnRate), pv(tp.returnP)],
           ]}
         />
-        <p className="text-xs text-zinc-500">
-          Started {tp.startedAt ?? "—"} New York time; topicsTestPct = {tp.pct}% in Config (0 stops it). Per-topic numbers, day by day and the topic
-          cards&apos; funnel are on the{" "}
-          <Link href="/admin/topics" className="text-accent underline">
-            Topics test page
-          </Link>
-          .
-        </p>
+        <Rows
+          head={["Day", `${TOPICS_ARM_LABELS.control}: visitors · votes/visitor · sign-up`, `${TOPICS_ARM_LABELS.topics}: visitors · votes/visitor · sign-up`]}
+          rows={tp.daily.map((d) => [
+            d.day,
+            `${d.control.visitors} · ${d.control.avgVotes.toFixed(1)} · ${pctN(d.control.signupRate)}`,
+            `${d.topics.visitors} · ${d.topics.avgVotes.toFixed(1)} · ${pctN(d.topics.signupRate)}`,
+          ])}
+        />
       </>
     ),
     gate: (

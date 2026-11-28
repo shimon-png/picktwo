@@ -63,6 +63,8 @@ const two = (v: number) => v.toFixed(2);
 
 function summarize({ gt, ab, pb, pk, wb, tp }: Loaded): TestSummary[] {
   const out: TestSummary[] = [];
+  // Topics test (50/50 on new browsers, deck_topics_v1). Decided on sign-up rate (Alex's hypothesis); votes per
+  // visitor and return are in the details and on /admin/topics.
   const tOn = tp.pct > 0 && !!tp.startedAt;
   const tArms: TestArm[] = [
     { label: TOPICS_ARM_LABELS.control, people: tp.total.control.visitors, value: tp.total.control.signupRate },

@@ -370,7 +370,7 @@ export async function getBattleView(slug: string, viewer: { user: User | null; d
       : null,
     boostActive: !!b.boostUntil && b.boostUntil > now && b.boostVotesLeft > 0,
     canEdit: isOwner && totalVotes === 0 && isOpen,
-    canReportOutcome: isOwner && (!isOpen || totalVotes >= economy.minVotesForLoop),
+    canReportOutcome: (isOwner || !!askerThreadId) && (!isOpen || totalVotes >= economy.minVotesForLoop),
     loopEligible: totalVotes >= economy.minVotesForLoop,
     minVotesForLoop: economy.minVotesForLoop,
     boostCost: economy.boostCost,

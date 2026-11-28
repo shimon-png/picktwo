@@ -116,10 +116,10 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
   const loopPoints = v.loopRewards.loop;
   const allReasons = [...v.reasons.A, ...v.reasons.B].sort((x, y) => score(y) - score(x));
   const chosenLabel = v.outcome ? (v.outcome.chosen === "A" ? A.label : v.outcome.chosen === "B" ? B.label : "neither") : null;
-  const showStickyLoop = v.isOwner && !v.outcome && v.canReportOutcome;
+  const showStickyLoop = (v.isOwner || !!v.askerThreadId) && !v.outcome && v.canReportOutcome;
 
   return (
-    <article className={cn("space-y-5", showStickyLoop && "pb-20")}>
+    <article className={cn("space-y-5", showStickyLoop && "pb-20 md:pb-0")}>
       {v.isOwner && (
         <div className="-mx-2 flex h-11 items-center gap-1">
           <Link href="/you" className="rounded-lg p-2 hover:bg-surface" aria-label="Back">
@@ -416,7 +416,8 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
       )}
 
       {showStickyLoop && (
-        <div className="fixed inset-x-0 bottom-[calc(3.9rem+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t from-page via-page to-page/0 px-4 pb-3 pt-6 md:bottom-0 md:pl-60">
+        <div className="fixed inset-x-0 bottom-[calc(3.9rem+env(safe-area-inset-bottom))] z-30 bg-gradient-to-t from-page via-page to-page/0 px-4 pb-3 pt-6 md:sticky md:bottom-0 md:px-0 md:pb-4">
+          {/* Phones: pinned above the tab bar. Desktop: sticks to the bottom inside the page column (Alex, Nov 28: it floated off to the side). */}
           <Link href={`/b/${v.slug}/report`} className="btn-primary mx-auto w-full max-w-2xl py-3">
             Decided? Close the loop · +{loopPoints} <Zap className="size-4 fill-white" aria-hidden />
           </Link>

@@ -17,7 +17,7 @@ import { inHoldout } from "./ranking";
 import { answerAbout, knownAnswers } from "./about";
 import { voteTotal, tasteProfileFor } from "./taste-profile";
 import { getFeed } from "./feed";
-import { createBattle, screenPhotoUrls } from "./battles";
+import { createBattle, getBattleRow, pickbotThreadFor, screenPhotoUrls } from "./battles";
 import { reportOutcome } from "./outcomes";
 import { notify } from "./notifications";
 import { deliver } from "./mailer";
@@ -600,6 +600,22 @@ export async function threadOutcome(userIn: User | null, id: string, chosen: "A"
   await addMessage(t.id, { role: "USER", kind: "note", text: chosen === "NEITHER" ? "I went with neither" : `I picked ${chosen}` });
   track("pickbot_outcome", { threadId: t.id, chosen }, { userId: user.id });
   return res;
+}
+
+/**
+ * Close the loop from the battle's own report page (`/b/[slug]/report`): the poster as usual, or the person who asked
+ * a Pickbot crowd question (Alex, Nov 28: from Your battles they stay there, not sent into the chat). The asker's
+ * pick is also noted in their Pickbot thread so the chat stays in step.
+ */
+export async function reportBattleOutcome(slug: string, user: User, input: Parameters<typeof reportOutcome>[2]) {
+  const b = await getBattleRow(slug);
+  const threadId = b && b.authorId !== user.id && (b.tags as { pickbot?: unknown } | null)?.pickbot ? await pickbotThreadFor(b.id, user.id) : null;
+  const res = await reportOutcome(slug, user, input, { pickbotAsker: !!threadId });
+  if (threadId && !res.edited) {
+    await addMessage(threadId, { role: "USER", kind: "note", text: input.chosen === "NEITHER" ? "I went with neither" : `I picked ${input.chosen}` });
+    track("pickbot_outcome", { threadId, chosen: input.chosen, from: "battle" }, { userId: user.id });
+  }
+  return { ...res, pickbotAsker: !!threadId };
 }
 
 /**
