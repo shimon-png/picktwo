@@ -1,13 +1,12 @@
-import Link from "next/link";
 import { beforeAfterStats, brainScope, dailyNumbers } from "@/server/services/brain";
 import { change } from "@/server/services/before-after-rules";
 import { ueBasics } from "@/server/services/unit-economics";
 import { unitEconomics } from "@/server/services/unit-economics-rules";
 import type { BrainListKind } from "@/server/services/brain-lists";
 import { TrendChart, type FmtKey, type TrendMetric } from "../charts-client";
-import { Delta, Ratio, Rows, Section, ShowMore, dayBreakEven, makeListHref, pct, ratio, spanLabel, type TabProps } from "../ui";
+import { Rows, Section, makeListHref, pct, spanLabel, type TabProps } from "../ui";
 
-/** Day by day as one chart at a time (pick the number; every metric is sent up front so switching is instant), the full table behind "Show table"; Before vs after. */
+/** Day by day as one chart at a time (pick the number; every metric is sent up front so switching is instant); the table is on the top screen (day-table.tsx); Before vs after. */
 const METRICS: { key: string; label: string; kind: BrainListKind; fmt: FmtKey; value: (d: Day, be: (d: Day) => number | null) => number | null }[] = [
   { key: "visitors", label: "Visitors", kind: "visitors", fmt: "int", value: (d) => d.visitors },
   { key: "votes", label: "Votes", kind: "votes", fmt: "int", value: (d) => d.votes },
@@ -25,7 +24,6 @@ export async function TrendsTab({ days, view, metric }: TabProps & { metric?: st
   const scope = await brainScope(view, Math.max(days, 14));
   const [rawDaily, ba, ue] = await Promise.all([dailyNumbers(scope), beforeAfterStats(view), ueBasics()]);
   const daily: Day[] = rawDaily.map((d) => ({ day: d.day, visitors: Number(d.visitors), visits: Number(d.visits), signups: Number(d.signups), votes: Number(d.votes), voters: Number(d.voters), posts: Number(d.posts) }));
-  const s = { daily: daily.slice(0, days === 1 ? 2 : days + 1) };
   const be = (d: Day) => (d.visitors ? unitEconomics({ ...d, costPerVisitor: ue.costPerVisitor }, ue.assumptions).breakEven : null);
   const oldestFirst = [...daily].reverse();
   const metrics: TrendMetric[] = METRICS.map((m) => ({
@@ -38,43 +36,13 @@ export async function TrendsTab({ days, view, metric }: TabProps & { metric?: st
   return (
     <>
       <Section
-        title="Day by day"
+        title="Day by day chart"
         note="New York days, last 14 at least (whatever window is picked). Pick a number to chart. Hover a dot (tap on a phone) for that day's numbers; click it for the list. The dashed line is the 7-day average, so one odd day doesn't hide the trend."
       >
         <TrendChart metrics={metrics} initial={metric ?? "vpv"} />
-        <ShowMore label="Show table">
-          <p className="text-xs text-zinc-500">
-            Tap any number to see who or what is behind it. The small number is the change from the day before. Visitors and Voters are people, so someone
-            active on two days counts on both. Votes per voter = votes ÷ people who voted that day; votes per visitor = votes ÷ everyone who visited.
-            Break-even per visitor = that day&apos;s visitors, visits, votes and sign-ups run through Unit economics (same prices and serving cost).
-          </p>
-        <Rows
-          head={["Day", "Visitors (people)", "Visits", "Sign-ups", "Votes", "Voters (people)", "Votes per voter", "Votes per visitor", "Battles posted", "Break-even per visitor"]}
-          rows={s.daily.map((d, i) => {
-            const prev = s.daily[i + 1];
-            const cell = (kind: BrainListKind, now: number, before: number | undefined) =>
-              now > 0 ? (
-                <Link key={kind + now} href={listHref(kind, d.day)} className="underline decoration-ink/20 underline-offset-2 hover:decoration-accent">
-                  <Delta now={now} prev={before} />
-                </Link>
-              ) : (
-                <Delta key={kind} now={now} prev={before} />
-              );
-            return [
-              d.day,
-              cell("visitors", d.visitors, prev?.visitors),
-              cell("visitors", d.visits, prev?.visits),
-              cell("signups", d.signups, prev?.signups),
-              cell("votes", d.votes, prev?.votes),
-              cell("voters", d.voters, prev?.voters),
-              <Ratio key="vpv" now={ratio(d.votes, d.voters)} prev={prev && ratio(prev.votes, prev.voters)} />,
-              <Ratio key="vpvis" now={ratio(d.votes, d.visitors)} prev={prev && ratio(prev.votes, prev.visitors)} />,
-              cell("battles", d.posts, prev?.posts),
-              dayBreakEven(ue, d),
-            ];
-          })}
-        />
-        </ShowMore>
+        <p className="text-xs text-zinc-500">
+          The day-by-day table is on the Brain&apos;s opening view, right under the headline tiles.
+        </p>
       </Section>
 
       <Section
