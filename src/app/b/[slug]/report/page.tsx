@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/server/viewer";
-import { getBattleRow } from "@/server/services/battles";
+import { getBattleRow, pickbotThreadFor } from "@/server/services/battles";
 import { db } from "@/server/db";
 import { options, outcomes } from "@/server/db/schema";
 import { getEconomy } from "@/server/services/config";
@@ -16,7 +16,9 @@ export default async function ReportPage({ params, searchParams }: { params: Pro
   if (!user) redirect(`/signin?callbackUrl=${encodeURIComponent(`/b/${slug}/report${c ? `?c=${c}` : ""}`)}`);
   const b = await getBattleRow(slug);
   if (!b) notFound();
-  if (b.authorId !== user.id) redirect(`/b/${slug}`);
+  // The poster, or the person who asked this Pickbot crowd question (posted as "Asked via Pickbot").
+  const asker = b.authorId !== user.id && (b.tags as { pickbot?: unknown } | null)?.pickbot ? !!(await pickbotThreadFor(b.id, user.id)) : false;
+  if (b.authorId !== user.id && !asker) redirect(`/b/${slug}`);
   const [opts, [existing], economy] = await Promise.all([
     db.select().from(options).where(eq(options.battleId, b.id)),
     db.select().from(outcomes).where(eq(outcomes.battleId, b.id)),
