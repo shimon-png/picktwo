@@ -1,12 +1,42 @@
 import { ARM_LABELS } from "@/server/services/gate-test-rules";
 import { Rows, gateRow, nyTime, pct, pctN, perVisitor, verdict, barVerdict, type TabProps } from "../ui";
 import { TestCard, loadTests } from "../tests";
+import { TOPICS_ARM_LABELS } from "@/server/services/topics-test-rules";
+import Link from "next/link";
 
 /** Every test on the same card, live ones first; the old per-test tables sit behind "Show details". */
 export async function ExperimentsTab({ days, view }: TabProps) {
-  const { gt, ab, pb, pk, wb, summaries } = await loadTests(view, days);
+  const { gt, ab, pb, pk, wb, tp, summaries } = await loadTests(view, days);
   const order = [...summaries].sort((a, b) => Number(b.live) - Number(a.live));
+  const pv = (p: number | null) => (p == null ? "no p yet" : p < 0.05 ? `real difference (p = ${p.toFixed(3)})` : `could be chance (p = ${p.toFixed(2)})`);
   const details: Record<string, React.ReactNode> = {
+    topics: (
+      <>
+        <p className="text-xs text-zinc-500">
+          New signed-out browsers (no votes yet) are split at random: {TOPICS_ARM_LABELS.control} vs {TOPICS_ARM_LABELS.topics} (chip row, &quot;stay on Mix?&quot; card, topic sign-up nudge). Came back = active on 2+ days in their first week.
+          {tp.startedAt ? ` Started ${nyTime(tp.startedAt)}.` : " Not started yet."}{" "}
+          <Link href="/admin/topics" className="underline">Full dashboard</Link>
+        </p>
+        <Rows
+          head={["Metric", TOPICS_ARM_LABELS.control, TOPICS_ARM_LABELS.topics, "p"]}
+          rows={[
+            ["Visitors", tp.total.control.visitors, tp.total.topics.visitors, ""],
+            ["Votes per visitor", tp.total.control.avgVotes.toFixed(2), tp.total.topics.avgVotes.toFixed(2), pv(tp.votesP)],
+            ["Voted at all", pctN(tp.total.control.voteRate), pctN(tp.total.topics.voteRate), pv(tp.voteRateP)],
+            ["Sign-up rate", pctN(tp.total.control.signupRate), pctN(tp.total.topics.signupRate), pv(tp.signupP)],
+            ["Came back", pctN(tp.total.control.returnRate), pctN(tp.total.topics.returnRate), pv(tp.returnP)],
+          ]}
+        />
+        <Rows
+          head={["Day", `${TOPICS_ARM_LABELS.control}: visitors · votes/visitor · sign-up`, `${TOPICS_ARM_LABELS.topics}: visitors · votes/visitor · sign-up`]}
+          rows={tp.daily.map((d) => [
+            d.day,
+            `${d.control.visitors} · ${d.control.avgVotes.toFixed(1)} · ${pctN(d.control.signupRate)}`,
+            `${d.topics.visitors} · ${d.topics.avgVotes.toFixed(1)} · ${pctN(d.topics.signupRate)}`,
+          ])}
+        />
+      </>
+    ),
     gate: (
       <>
         <p className="text-xs text-zinc-500">{`Every new signed-out browser is put in a group at random and stays there. A (control): after ${gt.limit} free votes, a sign-up wall they can't skip. B: a sign-up dialog they can close and keep voting; it shows again every ${gt.every} votes. ${gt.pct}% go to B (gateTestPct in Config; 0 stops the test, everyone gets A). Rows are by the day the browser was first seen (New York). Votes count everything that browser did since, as a guest and in the account it signed up to. Reached the gate = saw the wall or dialog at least once.`}</p>
