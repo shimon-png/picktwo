@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TABS: { href: string; label: string; badge?: "flagged" | "unread" }[] = [
   { href: "/admin/brain", label: "Brain" },
+  { href: "/admin/topics", label: "Topics test" },
   { href: "/admin/journey", label: "Journey" },
   { href: "/admin/comments", label: "Comments" },
   { href: "/admin/finance", label: "Finance" },

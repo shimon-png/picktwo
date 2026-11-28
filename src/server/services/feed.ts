@@ -12,10 +12,22 @@ import { matchesTarget } from "./targeting";
 import { isHumanBattle } from "@/lib/auto-seed";
 import { activeMindTopic } from "./mind";
 import { mindFactor } from "@/lib/mind";
+import { MIX, countTopics, topicOf, type DeckTopic, type TopicId } from "@/lib/topics";
 
-export type FeedItem = BattleCard & { score: number; arm?: "engine" | "holdout"; featured?: boolean; opener?: boolean; pickRate?: number; debug?: Record<string, number> };
+export type FeedItem = BattleCard & { score: number; topic?: TopicId; arm?: "engine" | "holdout"; featured?: boolean; opener?: boolean; pickRate?: number; debug?: Record<string, number> };
 
-export async function getFeed(viewer: { user: User | null; deviceId: string | null }, opts: { limit?: number; debug?: boolean } = {}) {
+export async function getFeed(viewer: { user: User | null; deviceId: string | null }, opts: { limit?: number; debug?: boolean; topic?: DeckTopic } = {}) {
+  return (await getDeck(viewer, opts)).items;
+}
+
+/**
+ * The ranked deck, optionally narrowed to one topic (lib/topics.ts, the topics A/B test), plus how many battles are
+ * left for this viewer in each topic (before the topic filter).
+ */
+export async function getDeck(
+  viewer: { user: User | null; deviceId: string | null },
+  opts: { limit?: number; debug?: boolean; topic?: DeckTopic } = {},
+): Promise<{ items: FeedItem[]; counts: Record<TopicId, number> }> {
   const limit = opts.limit ?? 20;
   const economy = await getEconomy();
   const now = new Date();
@@ -68,6 +80,8 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
         gt(battles.createdAt, new Date(now.getTime() - 7 * 86400_000)),
         visibilityCond,
         user ? sql`${battles.authorId} <> ${user.id}` : sql`true`,
+        // Your own Pickbot crowd questions (posted as @askedviapickbot) aren't yours to vote on.
+        user ? sql`NOT EXISTS (SELECT 1 FROM pickbot_thread pt WHERE pt.battle_id = ${battles.id} AND pt.user_id = ${user.id})` : sql`true`,
         blocked.length ? notInArray(battles.authorId, blocked) : sql`true`,
         sql`${users.bannedAt} IS NULL`,
         // "People like you are asking" preset battles (lib/asking.ts) only show through their card.
@@ -82,7 +96,12 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     )
     .limit(500);
   // "Target a specific group": only viewers whose profile matches see a targeted battle in the deck.
-  const rows = allRows.filter((r) => matchesTarget(r.b.tags?.target, user));
+  const targeted = allRows.filter((r) => matchesTarget(r.b.tags?.target, user));
+  // Topics (lib/topics.ts): every battle has one; a chosen topic narrows the deck, the counts cover them all.
+  const topicById = new Map(targeted.map((r) => [r.b.id, topicOf({ title: r.b.title, context: r.b.context, tags: r.b.tags })]));
+  const counts = countTopics([...topicById.values()]);
+  const topic = opts.topic ?? MIX;
+  const rows = topic === MIX ? targeted : targeted.filter((r) => topicById.get(r.b.id) === topic);
 
   // Viewer profile
   const profile: ViewerProfile = { categoryShare: {}, kidAges: user?.kidAges ?? [], country: user?.country ?? null };
@@ -164,15 +183,17 @@ export async function getFeed(viewer: { user: User | null; deviceId: string | nu
     }
   }
   const cards = await hydrateCards(picked.map((p) => p.row));
-  return cards.map((c, i) => ({
+  const items = cards.map((c, i) => ({
     ...c,
     arm,
+    topic: topicById.get(picked[i].row.b.id),
     score: picked[i].score,
     ...(picked[i].row.b.tags?.featured ? { featured: true } : {}),
     ...(openerId === picked[i].row.b.id ? { opener: true } : {}),
     ...(wantRates ? { pickRate: Math.round(pickRate(decisions.get(picked[i].row.b.id)?.votes ?? 0, decisions.get(picked[i].row.b.id)?.skips ?? 0, avgPick) * 1000) / 1000 } : {}),
     ...(opts.debug ? { debug: { priorityFactor: picked[i].pf, openLoops: picked[i].openLoops } } : {}),
   })) as FeedItem[];
+  return { items, counts };
 }
 
 /** Has this person (account, else device and an account it was linked to) voted on or skipped anything yet? */

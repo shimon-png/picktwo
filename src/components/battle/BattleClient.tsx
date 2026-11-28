@@ -17,6 +17,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { OptionFace } from "./OptionFace";
 import { CopyLink, ShareGrid, ShareIconButton } from "./ShareButtons";
 import { ReportButton } from "./ReportButton";
+import { PickbotMark } from "@/components/pickbot/PickbotMark";
 
 type VoteRes = { results: { a: number; b: number; total: number }; points: number; ppBalance: number | null; gatePrompt?: boolean };
 type V = NonNullable<BattleView>;
@@ -49,7 +50,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
   }, [v.isOpen, v.results, refresh]);
 
   async function vote(side: "A" | "B") {
-    if (busy || !v.isOpen || v.isOwner) return;
+    if (busy || !v.isOpen || v.isOwner || v.askerThreadId) return;
     if (v.myVote?.side === side) return;
     setBusy(true);
     const prev = v;
@@ -129,6 +130,29 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
         </div>
       )}
 
+      {v.askerThreadId && (
+        <>
+          <div className="-mx-2 flex h-11 items-center gap-1">
+            <Link href="/you" className="rounded-lg p-2 hover:bg-surface" aria-label="Back">
+              <ArrowLeft className="size-5" />
+            </Link>
+            <span className="flex-1 text-[15px]">Your Pickbot question</span>
+            <ShareIconButton url={shareUrl} title={v.title} />
+          </div>
+          <Link
+            href={`/ask/${v.askerThreadId}`}
+            className="flex items-center gap-3 rounded-[16px] bg-violet-soft px-3.5 py-3 text-[13px] text-ink"
+            data-testid="pickbot-asker-banner"
+          >
+            <PickbotMark className="size-7" />
+            <span className="min-w-0 flex-1">
+              You asked this with Pickbot. Everyone else sees it as “Asked via Pickbot”, never your name.
+              <span className="mt-0.5 block font-medium text-violet">Open your Pickbot chat →</span>
+            </span>
+          </Link>
+        </>
+      )}
+
       {v.outcome && <OutcomeBanner v={v} leader={leader} />}
 
       <header className="space-y-2">
@@ -189,7 +213,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
         <div className={cn("grid grid-cols-2 gap-2", res ? "h-[140px]" : "h-[200px]")}>
           {(["A", "B"] as const).map((s) => {
             const o = s === "A" ? A : B;
-            const canVote = v.isOpen && !v.isOwner;
+            const canVote = v.isOpen && !v.isOwner && !v.askerThreadId;
             const face = (
               <OptionFace
                 side={s}
@@ -197,7 +221,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
                 description={o.description}
                 image={o.imageUrl || o.urlImage}
                 percent={res ? (s === "A" ? res.a : res.b) : null}
-                ring={v.isOwner || !v.isOpen ? leader === s : v.myVote?.side === s}
+                ring={v.isOwner || v.askerThreadId || !v.isOpen ? leader === s : v.myVote?.side === s}
               />
             );
             return canVote ? (
@@ -246,7 +270,7 @@ export function BattleClient({ initial, signedIn, shareUrl, source = "link" }: {
               {v.relevantVotes && v.relevantVotes.count > 0 && ` · ${v.relevantVotes.count} from parents of ${v.relevantVotes.ageLabel} year olds`}
               {v.myVote && v.isOpen && " · tap the other option to change your vote"}
             </>
-          ) : v.isOpen && !v.isOwner ? (
+          ) : v.isOpen && !v.isOwner && !v.askerThreadId ? (
             "Tap to vote — results appear after you pick"
           ) : !v.isOpen && !v.isOwner ? (
             "Voting has closed. Results are only shown to people who voted."

@@ -370,13 +370,20 @@ function Split({ label, a, b, va, vb, lime }: { label: string; a: string; b: str
         <span>{label}</span>
         <span className="tabular-nums">{va + vb} votes</span>
       </div>
-      <div className="flex h-7 overflow-hidden rounded-full text-[12px] font-medium">
-        <span className={cn("flex items-center px-2.5 text-white", lime ? "bg-green" : "bg-a")} style={{ width: `${Math.max(pa, 14)}%` }}>
-          {pa}% {a}
+      {/* Labels sit above the bar, never inside it: long answers wrap here instead of spilling off a thin segment. */}
+      <div className="grid grid-cols-2 gap-3 text-[13px] leading-snug">
+        <span className="min-w-0 break-words">
+          <b className={cn("mr-1 font-display text-[20px] leading-none tabular-nums", lime ? "text-green" : "text-a")}>{pa}%</b>
+          <span className="text-ink">{a}</span>
         </span>
-        <span className="flex flex-1 items-center justify-end bg-b px-2.5 text-white">
-          {100 - pa}% {b}
+        <span className="min-w-0 break-words text-right">
+          <b className="mr-1 font-display text-[20px] leading-none tabular-nums text-b">{100 - pa}%</b>
+          <span className="text-ink">{b}</span>
         </span>
+      </div>
+      <div className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-ink/10">
+        {pa > 0 && <span className={cn("block h-full rounded-full transition-[width] duration-700", lime ? "bg-green" : "bg-a")} style={{ width: `${pa}%` }} />}
+        {pa < 100 && <span className="block h-full flex-1 rounded-full bg-b" />}
       </div>
     </div>
   );

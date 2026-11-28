@@ -11,6 +11,7 @@ import { Bar } from "@/components/ui/Bar";
 import { OptionEditor, type OptionDraft } from "./OptionEditor";
 import { cleanTarget, type BattleTarget } from "@/server/services/targeting";
 import { useZipTargets } from "@/lib/use-zip";
+import { TOPICS, isTopic, type TopicId } from "@/lib/topics";
 
 type Visibility = "PUBLIC" | "LINK_ONLY" | "FRIENDS";
 const DRAFT_KEY = "pt:draft";
@@ -41,6 +42,8 @@ export function ComposeForm({
   const [context, setContext] = useState("");
   const [postAs, setPostAs] = useState("");
   const [target, setTarget] = useState<BattleTarget>({});
+  // The poster's own topic for the Vote deck topics (lib/topics.ts); optional, else we work it out from the words.
+  const [topic, setTopic] = useState<TopicId | null>(null);
   const [targetOpen, setTargetOpen] = useState(false);
   const [zipText, setZipText] = useState("");
   const [deadline, setDeadline] = useState<number>(24);
@@ -63,6 +66,7 @@ export function ComposeForm({
           setTitleEdited(true);
         }
         if (d.target) setTarget(d.target);
+        if (isTopic(d.topic)) setTopic(d.topic);
         if (d.zipText) setZipText(d.zipText);
         // Drafts saved before the 5-day max could hold 168 (7 days): fall back to the longest preset still offered.
         if (d.deadline) setDeadline(DEADLINE_PRESETS.some((p) => p.hours === d.deadline) ? d.deadline : DEADLINE_PRESETS[DEADLINE_PRESETS.length - 1].hours);
@@ -74,9 +78,9 @@ export function ComposeForm({
   useEffect(() => {
     if (!loaded) return;
     try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ a, b, context, title, titleEdited, target, zipText, deadline, visibility }));
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ a, b, context, title, titleEdited, target, topic, zipText, deadline, visibility }));
     } catch {}
-  }, [loaded, a, b, context, title, titleEdited, target, zipText, deadline, visibility]);
+  }, [loaded, a, b, context, title, titleEdited, target, topic, zipText, deadline, visibility]);
 
   const zips = zipText
     .split(/[,\s]+/)
@@ -105,7 +109,7 @@ export function ComposeForm({
           title: question.trim(),
           context: context.trim(),
           ...(isAdmin && postAs.trim() ? { postAs: postAs.trim() } : {}),
-          tags: cleanedTarget ? { target: cleanedTarget } : {},
+          tags: { ...(cleanedTarget ? { target: cleanedTarget } : {}), ...(topic ? { topic } : {}) },
           visibility,
           deadlineHours: deadline,
           options: [clean(a), clean(b)],
@@ -214,6 +218,26 @@ export function ComposeForm({
                     setTitleEdited(true);
                   }}
                 />
+              </div>
+              <div>
+                <span className="label">Topic (optional)</span>
+                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Topic">
+                  {TOPICS.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      aria-pressed={topic === t.id}
+                      onClick={() => setTopic(topic === t.id ? null : t.id)}
+                      className={cn(
+                        "rounded-full px-3 py-1.5 text-[13px] font-bold text-[#15112b] transition",
+                        `qtile-${t.tone}`,
+                        topic === t.id ? "ring-2 ring-ink ring-offset-1" : "opacity-60 hover:opacity-100",
+                      )}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="rounded-lg shadow-ring">
                 <button

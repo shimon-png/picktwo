@@ -41,7 +41,9 @@ const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
  * Variant "map" ("See my personality map", lib/mind.ts): any missing sex / age shows open and must be tapped.
  * Ends with a full page load of `next` so the guest's votes and answers move onto the new account.
  */
-export function OneTapSignup({ next, soft = false, variant }: { next: string; soft?: boolean; variant?: "map" }) {
+export type SignupHeadline = { badge?: string; title: string; sub?: string };
+
+export function OneTapSignup({ next, soft = false, variant, headline }: { next: string; soft?: boolean; variant?: "map"; headline?: SignupHeadline }) {
   const [pre, setPre] = useState<Prefill | null>(null);
   const [step, setStep] = useState<"confirm" | "code">("confirm");
   const [handle, setHandle] = useState("");
@@ -148,11 +150,11 @@ export function OneTapSignup({ next, soft = false, variant }: { next: string; so
     <div className="space-y-3">
       <div className="space-y-1">
         <span className="inline-block rounded-full bg-green-soft px-2 py-1 font-display text-[10px] font-semibold uppercase tracking-[.1em] text-green">
-          Save your {pre.votes > 0 ? `${pre.votes} ` : ""}picks
+          {headline?.badge ?? <>Save your {pre.votes > 0 ? `${pre.votes} ` : ""}picks</>}
         </span>
-        <h2 className="text-[22px] leading-tight">{map ? "Your personality map is ready." : "You’re all set. Just confirm."}</h2>
+        <h2 className="text-[22px] leading-tight">{headline?.title ?? (map ? "Your personality map is ready." : "You’re all set. Just confirm.")}</h2>
         <p className="text-sm text-zinc-600">
-          {map
+          {headline?.sub ? headline.sub : map
             ? askAbout
               ? "We filled in what we know. Tap what’s missing and confirm."
               : "We filled in what we know. Just confirm."

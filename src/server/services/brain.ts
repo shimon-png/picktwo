@@ -192,6 +192,13 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
     FROM battle b LEFT JOIN "option" o ON o.battle_id = b.id
     WHERE b.engagement_voters >= 3 AND b.status <> 'DELETED'
     GROUP BY b.id ORDER BY b.engagement_score DESC LIMIT 15`);
+  // Lowest scores (Brain Deck tab, Nov 28): battles people don't come back after; candidates to retire.
+  const bottomEngaging = await db.execute<{ slug: string; title: string; score: number; voters: number; seed: boolean; kind: string }>(sql`
+    SELECT b.slug, b.title, b.engagement_score AS score, b.engagement_voters AS voters, b.id LIKE 'seed_%' AS seed,
+      CASE WHEN count(o.image_url) = 2 THEN 'photo' WHEN count(o.image_url) = 0 THEN 'text' ELSE 'mixed' END AS kind
+    FROM battle b LEFT JOIN "option" o ON o.battle_id = b.id
+    WHERE b.engagement_voters >= 3 AND b.status <> 'DELETED'
+    GROUP BY b.id ORDER BY b.engagement_score ASC LIMIT 10`);
 
   // Splits on real votes only (≥ 10 real votes): closest to 50/50 and most one-sided.
   const splits = (dir: "ASC" | "DESC") =>
@@ -229,10 +236,10 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
 
   const [daily, visitSources] = await Promise.all([dailyNumbers(scope), visitsBySource(scope)]);
 
-  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byStakes, untagged, tagging, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, closest, lopsided };
+  return { view: scope.view, cleanFrom: scope.cleanFrom, daily, visitSources, byStakes, untagged, tagging, days, tiles, byKind, votePlaces, depth, methods, sources, retention, topEngaging, bottomEngaging, closest, lopsided };
 }
 
-type Scope = Awaited<ReturnType<typeof brainScope>>;
+export type Scope = Awaited<ReturnType<typeof brainScope>>;
 
 export type DayRow = { day: string; visitors: number; visits: number; signups: number; votes: number; voters: number; posts: number };
 
@@ -276,7 +283,7 @@ export type VisitSourceRow = { source: Source; label: string; visits: number; vi
  * Where visits came from, using each visit's own tags (an ad click, utm_source, or the referring site); the same
  * classifier as "Sign-ups by source". `today` / `yesterday` count visitors on those New York days.
  */
-async function visitsBySource(scope: Scope): Promise<VisitSourceRow[]> {
+export async function visitsBySource(scope: Scope): Promise<VisitSourceRow[]> {
   const { since, ev } = scope;
   const rows = await db.execute<{ props: Record<string, unknown>; who: string | null; day: string; today: string; yesterday: string }>(sql`
     SELECT e.props, ${WHO_E} AS who,

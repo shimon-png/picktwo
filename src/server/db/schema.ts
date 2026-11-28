@@ -50,6 +50,8 @@ export type BattleTags = {
   recipient?: string;
   budget?: string;
   occasion?: string;
+  /** The poster's own topic pick in the composer (lib/topics.ts); wins over the AI theme for the deck topics. */
+  topic?: string;
   target?: BattleTarget;
   brain?: BrainTags;
   /** Pinned first: the homepage hero and the top of everyone's Vote deck while it's open (set by a migration). */
