@@ -10,7 +10,7 @@ import { profileProgressFor } from "@/server/services/profile-progress";
 import { redirect } from "next/navigation";
 import { onboardingUrl, profileIncomplete } from "@/lib/profile";
 import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
-import { Bell, ChevronRight, MessageCircle, Users, Flag, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
+import { Bell, Check, ChevronRight, MessageCircle, Users, Flag, GraduationCap, LifeBuoy, Mail, Lightbulb, MessageSquareText, RefreshCcw, Settings, ThumbsUp, User, Zap } from "lucide-react";
 import { getCurrentUser, isAdmin } from "@/server/viewer";
 import { unreadContactCount } from "@/server/services/contact";
 import { openReportCount } from "@/server/services/reports";
@@ -99,7 +99,7 @@ export default async function YouPage() {
     })().catch(() => null),
   ]);
   const reasonCounts = new Map(reasonRows.map((r) => [r.id, r.n]));
-  // Pickbot crowd questions are posted under @askedviapickbot: theirs to see here, closed from the Pickbot chat.
+  // Pickbot crowd questions are posted under @askedviapickbot: theirs to see here and close the loop on like their own.
   const askedThreads = new Map(
     (
       await db
@@ -112,10 +112,13 @@ export default async function YouPage() {
   const next = nextTier(user.correctPicks, e);
   const blocked = !canPostBattle(unreported, e.maxUnreportedBattles);
   const t = pointsTier(user.ppBalance, e.tierHighAt, e.tierTopAt);
-  const awaiting = mine.filter((b) => b.status !== "OPEN" && !b.outcome && !askedThreads.has(b.id));
+  const awaiting = mine.filter((b) => b.status !== "OPEN" && !b.outcome);
   // Two groups, newest first: Active (still voting, by when posted) and Closed (by when voting ended).
   const live = mine.filter((b) => b.status === "OPEN");
-  const closed = mine.filter((b) => b.status !== "OPEN").sort((x, y) => y.deadline.localeCompare(x.deadline));
+  // Closed: still waiting for your pick first (inbox-style, Alex Nov 28), then by when voting ended.
+  const closed = mine
+    .filter((b) => b.status !== "OPEN")
+    .sort((x, y) => Number(!!x.outcome) - Number(!!y.outcome) || y.deadline.localeCompare(x.deadline));
   const earn: [Tone, React.ComponentType<{ className?: string }>, string, number][] = [
     ["pink", ThumbsUp, "Vote on a battle", e.votePoints],
     ["teal", MessageSquareText, "Add a reason", e.voteReasonBonus],
@@ -356,27 +359,32 @@ function BattleRow({
   const votes = b.votesA + b.votesB;
   const picked = b.outcome ? (b.outcome.chosen === "A" ? b.labelA : b.outcome.chosen === "B" ? b.labelB : "neither") : null;
   const status = picked
-    ? `Closed · picked ${picked}`
+    ? `Loop closed · picked ${picked}`
     : awaiting
-      ? "Voting closed · tell people what you picked"
-      : pickbotThread && b.status !== "OPEN"
-        ? `Voting closed · ${votes} vote${votes === 1 ? "" : "s"} · tell Pickbot what you picked`
-        : `Live · ${votes} vote${votes === 1 ? "" : "s"} · ${reasons} reason${reasons === 1 ? "" : "s"} · ${timeLeft(b.deadline)}`;
+      ? "Waiting for your pick · close the loop"
+      : `Live · ${votes} vote${votes === 1 ? "" : "s"} · ${reasons} reason${reasons === 1 ? "" : "s"} · ${timeLeft(b.deadline)}`;
   return (
     <div className="flex items-center gap-2">
-      <Link href={awaiting ? `/b/${b.slug}/report` : pickbotThread && b.status !== "OPEN" && !b.outcome ? `/ask/${pickbotThread}` : `/b/${b.slug}`} className="flex min-w-0 flex-1 items-center gap-3 py-3">
+      <Link href={awaiting ? `/b/${b.slug}/report` : `/b/${b.slug}`} className="flex min-w-0 flex-1 items-center gap-3 py-3">
         <span className="flex gap-1">
           <Thumb img={b.imageA} label={b.labelA} side="A" />
           <Thumb img={b.imageB} label={b.labelB} side="B" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm">{b.title}</span>
+          {/* Inbox-style cue (Alex, Nov 28): waiting for your pick = bold + pink dot; reported = plain with a check. */}
+          <span className={cn("flex items-center gap-1.5 text-sm", awaiting && "font-semibold")}>
+            {awaiting && <span className="size-2 shrink-0 rounded-full bg-pink" aria-label="Waiting for your pick" />}
+            <span className="truncate">{b.title}</span>
+          </span>
           {pickbotThread && (
             <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-violet-soft px-2 py-0.5 text-[11px] text-violet" title="Others see it as “Asked via Pickbot”">
               <PickbotMark className="size-3" /> Asked via Pickbot · anonymous to others
             </span>
           )}
-          <span className="block truncate text-xs text-zinc-500">{status}</span>
+          <span className={cn("flex items-center gap-1 truncate text-xs", awaiting ? "font-medium text-pink" : "text-zinc-500")}>
+            {picked && <Check className="size-3.5 shrink-0 text-ok" aria-hidden />}
+            <span className="truncate">{status}</span>
+          </span>
           {votes > 0 && (
             <span className="mt-0.5 block text-xs text-zinc-500">
               <Scores compact everyone={pct(b.votesA, b.votesB)} experts={b.expert} labelA={b.labelA} labelB={b.labelB} />

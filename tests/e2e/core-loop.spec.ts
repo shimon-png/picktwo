@@ -180,7 +180,7 @@ test("post → vote (anon + signed in) → close the loop → called it", async 
   await poster.getByRole("button", { name: /Share the outcome/ }).click();
   await expect(poster.getByText(/Loop closed — thank you/)).toBeVisible();
   await poster.waitForURL(/\/you$/);
-  await expect(poster.getByText(/Closed · picked Lego Art Set/)).toBeVisible();
+  await expect(poster.getByText(/Loop closed · picked Lego Art Set/)).toBeVisible();
   // Ledger shows the reward
   await expect(poster.getByText(/^Closed the loop/)).toBeVisible();
   await expect(poster.getByText("Closed within 48h")).toBeVisible();
