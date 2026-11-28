@@ -36,6 +36,22 @@ async function costPerVisitor(): Promise<{ perVisitor: number | null; spend: num
   }
 }
 
+/** Just the prices and the serving cost (no per-person scan): for the Brain's top screen break-even per day. */
+export async function ueBasics(): Promise<{ assumptions: UeAssumptions; costPerVisitor: number | null }> {
+  const [e, cost] = await Promise.all([getEconomy(), costPerVisitor()]);
+  return {
+    assumptions: {
+      ueAdCpm: e.ueAdCpm,
+      ueVotesPerAd: e.ueVotesPerAd,
+      ueSponsoredSharePct: e.ueSponsoredSharePct,
+      ueSponsoredCpm: e.ueSponsoredCpm,
+      ueSignupValue: e.ueSignupValue,
+      ueLifetimeVisits: e.ueLifetimeVisits,
+    },
+    costPerVisitor: cost.perVisitor,
+  };
+}
+
 type Person = { who: string; visits: number; days: number; first: Record<string, unknown> | null; votes: number; signed: boolean };
 
 /** All data from economy `ueFrom` (a New York day, YYYYMMDD; default 2026-11-23, the start of real tracking) to now. */
