@@ -122,15 +122,17 @@ export async function getBrainStats(days = 7, view: BrainView = "clean") {
       FROM ${EV_FROM}
       WHERE e.name = 'card_shown' AND e.created_at > ${since} AND ${notBot}
       GROUP BY 1, 2, 3
+    ),
+    -- The window's deck votes, one per person × battle, hash-joined to the cards (Nov 27 speed-up: a per-card
+    -- lookup on COALESCE(...) = who can't use an index and ran once per card).
+    vv AS (
+      SELECT DISTINCT ON (v.battle_id, ${WHO_V}) v.battle_id, ${WHO_V} AS who, v.id, v.dwell_ms FROM ${V_FROM}
+      WHERE v.source = 'feed' AND v.created_at > ${since} AND NOT v.flagged AND ${voteOK}
     )
     SELECT c.kind, sum(c.shown)::int AS views, count(*)::int AS seen, count(v.id)::int AS voted,
       percentile_cont(0.5) WITHIN GROUP (ORDER BY v.dwell_ms)::float AS median_ms
     FROM c
-    LEFT JOIN LATERAL (
-      SELECT v.id, v.dwell_ms FROM ${V_FROM}
-      WHERE v.battle_id = c.battle_id AND v.source = 'feed' AND v.created_at > ${since} AND NOT v.flagged AND ${voteOK} AND ${WHO_V} = c.who
-      LIMIT 1
-    ) v ON true
+    LEFT JOIN vv v ON v.battle_id = c.battle_id AND v.who = c.who
     GROUP BY 1 ORDER BY 2 DESC`);
 
   // Every counted vote by where it was made × text/photo battle. Adds up exactly to the votes tile.

@@ -47,12 +47,19 @@ export async function signupSources(days = 30, view: BrainView = "clean") {
         AND b.created_at < u.onboarded_at + make_interval(days => ${windowDays})) AS posted,
       EXISTS (SELECT 1 FROM vote v WHERE v.user_id = u.id AND NOT v.flagged AND v.created_at > now() - interval '7 days') AS active7
     FROM "user" u
+    -- First visit: the earliest session_start on the account or any browser linked to it. Two index lookups
+    -- (user, then each linked device) instead of one OR, which made Postgres walk every session_start in time
+    -- order for each sign-up (Nov 27 speed-up).
     LEFT JOIN LATERAL (
-      SELECT e.props FROM analytics_event e
-      WHERE e.name = 'session_start'
-        AND COALESCE((e.props->>'bot')::boolean, false) = false
-        AND (e.user_id = u.id OR e.device_id IN (SELECT d.id FROM device d WHERE d.user_id = u.id))
-      ORDER BY e.created_at ASC LIMIT 1
+      SELECT x.props FROM (
+        (SELECT e.props, e.created_at FROM analytics_event e
+          WHERE e.user_id = u.id AND e.name = 'session_start' AND COALESCE((e.props->>'bot')::boolean, false) = false
+          ORDER BY e.created_at ASC LIMIT 1)
+        UNION ALL
+        (SELECT e.props, e.created_at FROM device d JOIN analytics_event e ON e.device_id = d.id
+          WHERE d.user_id = u.id AND e.name = 'session_start' AND COALESCE((e.props->>'bot')::boolean, false) = false
+          ORDER BY e.created_at ASC LIMIT 1)
+      ) x ORDER BY x.created_at ASC LIMIT 1
     ) ft ON true
     WHERE u.onboarded_at > ${since} AND ${us}`);
 

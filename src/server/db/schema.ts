@@ -168,7 +168,11 @@ export const devices = pgTable("device", {
   model: text("model"),
   tier: text("tier"),
   seenAt: ts("seen_at"),
-});
+},
+  // "Which browsers belong to this account" is asked on nearly every admin number (one person = account + its
+  // browsers) and in linkDevice; without this index each ask scanned the whole table (Nov 27).
+  (t) => [index("device_user").on(t.userId)],
+);
 
 /**
  * About-you cards (services/about.ts): one row per card shown to a person (account or guest browser) and what
